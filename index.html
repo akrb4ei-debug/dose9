@@ -1,0 +1,1885 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Operation Dashboard</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;800&display=swap" rel="stylesheet">
+
+  <style>
+    :root{
+      /* Premium Palette */
+      --bg0:#05060B;
+      --bg1:#070A14;
+      --bg2:#0B1230;
+      --bg3:#0F1A3A;
+      --ink: rgba(255,255,255,0.92);
+      --muted: rgba(255,255,255,0.68);
+
+      --glass: rgba(255,255,255,0.085);
+      --glass2: rgba(255,255,255,0.065);
+      --stroke: rgba(255,255,255,0.16);
+      --stroke2: rgba(255,255,255,0.12);
+
+      --gold:#E7D3A3; /* champagne */
+      --gold2:#C9A86A; /* deeper gold */
+      --aqua:#2EE8D1; /* premium aqua */
+      --blue:#4F87FF; /* royal blue */
+      --purple:#9B6BFF; /* premium purple */
+      --good:#2EE8D1;
+      --bad:#FF5B7A;
+
+      --shadow: 0 18px 70px rgba(0,0,0,0.58);
+      --shadow2: 0 14px 44px rgba(0,0,0,0.42);
+    }
+
+    *{ box-sizing:border-box; font-family:'Pretendard',system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; }
+    body{
+      margin:0; min-height:100vh; color:var(--ink);
+      background:
+        radial-gradient(1100px 700px at 12% 12%, rgba(79,135,255,0.20), transparent 55%),
+        radial-gradient(900px 540px at 88% 18%, rgba(155,107,255,0.18), transparent 58%),
+        radial-gradient(900px 700px at 48% 98%, rgba(46,232,209,0.14), transparent 58%),
+        radial-gradient(700px 500px at 76% 82%, rgba(231,211,163,0.10), transparent 60%),
+        linear-gradient(160deg, var(--bg0), var(--bg2), var(--bg3), var(--bg1));
+      background-size: 420% 420%;
+      animation: bgMove 16s ease infinite;
+    }
+    @keyframes bgMove{
+      0%{background-position:0% 50%;}
+      50%{background-position:100% 50%;}
+      100%{background-position:0% 50%;}
+    }
+
+    .wrap{ width:min(1360px, 95vw); margin: 22px auto 44px; }
+
+    .topbar{
+      display:flex; align-items:center; justify-content:space-between; gap:12px;
+      padding: 14px 16px; border-radius: 18px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.10), rgba(255,255,255,0.06));
+      border: 1px solid var(--stroke);
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow2);
+      position: sticky; top: 14px; z-index: 30;
+    }
+    .brand{ display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:0.2px; }
+    .brand .logo{
+      width:36px; height:36px; border-radius: 14px;
+      display:grid; place-items:center;
+      background:
+        radial-gradient(14px 14px at 30% 30%, rgba(255,255,255,0.45), transparent 55%),
+        linear-gradient(135deg, rgba(231,211,163,0.92), rgba(155,107,255,0.55), rgba(79,135,255,0.60));
+      border:1px solid rgba(255,255,255,0.22);
+      box-shadow: 0 18px 44px rgba(0,0,0,0.40);
+      color:#0B1020;
+      font-weight: 900;
+    }
+    .pill{
+      font-size:12px; padding:6px 10px; border-radius:999px;
+      background: rgba(255,255,255,0.10);
+      border:1px solid rgba(255,255,255,0.16);
+      color: rgba(255,255,255,0.86);
+      font-weight:800;
+      white-space:nowrap;
+    }
+    .pill.good{ color: var(--good); border-color: rgba(46,232,209,0.22); background: rgba(46,232,209,0.10); }
+    .pill.admin{ color: var(--gold); border-color: rgba(231,211,163,0.22); background: rgba(231,211,163,0.10); }
+
+    .grid{ display:grid; grid-template-columns: 1fr 1fr; gap:18px; margin-top:14px; align-items:start; }
+    @media (max-width: 980px){ .grid{ grid-template-columns:1fr; } }
+
+    .card{
+      background: linear-gradient(180deg, var(--glass), var(--glass2));
+      border:1px solid var(--stroke);
+      border-radius:18px;
+      padding:18px;
+      backdrop-filter: blur(18px);
+      box-shadow: var(--shadow2);
+      position: relative;
+      overflow: hidden;
+    }
+    .card::before{
+      content:"";
+      position:absolute; inset:-2px;
+      background: radial-gradient(900px 220px at 12% 0%, rgba(231,211,163,0.10), transparent 55%),
+                  radial-gradient(900px 220px at 88% 0%, rgba(155,107,255,0.10), transparent 55%);
+      pointer-events:none;
+      opacity: 0.9;
+    }
+    .card > *{ position: relative; z-index: 1; }
+
+    .card h2, .card h3{ margin:0 0 10px; }
+    .sub{ color: var(--muted); font-size: 13px; margin-top:-4px; }
+
+    .row{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+
+    input{
+      border:none; outline:none;
+      padding: 11px 12px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.10);
+      border:1px solid rgba(255,255,255,0.16);
+      color: var(--ink);
+      min-width: 190px;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+    input::placeholder{ color: rgba(255,255,255,0.55); }
+
+    .btn{
+      border:none; outline:none; cursor:pointer; user-select:none;
+      padding: 11px 14px;
+      border-radius: 14px;
+      font-weight:900;
+      color: var(--ink);
+      background: rgba(255,255,255,0.10);
+      border:1px solid rgba(255,255,255,0.16);
+      transition: transform .15s ease, box-shadow .15s ease, background .15s ease, filter .15s ease;
+      white-space:nowrap;
+    }
+    .btn:hover{ transform: translateY(-2px); box-shadow: 0 14px 26px rgba(0,0,0,0.40); background: rgba(255,255,255,0.14); }
+    .btn:active{ transform: translateY(0px); box-shadow:none; }
+    .btn.primary{
+      background:
+        radial-gradient(14px 14px at 20% 20%, rgba(255,255,255,0.35), transparent 60%),
+        linear-gradient(135deg, rgba(79,135,255,0.92), rgba(155,107,255,0.72));
+      border-color: rgba(255,255,255,0.20);
+    }
+    .btn.danger{
+      background:
+        radial-gradient(14px 14px at 20% 20%, rgba(255,255,255,0.28), transparent 60%),
+        linear-gradient(135deg, rgba(255,90,120,0.90), rgba(255,120,70,0.64));
+      border-color: rgba(255,255,255,0.18);
+    }
+    .btn.admin{
+      background:
+        radial-gradient(14px 14px at 20% 20%, rgba(255,255,255,0.30), transparent 60%),
+        linear-gradient(135deg, rgba(231,211,163,0.92), rgba(201,168,106,0.62));
+      color:#151015;
+      border-color: rgba(255,255,255,0.16);
+    }
+    .btn.ghost{ background: rgba(255,255,255,0.07); }
+    .btn.small{ padding: 7px 10px; border-radius: 12px; font-size: 12px; }
+    .btn.icon{ padding: 8px 10px; border-radius: 12px; font-weight: 900; line-height: 1; }
+
+    .kpi{ display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:10px; margin-top:10px; }
+    @media (max-width: 980px){ .kpi{ grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .kpi .box{
+      border-radius:16px; padding:12px;
+      background: rgba(255,255,255,0.08);
+      border:1px solid rgba(255,255,255,0.14);
+    }
+    .kpi .label{ font-size:12px; color: var(--muted); font-weight:800; }
+    .kpi .value{ font-size:20px; font-weight:900; margin-top:6px; }
+    .good{ color: var(--good); }
+    .bad{ color: var(--bad); }
+
+    .online-list{ margin-top:10px; display:flex; flex-direction:column; gap:8px; max-height: 320px; overflow:auto; padding-right:4px; }
+    .chip{
+      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      padding: 10px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.09);
+      border:1px solid rgba(255,255,255,0.14);
+      font-weight:900;
+    }
+    .chip .leftPart{ display:flex; align-items:center; gap:10px; }
+    .dot{ width:10px; height:10px; border-radius:999px; background: var(--good); box-shadow: 0 0 14px rgba(46,232,209,0.45); }
+    .dot.off{ background: var(--bad); box-shadow: 0 0 14px rgba(255,91,122,0.45); }
+
+    .tabs{ display:flex; gap:8px; flex-wrap:wrap; margin: 6px 0 12px; }
+    .tab{
+      padding: 9px 12px; border-radius: 14px; cursor:pointer;
+      background: rgba(255,255,255,0.07);
+      border:1px solid rgba(255,255,255,0.12);
+      font-weight:900; font-size:13px;
+      transition: .15s;
+      white-space:nowrap;
+    }
+    .tab.active{
+      background: rgba(255,255,255,0.14);
+      border:1px solid rgba(255,255,255,0.18);
+      box-shadow: 0 12px 28px rgba(0,0,0,0.30);
+    }
+
+    .dropdown-wrap{ position:relative; display:inline-flex; }
+    .dropdown{
+      position:absolute; top: 44px; right:0;
+      width: 240px;
+      border-radius: 14px;
+      background: rgba(10, 12, 22, 0.92);
+      border:1px solid rgba(255,255,255,0.16);
+      backdrop-filter: blur(12px);
+      overflow:hidden;
+      transform-origin: top right;
+      max-height: 0; opacity: 0; transform: translateY(-6px) scale(0.98);
+      transition: max-height .22s ease, opacity .22s ease, transform .22s ease;
+      pointer-events:none;
+      z-index: 40;
+    }
+    .dropdown.open{ max-height: 360px; opacity: 1; transform: translateY(0px) scale(1); pointer-events:auto; }
+    .dropdown button{
+      width:100%; text-align:left;
+      border:none; outline:none; cursor:pointer;
+      padding: 11px 12px;
+      background: transparent;
+      color: var(--ink);
+      font-weight:900;
+    }
+    .dropdown button:hover{ background: rgba(255,255,255,0.08); }
+
+    .tableWrap{ margin-top:10px; overflow:auto; max-height: 520px; }
+    .table{
+      width:100%;
+      border-collapse: collapse;
+      overflow:hidden;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.05);
+      min-width: 1080px;
+    }
+    .table th, .table td{
+      padding: 12px 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.10);
+      text-align:center;
+      font-size: 13px;
+      white-space: nowrap;
+      vertical-align: middle;
+    }
+    .table th{ color: rgba(255,255,255,0.78); font-weight:900; font-size: 12px; letter-spacing:.25px; }
+    .table tr:hover td{ background: rgba(255,255,255,0.06); }
+    .left{ text-align:left !important; white-space: normal; }
+
+    .eye{
+      display:inline-flex; align-items:center; justify-content:center;
+      width:34px; height:34px; border-radius: 12px;
+      background: rgba(255,255,255,0.08);
+      border:1px solid rgba(255,255,255,0.14);
+      cursor:pointer;
+      transition:.15s;
+    }
+    .eye:hover{ background: rgba(255,255,255,0.14); transform: translateY(-1px); }
+    .eye.hidden-eye{ opacity:0.45; position:relative; }
+    .eye.hidden-eye::after{
+      content:"";
+      position:absolute; width:22px; height:2px; background: rgba(255,255,255,0.82);
+      transform: rotate(-18deg);
+      border-radius:999px;
+    }
+
+    .modal{
+      position:fixed; inset:0;
+      background: rgba(0,0,0,0.66);
+      display:none; align-items:center; justify-content:center;
+      padding: 18px;
+      z-index: 100;
+    }
+    .modal.show{ display:flex; }
+    .modal-box{
+      width: min(900px, 96vw);
+      border-radius: 20px;
+      background: rgba(12, 14, 24, 0.92);
+      border:1px solid rgba(255,255,255,0.16);
+      backdrop-filter: blur(16px);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+      animation: pop .18s ease;
+    }
+    @keyframes pop{
+      from{ transform: translateY(8px) scale(0.985); opacity:0; }
+      to{ transform: translateY(0) scale(1); opacity:1; }
+    }
+    .modal-head{
+      display:flex; align-items:center; justify-content:space-between;
+      padding: 14px 16px;
+      background: rgba(255,255,255,0.06);
+      border-bottom:1px solid rgba(255,255,255,0.10);
+    }
+    .modal-title{ font-weight:900; font-size: 14px; letter-spacing:.2px; }
+    .modal-body{ padding: 16px; }
+    .modal-foot{
+      display:flex; justify-content:flex-end; gap:10px;
+      padding: 14px 16px;
+      background: rgba(255,255,255,0.06);
+      border-top:1px solid rgba(255,255,255,0.10);
+      flex-wrap: wrap;
+    }
+
+    .picker{ display:grid; grid-template-columns: 1fr 1fr; gap:12px; }
+    @media (max-width: 900px){ .picker{ grid-template-columns: 1fr; } }
+    .panel{
+      border-radius: 16px;
+      background: rgba(255,255,255,0.06);
+      border:1px solid rgba(255,255,255,0.12);
+      padding: 12px;
+    }
+    .panel h4{ margin:0 0 10px; font-size: 13px; font-weight:900; }
+    .hint{ font-size:12px; color: var(--muted); margin-top:-6px; margin-bottom:8px; font-weight:800; }
+
+    .userlist{ max-height: 360px; overflow:auto; display:flex; flex-direction:column; gap:6px; padding-right:4px; }
+    .userrow{
+      display:flex; align-items:center; justify-content:space-between; gap:8px;
+      padding: 10px 10px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.07);
+      border:1px solid rgba(255,255,255,0.10);
+      cursor:pointer;
+      transition:.12s;
+    }
+    .userrow:hover{ background: rgba(255,255,255,0.11); transform: translateY(-1px); }
+    .userrow .name{ font-weight:900; }
+    .userrow .tag{
+      font-size: 12px; padding: 4px 8px; border-radius: 999px;
+      border:1px solid rgba(255,255,255,0.14);
+      color: rgba(255,255,255,0.86);
+      background: rgba(255,255,255,0.05);
+      font-weight:900;
+      white-space: nowrap;
+    }
+
+    .selected{
+      display:flex; flex-wrap:wrap; gap:8px;
+      min-height: 44px;
+      padding: 10px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.04);
+      border:1px dashed rgba(255,255,255,0.18);
+    }
+    .selchip{
+      display:inline-flex; align-items:center; gap:8px;
+      padding: 8px 10px;
+      border-radius: 999px;
+      background: rgba(231,211,163,0.10);
+      border:1px solid rgba(231,211,163,0.18);
+      font-weight:900;
+      white-space: nowrap;
+    }
+    .xbtn{
+      width:22px; height:22px; border-radius: 999px;
+      display:inline-flex; align-items:center; justify-content:center;
+      background: rgba(255,255,255,0.14);
+      border:1px solid rgba(255,255,255,0.16);
+      cursor:pointer;
+      font-weight:900;
+    }
+
+    .toggle{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+    .toggle .opt{
+      padding: 10px 12px; min-width: 84px; text-align:center;
+      border-radius: 14px;
+      border:1px solid rgba(255,255,255,0.14);
+      background: rgba(255,255,255,0.06);
+      cursor:pointer;
+      font-weight:900;
+      white-space: nowrap;
+    }
+    .toggle .opt.active{
+      background: rgba(46,232,209,0.12);
+      border:1px solid rgba(46,232,209,0.22);
+      color: var(--good);
+      box-shadow: 0 12px 28px rgba(0,0,0,0.22);
+    }
+
+    .pager{ display:flex; gap:10px; justify-content:center; align-items:center; margin-top: 12px; flex-wrap:wrap; }
+    .pagebtn{
+      padding: 8px 12px;
+      border-radius: 12px;
+      background: rgba(255,255,255,0.08);
+      border:1px solid rgba(255,255,255,0.12);
+      cursor:pointer;
+      font-weight:900;
+      white-space: nowrap;
+    }
+    .pagebtn.active{
+      background: rgba(231,211,163,0.14);
+      border:1px solid rgba(231,211,163,0.20);
+      color: var(--gold);
+    }
+
+    .note{ font-size:12px; color: var(--muted); margin-top:8px; font-weight:800; line-height: 1.5; }
+    .tinyStatus{ margin-top: 8px; font-size: 12px; color: rgba(255,255,255,0.70); font-weight: 900; min-height: 16px; }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <div class="brand">
+        <div class="logo">◆</div>
+        <div>
+          <div style="font-size:16px; font-weight:900;">Operation Dashboard</div>
+          <div style="font-size:12px; color:var(--muted); font-weight:800;">근태 + 콘텐츠(보급/송전소/차량수호)</div>
+        </div>
+      </div>
+      <div class="row">
+        <span class="pill good" id="realtimePill">실시간: ON</span>
+        <span class="pill" id="whoami">미로그인</span>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- Main -->
+      <div class="card">
+        <h2>메인</h2>
+        <div class="sub">출근/퇴근 + 보급/송전소/차량수호 보고는 여기서 처리됩니다.</div>
+
+        <div class="row" style="margin-top:12px;">
+          <input id="nickname" placeholder="닉네임(아이디)" autocomplete="username" />
+          <input id="password" placeholder="비밀번호" type="password" autocomplete="current-password" />
+          <button class="btn primary" id="loginBtn">로그인</button>
+          <button class="btn ghost" id="logoutBtn" disabled>로그아웃</button>
+          <button class="btn admin" id="adminBtn" style="display:none;">관리</button>
+        </div>
+
+        <div class="kpi">
+          <div class="box">
+            <div class="label">현재 접속</div>
+            <div class="value good" id="kpiOnline">0</div>
+          </div>
+          <div class="box">
+            <div class="label">내 상태</div>
+            <div class="value" id="kpiMe">-</div>
+          </div>
+          <div class="box">
+            <div class="label">오늘 콘텐츠</div>
+            <div class="value" id="kpiTodayContent">-</div>
+          </div>
+          <div class="box">
+            <div class="label">최근 7일 내 근무</div>
+            <div class="value" id="kpiWeekHours">-</div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top:12px;">
+          <button class="btn primary" id="checkInBtn" disabled>출근</button>
+          <button class="btn danger" id="checkOutBtn" disabled>퇴근</button>
+          <button class="btn" id="supplyBtn" disabled>보급</button>
+          <button class="btn" id="powerBtn" disabled>송전소</button>
+          <button class="btn" id="escortBtn" disabled>차량 수호</button>
+        </div>
+
+        <div class="card" style="margin-top:14px;">
+          <div class="row" style="justify-content:space-between;">
+            <h3 style="margin:0;">접속중(출근중) 목록</h3>
+            <span class="pill good">실시간</span>
+          </div>
+          <div class="sub">일반 유저는 숨김 유저가 여기서 보이지 않습니다. (관리자는 보입니다.)</div>
+          <div class="online-list" id="onlineUsers"></div>
+        </div>
+      </div>
+
+      <!-- Admin -->
+      <div class="card" id="adminPanel" style="display:none; min-height: 820px;">
+        <h2>관리</h2>
+        <div class="sub">화이트리스트 / 통계 / 콘텐츠 기록을 관리합니다.</div>
+
+        <div class="tabs">
+          <div class="tab active" data-tab="users">유저/통계</div>
+          <div class="tab" data-tab="content">콘텐츠 기록</div>
+        </div>
+
+        <!-- Users/Stats -->
+        <div id="tabUsers">
+          <div class="row">
+            <button class="btn admin" id="refreshStatsBtn">통계 갱신</button>
+            <button class="btn" id="adminRoleBtn">관리자 권한</button>
+            <button class="btn danger" id="resetWorkBtn">총 출근시간 초기화</button>
+          </div>
+          <div class="tinyStatus" id="statsMsg"></div>
+
+          <div class="card" style="margin-top:12px;">
+            <h3 style="margin:0 0 8px;">화이트리스트(등록 유저)</h3>
+            <div class="row">
+              <input id="newUser" placeholder="닉네임" />
+              <input id="newPass" placeholder="비밀번호" />
+              <button class="btn" id="addUserBtn">유저 추가</button>
+            </div>
+
+            <div class="row">
+              <input id="editUser" placeholder="닉네임" />
+              <input id="editPass" placeholder="새 비밀번호" />
+              <button class="btn" id="changePassBtn">비번 변경</button>
+              <button class="btn danger" id="deleteUserBtn">유저 삭제</button>
+            </div>
+
+            <div class="note">• 아이디와 닉네임은 동일하게 판정되며, 내부 비교는 소문자로 수행됩니다.</div>
+
+            <div class="tableWrap">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th>닉네임</th>
+                    <th>접속</th>
+                    <th>마지막 출근</th>
+                    <th>마지막 퇴근</th>
+                    <th>최근 7일 근무시간</th>
+                    <th>송전소</th>
+                    <th>보급</th>
+                    <th>차량수호</th>
+                    <th>숨김</th>
+                    <th>근태관리</th>
+                  </tr>
+                </thead>
+                <tbody id="userStatsBody">
+                  <tr><td colspan="10" style="color:rgba(255,255,255,0.65);">통계 갱신을 눌러주시기 바랍니다.</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Content records -->
+        <div id="tabContent" style="display:none;">
+          <div class="row" style="justify-content:space-between;">
+            <div class="dropdown-wrap">
+              <button class="btn" id="filterBtn">필터 ▾</button>
+              <div class="dropdown" id="filterMenu">
+                <button data-filter="all">전체 보기</button>
+                <button data-filter="supply">보급만 보기</button>
+                <button data-filter="power">송전소만 보기</button>
+                <button data-filter="escort">차량 수호만 보기</button>
+              </div>
+            </div>
+
+            <div class="row">
+              <button class="btn ghost" id="toggleDeletedBtn" title="삭제된 기록 표시 토글입니다.">삭제된 기록 보기: OFF</button>
+              <span class="pill good">1페이지 실시간</span>
+              <button class="btn admin" id="refreshContentBtn">새로고침</button>
+            </div>
+          </div>
+
+          <div class="note">
+            • 20개씩 페이지로 구성되며, 1페이지는 실시간으로 갱신됩니다.<br>
+            • 일반 유저는 “숨김 유저”가 참여자 표시에서 숨겨집니다. 관리자는 모두 확인 가능합니다.<br>
+            • 삭제는 소프트 삭제로 처리되며, 필요 시 “삭제된 기록 보기”로 확인 가능합니다.<br>
+            • 수정은 작성자 또는 관리자만 가능합니다.
+          </div>
+
+          <div class="tableWrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>타입</th>
+                  <th>날짜/시간</th>
+                  <th>참여자 목록</th>
+                  <th>성공/실패</th>
+                  <th>삭제</th>
+                  <th>수정</th>
+                </tr>
+              </thead>
+              <tbody id="contentBody"></tbody>
+            </table>
+          </div>
+
+          <div class="pager" id="pager"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Alert Modal -->
+  <div class="modal" id="alertModal" aria-hidden="true">
+    <div class="modal-box" style="width:min(520px,96vw);">
+      <div class="modal-head">
+        <div class="modal-title">알림</div>
+        <button class="btn small ghost" id="alertClose">닫기</button>
+      </div>
+      <div class="modal-body">
+        <div id="alertText" style="font-weight:900; font-size:14px;"></div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn primary" id="alertOk">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Content Modal -->
+  <div class="modal" id="contentModal" aria-hidden="true">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div class="modal-title" id="contentTitle">콘텐츠</div>
+        <button class="btn small ghost" id="contentCloseTop">닫기</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="picker">
+          <div class="panel">
+            <h4>명단 추가</h4>
+            <div class="hint">목록에서 클릭하면 참여자에 추가됩니다. (본인은 자동으로 포함됩니다.)</div>
+            <div class="row">
+              <input id="userSearch" placeholder="검색(닉네임)" style="flex:1 1 auto; min-width: 220px;">
+              <button class="btn small" id="toggleUserListBtn">+ 명단 펼치기</button>
+            </div>
+            <div id="userListWrap" style="margin-top:10px; display:none;">
+              <div class="userlist" id="userList"></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h4>참여자</h4>
+            <div class="hint">참여자 없이 저장하면 “작성자(본인)”만 등록됩니다.</div>
+            <div class="selected" id="selectedUsers"></div>
+
+            <div style="height:12px;"></div>
+
+            <div id="resultWrap" style="display:none;">
+              <h4>성공/실패 여부</h4>
+              <div class="hint">O / X 중 하나를 선택합니다.</div>
+              <div class="toggle">
+                <div class="opt" id="optO">O</div>
+                <div class="opt" id="optX">X</div>
+              </div>
+            </div>
+
+            <div class="note" id="contentHint"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn ghost" id="contentCancel">취소</button>
+        <button class="btn primary" id="contentSave">저장</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Admin Role Modal -->
+  <div class="modal" id="adminRoleModal" aria-hidden="true">
+    <div class="modal-box">
+      <div class="modal-head">
+        <div class="modal-title">관리자 권한</div>
+        <button class="btn small ghost" id="adminRoleCloseTop">닫기</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="picker">
+          <div class="panel">
+            <h4>유저 선택</h4>
+            <div class="hint">여러 명 선택이 가능합니다.</div>
+            <div class="row">
+              <input id="adminRoleSearch" placeholder="검색(닉네임)" style="flex:1 1 auto; min-width: 220px;">
+              <button class="btn small" id="adminRoleToggleListBtn">+ 목록 펼치기</button>
+            </div>
+            <div id="adminRoleListWrap" style="margin-top:10px; display:none;">
+              <div class="userlist" id="adminRoleList"></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h4>선택된 유저</h4>
+            <div class="hint">임명/해임을 누르면 일괄 적용됩니다.</div>
+            <div class="selected" id="adminRoleSelected"></div>
+            <div class="note">• 관리자 화면에서는 숨김 유저도 항상 표시됩니다.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-foot">
+        <button class="btn danger" id="adminRoleRevokeBtn">선택 해임</button>
+        <button class="btn admin" id="adminRoleGrantBtn">선택 임명</button>
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import {
+    getFirestore,
+    collection, doc, getDoc, setDoc, updateDoc, deleteDoc, addDoc,
+    getDocs, query, where, orderBy, limit, startAfter,
+    onSnapshot
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  // Firebase 설정을 초기화합니다.
+  const firebaseConfig = {
+    apiKey: "AIzaSyAJ6MhR1JsGbvieb8akAi4Zpas_W3uaNJ4",
+    authDomain: "dosep-b6ee3.firebaseapp.com",
+    projectId: "dosep-b6ee3",
+    storageBucket: "dosep-b6ee3.firebasestorage.app",
+    messagingSenderId: "100096560571",
+    appId: "1:100096560571:web:7eb2c1255835b6b57c889e"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  const $ = (id) => document.getElementById(id);
+  const lowerNick = (s) => (s || "").trim().toLowerCase();
+  const nowMs = () => Date.now();
+  const fmt = (ms) => {
+    if (!ms) return "-";
+    try { return new Date(ms).toLocaleString(); } catch { return "-"; }
+  };
+
+  // 알림 모달을 관리합니다.
+  const alertModal = $("alertModal");
+  const alertText = $("alertText");
+  function showAlert(msg){
+    alertText.textContent = msg;
+    alertModal.classList.add("show");
+    alertModal.setAttribute("aria-hidden","false");
+  }
+  function closeAlert(){
+    alertModal.classList.remove("show");
+    alertModal.setAttribute("aria-hidden","true");
+  }
+  $("alertOk").addEventListener("click", closeAlert);
+  $("alertClose").addEventListener("click", closeAlert);
+  alertModal.addEventListener("click", (e)=>{ if(e.target===alertModal) closeAlert(); });
+
+  function setTinyStatus(id, msg){
+    const el = $(id);
+    el.textContent = msg || "";
+    if(!msg) return;
+    setTimeout(()=>{ if(el.textContent === msg) el.textContent = ""; }, 4000);
+  }
+
+  let currentUser = null;
+  let currentIsAdmin = false;
+
+  let usersCache = new Map();
+  let usersUnsub = null;
+  let onlineUnsub = null;
+
+  let contentType = null;
+  let selectedSet = new Set();
+  let resultOX = null; // 보급/차량수호 성공/실패
+
+  let editingContentId = null;
+  let editingContentCreatedBy = null;
+  let editingContentDeleted = false;
+
+  let adminRoleSet = new Set();
+
+  const PAGE_SIZE = 20;
+  let contentFilter = "all";
+  let contentPage = 1;
+  let contentFirstUnsub = null;
+  const pageCursors = [];
+  let showDeletedContent = false;
+
+  const colUsers = collection(db, "users");
+  const colWork = collection(db, "workRecords");
+  const colContent = collection(db, "contentRecords");
+
+  function setWhoami(){
+    $("whoami").textContent = currentUser
+      ? `접속: ${currentUser}${currentIsAdmin ? " (관리자)" : ""}`
+      : "미로그인";
+  }
+
+  function setLoggedInUI(on){
+    $("logoutBtn").disabled = !on;
+    $("checkInBtn").disabled = !on;
+    $("checkOutBtn").disabled = !on;
+    $("supplyBtn").disabled = !on;
+    $("powerBtn").disabled = !on;
+    $("escortBtn").disabled = !on;
+
+    if(!on){
+      $("adminBtn").style.display = "none";
+      $("adminPanel").style.display = "none";
+    }
+  }
+
+  function setAdminUI(on){
+    $("adminBtn").style.display = on ? "inline-flex" : "none";
+  }
+
+  async function refreshUsersCacheOnce(){
+    const snap = await getDocs(colUsers);
+    const map = new Map();
+    snap.forEach(d => map.set(d.id, d.data() || {}));
+    usersCache = map;
+  }
+
+  function startUsersRealtime(){
+    stopUsersRealtime();
+    usersUnsub = onSnapshot(colUsers, (snap)=>{
+      const map = new Map();
+      snap.forEach(d => map.set(d.id, d.data() || {}));
+      usersCache = map;
+    });
+  }
+  function stopUsersRealtime(){
+    if(usersUnsub){ usersUnsub(); usersUnsub = null; }
+  }
+
+  setLoggedInUI(false);
+  setWhoami();
+
+  $("loginBtn").addEventListener("click", async ()=>{
+    const nick = lowerNick($("nickname").value);
+    const pass = $("password").value;
+    if(!nick || !pass) return showAlert("닉네임과 비밀번호를 입력해주시기 바랍니다.");
+
+    try{
+      const uSnap = await getDoc(doc(db,"users",nick));
+      if(!uSnap.exists()) return showAlert("화이트리스트에 등록되지 않은 유저입니다.");
+
+      const u = uSnap.data() || {};
+      if((u.password ?? "") !== pass) return showAlert("비밀번호가 올바르지 않습니다.");
+
+      currentUser = nick;
+      currentIsAdmin = !!u.isAdmin;
+
+      setWhoami();
+      setLoggedInUI(true);
+      setAdminUI(currentIsAdmin);
+
+      startUsersRealtime();
+      await refreshUsersCacheOnce();
+
+      startOnlineRealtime();
+      await refreshKPI();
+
+      showAlert("로그인이 완료되었습니다.");
+    }catch(e){
+      showAlert("로그인 중 오류가 발생하였습니다. (Rules/DB를 확인해주시기 바랍니다.)");
+    }
+  });
+
+  $("logoutBtn").addEventListener("click", ()=>{
+    stopContentRealtime();
+    stopOnlineRealtime();
+    stopUsersRealtime();
+
+    currentUser = null;
+    currentIsAdmin = false;
+
+    $("adminPanel").style.display = "none";
+    setWhoami();
+    setLoggedInUI(false);
+
+    $("kpiOnline").textContent = "0";
+    $("kpiMe").textContent = "-";
+    $("kpiTodayContent").textContent = "-";
+    $("kpiWeekHours").textContent = "-";
+    $("onlineUsers").innerHTML = "";
+
+    showAlert("로그아웃이 완료되었습니다.");
+  });
+
+  $("checkInBtn").addEventListener("click", async ()=>{
+    if(!currentUser) return showAlert("로그인 후 이용해주시기 바랍니다.");
+    try{
+      const q = query(colWork, where("nickname","==", currentUser), where("checkOut","==", null));
+      const snap = await getDocs(q);
+      if(!snap.empty) return showAlert("퇴근 하지 않았습니다!");
+      await addDoc(colWork, { nickname: currentUser, checkIn: nowMs(), checkOut: null });
+      showAlert("출근이 완료되었습니다.");
+      await refreshKPI();
+    }catch(e){
+      showAlert("출근 처리 중 오류가 발생하였습니다.");
+    }
+  });
+
+  $("checkOutBtn").addEventListener("click", async ()=>{
+    if(!currentUser) return showAlert("로그인 후 이용해주시기 바랍니다.");
+    try{
+      const q = query(colWork, where("nickname","==", currentUser), where("checkOut","==", null));
+      const snap = await getDocs(q);
+      if(snap.empty) return showAlert("출근 하지 않았습니다!");
+      await updateDoc(snap.docs[0].ref, { checkOut: nowMs() });
+      showAlert("퇴근이 완료되었습니다.");
+      await refreshKPI();
+    }catch(e){
+      showAlert("퇴근 처리 중 오류가 발생하였습니다.");
+    }
+  });
+
+  function stopOnlineRealtime(){
+    if(onlineUnsub){ onlineUnsub(); onlineUnsub = null; }
+  }
+
+  function startOnlineRealtime(){
+    stopOnlineRealtime();
+    const q = query(colWork, where("checkOut","==", null));
+    onlineUnsub = onSnapshot(q, (snap)=>{
+      const online = new Set();
+      snap.forEach(d=>{
+        const r = d.data() || {};
+        const n = lowerNick(r.nickname);
+        if(!n) return;
+        const u = usersCache.get(n);
+        if(!currentIsAdmin && u?.hidden) return;
+        online.add(n);
+      });
+
+      const list = Array.from(online).sort((a,b)=>a.localeCompare(b));
+      $("kpiOnline").textContent = String(list.length);
+
+      if(list.length === 0){
+        $("onlineUsers").innerHTML = `<div class="chip"><div class="leftPart"><span class="dot off"></span><span>접속 X</span></div><span class="bad">접속 X</span></div>`;
+      }else{
+        $("onlineUsers").innerHTML = list.map(n => {
+          const u = usersCache.get(n) || {};
+          const hiddenBadge = (currentIsAdmin && u.hidden) ? `<span class="pill" style="opacity:.85;">숨김</span>` : ``;
+          return `
+            <div class="chip">
+              <div class="leftPart"><span class="dot"></span><span>${n}</span>${hiddenBadge}</div>
+              <span class="good">접속 O</span>
+            </div>
+          `;
+        }).join("");
+      }
+    });
+  }
+
+  async function refreshKPI(){
+    if(!currentUser){
+      $("kpiMe").textContent = "-";
+      $("kpiWeekHours").textContent = "-";
+      $("kpiTodayContent").textContent = "-";
+      return;
+    }
+
+    try{
+      const q = query(colWork, where("nickname","==", currentUser), where("checkOut","==", null));
+      const s = await getDocs(q);
+      const online = !s.empty;
+      $("kpiMe").innerHTML = online
+        ? `<span class="good">🟢 접속 O</span>`
+        : `<span class="bad">🔴 접속 X</span>`;
+    }catch{
+      $("kpiMe").textContent = "-";
+    }
+
+    try{
+      const weekAgo = nowMs() - 7*24*60*60*1000;
+      const snap = await getDocs(query(colWork, where("nickname","==", currentUser)));
+      let totalMs = 0;
+
+      snap.forEach(d=>{
+        const r = d.data() || {};
+        const ci = r.checkIn;
+        const co = (r.checkOut == null) ? nowMs() : r.checkOut;
+        if(typeof ci !== "number") return;
+
+        const start = Math.max(ci, weekAgo);
+        const end = co;
+        if(end <= weekAgo) return;
+        if(end > start) totalMs += (end - start);
+      });
+
+      $("kpiWeekHours").textContent = `${(totalMs/3600000).toFixed(2)}h`;
+    }catch{
+      $("kpiWeekHours").textContent = "-";
+    }
+
+    try{
+      const today = new Date(); today.setHours(0,0,0,0);
+      const startMs = today.getTime();
+      const csnap = await getDocs(colContent);
+      let cnt = 0;
+      csnap.forEach(d=>{
+        const c = d.data() || {};
+        if(!!c.deleted) return;
+        if((c.time || 0) >= startMs) cnt++;
+      });
+      $("kpiTodayContent").textContent = `${cnt}건`;
+    }catch{
+      $("kpiTodayContent").textContent = "-";
+    }
+  }
+
+  const contentModal = $("contentModal");
+
+  function openContentModal(type, opts = { isEdit:false }){
+    if(!currentUser) return showAlert("로그인 후 이용해주시기 바랍니다.");
+
+    if(!opts?.isEdit){
+      editingContentId = null;
+      editingContentCreatedBy = null;
+      editingContentDeleted = false;
+    }
+
+    contentType = type;
+    selectedSet = new Set();
+    resultOX = null;
+
+    const needsResult = (type === "supply" || type === "escort");
+    $("resultWrap").style.display = needsResult ? "block" : "none";
+
+    if(type === "supply"){
+      $("contentTitle").textContent = opts?.isEdit ? "📦 보급 수정" : "📦 보급 등록";
+      $("contentHint").textContent = "보급은 성공/실패(O/X) 여부가 필요합니다.";
+    } else if(type === "power"){
+      $("contentTitle").textContent = opts?.isEdit ? "⚡ 송전소 수정" : "⚡ 송전소 등록";
+      $("contentHint").textContent = "송전소는 참여자만 선택하면 됩니다. (참여자 없이 저장 가능)";
+    } else if(type === "escort"){
+      $("contentTitle").textContent = opts?.isEdit ? "🚚 차량 수호 수정" : "🚚 차량 수호 등록";
+      $("contentHint").textContent = "차량 수호는 성공/실패(O/X) 여부가 필요합니다.";
+    }
+
+    $("optO").classList.remove("active");
+    $("optX").classList.remove("active");
+
+    $("userSearch").value = "";
+    $("userListWrap").style.display = "none";
+
+    renderSelected();
+    renderUserList();
+
+    contentModal.classList.add("show");
+    contentModal.setAttribute("aria-hidden","false");
+  }
+
+  function closeContentModal(){
+    contentModal.classList.remove("show");
+    contentModal.setAttribute("aria-hidden","true");
+  }
+
+  $("contentCloseTop").addEventListener("click", closeContentModal);
+  $("contentCancel").addEventListener("click", closeContentModal);
+  contentModal.addEventListener("click", (e)=>{ if(e.target===contentModal) closeContentModal(); });
+
+  $("supplyBtn").addEventListener("click", ()=> openContentModal("supply"));
+  $("powerBtn").addEventListener("click", ()=> openContentModal("power"));
+  $("escortBtn").addEventListener("click", ()=> openContentModal("escort"));
+
+  $("toggleUserListBtn").addEventListener("click", ()=>{
+    const wrap = $("userListWrap");
+    wrap.style.display = (wrap.style.display === "none") ? "block" : "none";
+  });
+  $("userSearch").addEventListener("input", renderUserList);
+
+  $("optO").addEventListener("click", ()=>{
+    resultOX = "O";
+    $("optO").classList.add("active");
+    $("optX").classList.remove("active");
+  });
+  $("optX").addEventListener("click", ()=>{
+    resultOX = "X";
+    $("optX").classList.add("active");
+    $("optO").classList.remove("active");
+  });
+
+  function renderSelected(){
+    const el = $("selectedUsers");
+    if(selectedSet.size === 0){
+      el.innerHTML = `<span style="color:rgba(255,255,255,0.65); font-weight:900;">참여자가 없습니다. (저장 시 작성자만 등록됩니다.)</span>`;
+      return;
+    }
+    el.innerHTML = Array.from(selectedSet).map(n => `
+      <span class="selchip">
+        ${n}
+        <span class="xbtn" data-x="${n}">×</span>
+      </span>
+    `).join("");
+
+    el.querySelectorAll(".xbtn").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        selectedSet.delete(btn.getAttribute("data-x"));
+        renderSelected();
+      });
+    });
+  }
+
+  function renderUserList(){
+    const list = $("userList");
+    const q = lowerNick($("userSearch").value);
+
+    const users = Array.from(usersCache.keys()).sort((a,b)=>a.localeCompare(b));
+    let filtered = q ? users.filter(n => n.includes(q)) : users;
+
+    if(!currentIsAdmin){
+      filtered = filtered.filter(n => !(usersCache.get(n)?.hidden));
+    }
+
+    list.innerHTML = filtered.length ? filtered.map(n=>{
+      const u = usersCache.get(n) || {};
+      const badges = [];
+      if(u.isAdmin) badges.push("관리자");
+      if(u.hidden) badges.push("숨김");
+      const tag = badges.length ? badges.join(" · ") : "유저";
+      return `
+        <div class="userrow" data-nick="${n}">
+          <div class="name">${n}</div>
+          <div class="tag">${tag}</div>
+        </div>
+      `;
+    }).join("") : `<div style="color:rgba(255,255,255,0.7); font-weight:900;">검색 결과가 없습니다.</div>`;
+
+    list.querySelectorAll(".userrow").forEach(row=>{
+      row.addEventListener("click", ()=>{
+        const n = row.getAttribute("data-nick");
+        if(!n) return;
+        selectedSet.add(n);
+        renderSelected();
+      });
+    });
+  }
+
+  // ✅ 변경 핵심(요구사항 2): 참여자 0명이어도 저장 가능 + 작성자는 자동 포함됩니다.
+  $("contentSave").addEventListener("click", async ()=>{
+    if(!currentUser) return showAlert("로그인 후 이용해주시기 바랍니다.");
+
+    // 참여자가 없어도 저장 가능하도록 처리합니다.
+    const participantsRaw = Array.from(selectedSet);
+
+    // 참여자 목록 맨 앞에 작성자 ID를 자동 첨부합니다.
+    // 참여자가 0명이어도 [작성자]만 등록됩니다.
+    const merged = [currentUser, ...participantsRaw].map(lowerNick);
+    const participantsUnique = Array.from(new Set(merged));
+
+    const payload = {
+      type: contentType,
+      time: nowMs(),
+      participants: participantsUnique
+    };
+
+    // ✅ 변경 핵심(요구사항 1): 보급 + 차량수호 모두 O/X 필요합니다.
+    const needsResult = (contentType === "supply" || contentType === "escort");
+    if(needsResult){
+      if(!resultOX) return showAlert("성공/실패 여부(O/X)를 선택해주시기 바랍니다.");
+      payload.result = resultOX;
+    }else{
+      payload.result = null;
+    }
+
+    try{
+      if(editingContentId){
+        if(editingContentDeleted) return showAlert("삭제된 기록은 수정할 수 없습니다.");
+        const canEdit = currentIsAdmin || (currentUser === editingContentCreatedBy);
+        if(!canEdit) return showAlert("수정 권한이 없습니다.");
+
+        await updateDoc(doc(db, "contentRecords", editingContentId), {
+          ...payload,
+          updatedAt: nowMs(),
+          updatedBy: currentUser
+        });
+
+        closeContentModal();
+        showAlert("수정이 완료되었습니다.");
+        await refreshKPI();
+        return;
+      }
+
+      await addDoc(colContent, {
+        ...payload,
+        createdAt: nowMs(),
+        createdBy: currentUser,
+        updatedAt: null,
+        updatedBy: null,
+        deleted: false,
+        deletedAt: null,
+        deletedBy: null
+      });
+
+      closeContentModal();
+      showAlert("저장이 완료되었습니다.");
+      await refreshKPI();
+    }catch(e){
+      showAlert("저장/수정 중 오류가 발생하였습니다.");
+    }
+  });
+
+  // 관리자 탭 전환을 처리합니다.
+  const tabs = Array.from(document.querySelectorAll(".tab"));
+  function openTab(key){
+    tabs.forEach(t => t.classList.toggle("active", t.getAttribute("data-tab") === key));
+    $("tabUsers").style.display = (key === "users") ? "block" : "none";
+    $("tabContent").style.display = (key === "content") ? "block" : "none";
+
+    if(key === "content"){
+      contentPage = 1;
+      renderPager(1);
+      openContentPage(1);
+    }else{
+      stopContentRealtime();
+    }
+  }
+  tabs.forEach(t => t.addEventListener("click", ()=> openTab(t.getAttribute("data-tab"))));
+
+  // ✅ 관리 버튼 토글
+  $("adminBtn").addEventListener("click", async ()=>{
+    if(!currentIsAdmin) return showAlert("관리자 권한이 없습니다.");
+    const panel = $("adminPanel");
+    if(panel.style.display === "block"){
+      panel.style.display = "none";
+      stopContentRealtime();
+      return;
+    }
+    panel.style.display = "block";
+    openTab("users");
+    await refreshUsersCacheOnce();
+  });
+
+  $("addUserBtn").addEventListener("click", async ()=>{
+    if(!currentIsAdmin) return showAlert("관리자 권한이 없습니다.");
+    const n = lowerNick($("newUser").value);
+    const p = $("newPass").value;
+    if(!n) return showAlert("닉네임을 입력해주시기 바랍니다.");
+    if(!p) return showAlert("비밀번호를 입력해주시기 바랍니다.");
+    try{
+      await setDoc(doc(db,"users",n), { password: p, isAdmin:false, hidden:false }, { merge:true });
+      showAlert("유저 추가가 완료되었습니다.");
+      $("newUser").value=""; $("newPass").value="";
+    }catch(e){
+      showAlert("유저 추가 중 오류가 발생하였습니다.");
+    }
+  });
+
+  $("changePassBtn").addEventListener("click", async ()=>{
+    if(!currentIsAdmin) return showAlert("관리자 권한이 없습니다.");
+    const n = lowerNick($("editUser").value);
+    const p = $("editPass").value;
+    if(!n || !p) return showAlert("닉네임과 새 비밀번호를 입력해주시기 바랍니다.");
+    try{
+      await updateDoc(doc(db,"users",n), { password: p });
+      $("editPass").value="";
+      showAlert("비밀번호 변경이 완료되었습니다.");
+    }catch(e){
+      showAlert("비밀번호 변경 중 오류가 발생하였습니다.");
+    }
+  });
+
+  $("deleteUserBtn").addEventListener("click", async ()=>{
+    if(!currentIsAdmin) return showAlert("관리자 권한이 없습니다.");
+    const n = lowerNick($("editUser").value);
+    if(!n) return showAlert("닉네임을 입력해주시기 바랍니다.");
+    if(n === currentUser) return showAlert("본인 계정은 삭제할 수 없습니다.");
+    try{
+      await deleteDoc(doc(db,"users",n));
+      showAlert("유저 삭제가 완료되었습니다.");
+    }catch(e){
+      showAlert("유저 삭제 중 오류가 발생하였습니다.");
+    }
+  });
+
+  $("resetWorkBtn").addEventListener("click", async ()=>{
+    if(!currentIsAdmin) return showAlert("관리자 권한이 없습니다.");
+    const ok = confirm("정말로 근태 기록을 전체 초기화하시겠습니까?\n이 작업은 되돌릴 수 없습니다.");
+    if(!ok) return;
+
+    try{
+      const snap = await getDocs(colWork);
+      const ops = [];
+      snap.forEach(d => ops.push(deleteDoc(d.ref)));
+      await Promise.all(ops);
+      showAlert("근태 기록 초기화가 완료되었습니다.");
+      await refreshKPI();
+    }catch(e){
+      showAlert("초기화 중 오류가 발생하였습니다.");
+    }
+  });
+
+  async function adminForceCheckIn(nick){
+    if(!currentIsAdmin) return showAlert("관리자 권한이 없습니다.");
+    const target = lowerNick(nick);
+    const ok = confirm(`${target} 유저를 강제 출근 처리하시겠습니까?`);
+    if(!ok) return;
+
+    try{
+      const qOpen = query(colWork, where("nickname","==", target), where("checkOut","==", null));
+      const snapOpen = await getDocs(qOpen);
+      if(!snapOpen.empty) return showAlert("이미 출근중(접속 O)입니다.");
+      await addDoc(colWork, { nickname: target, checkIn: nowMs(), checkOut: null, forcedBy: currentUser, forcedAt: nowMs() });
+      showAlert("강제 출근이 완료되었습니다.");
+    }catch(e){
+      showAlert("강제 출근 중 오류가 발생하였습니다.");
+    }
+  }
+
+  async function adminForceCheckOut(nick){
+    if(!currentIsAdmin) return showAlert("관리자 권한이 없습니다.");
+    const target = lowerNick(nick);
+    const ok = confirm(`${target} 유저를 강제 퇴근 처리하시겠습니까?`);
+    if(!ok) return;
+
+    try{
+      const qOpen = query(colWork, where("nickname","==", target), where("checkOut","==", null));
+      const snapOpen = await getDocs(qOpen);
+      if(snapOpen.empty) return showAlert("출근중인 기록이 없습니다.");
+      await updateDoc(snapOpen.docs[0].ref, { checkOut: nowMs(), forcedBy: currentUser, forcedAt: nowMs() });
+      showAlert("강제 퇴근이 완료되었습니다.");
+    }catch(e){
+      showAlert("강제 퇴근 중 오류가 발생하였습니다.");
+    }
+  }
+
+  async function adminEditLatestOpenShift(nick){
+    if(!currentIsAdmin) return showAlert("관리자 권한이 없습니다.");
+    const target = lowerNick(nick);
+
+    try{
+      const qOpen = query(colWork, where("nickname","==", target), where("checkOut","==", null));
+      const snapOpen = await getDocs(qOpen);
+
+      let refDoc = null;
+      let data = null;
+
+      if(!snapOpen.empty){
+        refDoc = snapOpen.docs[0].ref;
+        data = snapOpen.docs[0].data() || {};
+      } else {
+        const qAll = query(colWork, where("nickname","==", target));
+        const snapAll = await getDocs(qAll);
+
+        let latest = null;
+        snapAll.forEach(d=>{
+          const r = d.data() || {};
+          const t = (typeof r.checkIn === "number") ? r.checkIn : 0;
+          if(!latest || t > latest.t){
+            latest = { t, ref: d.ref, data: r };
+          }
+        });
+
+        if(!latest) return showAlert("수정할 근태 기록이 없습니다.");
+        refDoc = latest.ref;
+        data = latest.data;
+      }
+
+      const curIn = data.checkIn || 0;
+      const curOut = (data.checkOut == null) ? null : data.checkOut;
+
+      const inStr = prompt("수정할 출근 시간을 입력해주시기 바랍니다.\n예) 2026-02-16T10:30", curIn ? new Date(curIn).toISOString().slice(0,16) : "");
+      if(inStr == null) return;
+
+      const outDefault = curOut ? new Date(curOut).toISOString().slice(0,16) : "";
+      const outStr = prompt("수정할 퇴근 시간을 입력해주시기 바랍니다.\n비워두면 퇴근 없음(null)로 처리됩니다.\n예) 2026-02-16T12:00", outDefault);
+      if(outStr == null) return;
+
+      const inMs = Date.parse(inStr);
+      if(!Number.isFinite(inMs)) return showAlert("출근 시간 형식이 올바르지 않습니다.");
+
+      let outMs = null;
+      if(outStr.trim() !== ""){
+        outMs = Date.parse(outStr);
+        if(!Number.isFinite(outMs)) return showAlert("퇴근 시간 형식이 올바르지 않습니다.");
+        if(outMs < inMs) return showAlert("퇴근 시간이 출근 시간보다 빠를 수 없습니다.");
+      }
+
+      const ok = confirm(`${target} 기록 시간을 수정하시겠습니까?`);
+      if(!ok) return;
+
+      await updateDoc(refDoc, {
+        checkIn: inMs,
+        checkOut: outMs,
+        editedBy: currentUser,
+        editedAt: nowMs()
+      });
+
+      showAlert("근태 기록 시간이 수정되었습니다.");
+    }catch(e){
+      showAlert("시간 수정 중 오류가 발생하였습니다.");
+    }
+  }
+
+  $("refreshStatsBtn").addEventListener("click", async ()=>{
+    if(!currentIsAdmin) return showAlert("관리자 권한이 없습니다.");
+
+    try{
+      const workSnap = await getDocs(colWork);
+      const workByUser = new Map();
+      workSnap.forEach(d=>{
+        const r = d.data() || {};
+        const n = lowerNick(r.nickname);
+        if(!n) return;
+        if(!workByUser.has(n)) workByUser.set(n, []);
+        workByUser.get(n).push({ ...r, _ref: d.ref });
+      });
+
+      const contentSnap = await getDocs(colContent);
+      const supplyCount = new Map();
+      const powerCount = new Map();
+      const escortCount = new Map();
+
+      contentSnap.forEach(d=>{
+        const c = d.data() || {};
+        if(!!c.deleted) return;
+        const type = c.type;
+        const participants = Array.isArray(c.participants) ? c.participants.map(lowerNick) : [];
+        for(const p of participants){
+          if(!p) continue;
+          if(type === "supply") supplyCount.set(p, (supplyCount.get(p)||0) + 1);
+          if(type === "power") powerCount.set(p, (powerCount.get(p)||0) + 1);
+          if(type === "escort") escortCount.set(p, (escortCount.get(p)||0) + 1);
+        }
+      });
+
+      const weekAgo = nowMs() - 7*24*60*60*1000;
+      const users = Array.from(usersCache.keys()).sort((a,b)=>a.localeCompare(b));
+
+      const rows = users.map(n=>{
+        const u = usersCache.get(n) || {};
+        const records = workByUser.get(n) || [];
+        const online = records.some(r => r.checkOut == null);
+
+        let lastIn = 0, lastOut = 0;
+        for(const r of records){
+          if(typeof r.checkIn === "number") lastIn = Math.max(lastIn, r.checkIn);
+          if(typeof r.checkOut === "number") lastOut = Math.max(lastOut, r.checkOut);
+        }
+
+        let totalMs = 0;
+        for(const r of records){
+          const ci = r.checkIn;
+          const co = (r.checkOut == null) ? nowMs() : r.checkOut;
+          if(typeof ci !== "number") continue;
+          const start = Math.max(ci, weekAgo);
+          const end = co;
+          if(end <= weekAgo) continue;
+          if(end > start) totalMs += (end - start);
+        }
+
+        const statusHtml = online
+          ? `<span class="good">🟢 접속 O</span>`
+          : `<span class="bad">🔴 접속 X</span>`;
+
+        const pCnt = powerCount.get(n) || 0;
+        const sCnt = supplyCount.get(n) || 0;
+        const eCnt = escortCount.get(n) || 0;
+
+        const hiddenBadge = u.hidden ? ` <span class="pill" style="opacity:.85;">숨김</span>` : ``;
+        const adminBadge = u.isAdmin ? ` <span class="pill admin" style="margin-left:6px;">ADMIN</span>` : ``;
+
+        return `
+          <tr>
+            <td style="font-weight:900;" class="left">${n}${adminBadge}${hiddenBadge}</td>
+            <td>${statusHtml}</td>
+            <td>${fmt(lastIn)}</td>
+            <td>${fmt(lastOut)}</td>
+            <td>${(totalMs/3600000).toFixed(2)}h</td>
+            <td>${pCnt}</td>
+            <td>${sCnt}</td>
+            <td>${eCnt}</td>
+            <td>
+              <span class="eye ${u.hidden ? "hidden-eye" : ""}" data-eye="${n}" title="숨김 토글">👁</span>
+            </td>
+            <td>
+              <button class="btn small admin" data-forcein="${n}">강제출근</button>
+              <button class="btn small danger" data-forceout="${n}">강제퇴근</button>
+              <button class="btn small" data-editwork="${n}">시간수정</button>
+            </td>
+          </tr>
+        `;
+      }).join("");
+
+      $("userStatsBody").innerHTML = rows || `<tr><td colspan="10" style="color:rgba(255,255,255,0.65);">표시할 유저가 없습니다.</td></tr>`;
+
+      document.querySelectorAll("[data-eye]").forEach(el=>{
+        el.addEventListener("click", async ()=>{
+          const nick = el.getAttribute("data-eye");
+          const cur = usersCache.get(nick) || {};
+          try{
+            await updateDoc(doc(db,"users",nick), { hidden: !cur.hidden });
+            setTinyStatus("statsMsg", "갱신 되었습니다.");
+            $("refreshStatsBtn").click();
+          }catch(e){
+            showAlert("숨김 처리 중 오류가 발생하였습니다.");
+          }
+        });
+      });
+
+      document.querySelectorAll("[data-forcein]").forEach(el=>{
+        el.addEventListener("click", async ()=>{
+          const nick = el.getAttribute("data-forcein");
+          if(!nick) return;
+          await adminForceCheckIn(nick);
+          $("refreshStatsBtn").click();
+        });
+      });
+
+      document.querySelectorAll("[data-forceout]").forEach(el=>{
+        el.addEventListener("click", async ()=>{
+          const nick = el.getAttribute("data-forceout");
+          if(!nick) return;
+          await adminForceCheckOut(nick);
+          $("refreshStatsBtn").click();
+        });
+      });
+
+      document.querySelectorAll("[data-editwork]").forEach(el=>{
+        el.addEventListener("click", async ()=>{
+          const nick = el.getAttribute("data-editwork");
+          if(!nick) return;
+          await adminEditLatestOpenShift(nick);
+          $("refreshStatsBtn").click();
+        });
+      });
+
+      setTinyStatus("statsMsg", "갱신 되었습니다.");
+    }catch(e){
+      showAlert("통계 갱신 중 오류가 발생하였습니다.");
+    }
+  });
+
+  const filterBtn = $("filterBtn");
+  const filterMenu = $("filterMenu");
+  const closeFilter = ()=> filterMenu.classList.remove("open");
+
+  filterBtn.addEventListener("click", ()=> filterMenu.classList.toggle("open"));
+  document.addEventListener("click", (e)=>{
+    if(!filterMenu.contains(e.target) && e.target !== filterBtn) closeFilter();
+  });
+  filterMenu.querySelectorAll("button").forEach(b=>{
+    b.addEventListener("click", ()=>{
+      contentFilter = b.getAttribute("data-filter");
+      closeFilter();
+      contentPage = 1;
+      renderPager(1);
+      openContentPage(1);
+    });
+  });
+
+  const toggleDeletedBtn = $("toggleDeletedBtn");
+  toggleDeletedBtn.addEventListener("click", ()=>{
+    showDeletedContent = !showDeletedContent;
+    toggleDeletedBtn.textContent = `삭제된 기록 보기: ${showDeletedContent ? "ON" : "OFF"}`;
+    contentPage = 1;
+    renderPager(1);
+    openContentPage(1);
+  });
+
+  $("refreshContentBtn").addEventListener("click", ()=>{
+    contentPage = 1;
+    renderPager(1);
+    openContentPage(1);
+  });
+
+  function stopContentRealtime(){
+    if(contentFirstUnsub){
+      contentFirstUnsub();
+      contentFirstUnsub = null;
+    }
+  }
+
+  function applyHiddenFilterToParticipants(parts){
+    if(currentIsAdmin) return parts;
+    return parts.filter(n => !(usersCache.get(lowerNick(n))?.hidden));
+  }
+
+  async function openEditContent(contentId){
+    if(!currentUser) return showAlert("로그인 후 이용해주시기 바랍니다.");
+    try{
+      const snap = await getDoc(doc(db, "contentRecords", contentId));
+      if(!snap.exists()) return showAlert("해당 기록을 찾을 수 없습니다.");
+
+      const c = snap.data() || {};
+      const deleted = !!c.deleted;
+
+      const createdBy = lowerNick(c.createdBy || "");
+      const canEdit = currentIsAdmin || (currentUser === createdBy);
+      if(!canEdit) return showAlert("수정 권한이 없습니다.");
+      if(deleted) return showAlert("삭제된 기록은 수정할 수 없습니다.");
+
+      editingContentId = contentId;
+      editingContentCreatedBy = createdBy;
+      editingContentDeleted = deleted;
+
+      openContentModal(c.type, { isEdit:true });
+
+      selectedSet = new Set((c.participants || []).map(lowerNick));
+      resultOX = (c.result === "O" || c.result === "X") ? c.result : null;
+
+      $("optO").classList.toggle("active", resultOX === "O");
+      $("optX").classList.toggle("active", resultOX === "X");
+
+      renderSelected();
+      renderUserList();
+    }catch(e){
+      showAlert("수정 화면을 여는 중 오류가 발생하였습니다.");
+    }
+  }
+
+  function renderContentRows(docs){
+    const rows = docs.map(ds=>{
+      const c = ds.data() || {};
+      const type = c.type || "-";
+
+      const deleted = !!c.deleted;
+      if(!showDeletedContent && deleted) return null;
+      if(contentFilter !== "all" && type !== contentFilter) return null;
+
+      const label =
+        (type === "supply") ? "보급" :
+        (type === "power") ? "송전소" :
+        (type === "escort") ? "차량 수호" :
+        type;
+
+      const time = fmt(c.time);
+
+      const rawParts = Array.isArray(c.participants) ? c.participants : [];
+      const parts = applyHiddenFilterToParticipants(rawParts);
+      const participants = parts.length ? parts.join(", ") : (rawParts.length ? "(숨김 처리됨)" : "-");
+
+      // ✅ 보급 + 차량수호만 결과 표시
+      const result = (type === "supply" || type === "escort") ? (c.result || "-") : "-";
+
+      const delCell = deleted
+        ? `<span class="pill" style="opacity:.85;">삭제됨</span>`
+        : `<button class="btn danger icon" data-softdel="${ds.id}">삭제</button>`;
+
+      const createdBy = lowerNick(c.createdBy || "");
+      const canEdit = currentIsAdmin || (currentUser === createdBy);
+
+      const editCell = (!deleted && canEdit)
+        ? `<button class="btn admin icon" data-editcontent="${ds.id}">수정</button>`
+        : `<span style="opacity:.6; font-weight:900;">-</span>`;
+
+      const deletedMeta = deleted
+        ? `<div style="margin-top:6px; color:rgba(255,255,255,0.65); font-size:12px; font-weight:900;">
+             삭제: ${fmt(c.deletedAt)} / ${c.deletedBy || "-"}
+           </div>`
+        : ``;
+
+      return `
+        <tr>
+          <td style="font-weight:900;">${label}${deleted ? ` <span class="pill" style="margin-left:6px;">DELETED</span>` : ""}</td>
+          <td>${time}</td>
+          <td class="left">${participants}${deletedMeta}</td>
+          <td style="font-weight:900;">${result}</td>
+          <td>${delCell}</td>
+          <td>${editCell}</td>
+        </tr>
+      `;
+    }).filter(Boolean).join("");
+
+    $("contentBody").innerHTML = rows || `<tr><td colspan="6" style="color:rgba(255,255,255,0.65);">기록이 없습니다.</td></tr>`;
+
+    $("contentBody").querySelectorAll("[data-softdel]").forEach(btn=>{
+      btn.addEventListener("click", async ()=>{
+        if(!currentIsAdmin) return showAlert("관리자 권한이 없습니다.");
+        const id = btn.getAttribute("data-softdel");
+        if(!id) return;
+
+        const ok = confirm("이 콘텐츠 기록을 삭제 처리(소프트 삭제)하시겠습니까?");
+        if(!ok) return;
+
+        try{
+          await updateDoc(doc(db, "contentRecords", id), {
+            deleted: true,
+            deletedAt: nowMs(),
+            deletedBy: currentUser || "unknown"
+          });
+
+          if(contentPage !== 1){
+            openContentPage(contentPage);
+          }
+        }catch(e){
+          showAlert("삭제 처리 중 오류가 발생하였습니다.");
+        }
+      });
+    });
+
+    $("contentBody").querySelectorAll("[data-editcontent]").forEach(btn=>{
+      btn.addEventListener("click", async ()=>{
+        const id = btn.getAttribute("data-editcontent");
+        if(!id) return;
+        await openEditContent(id);
+      });
+    });
+  }
+
+  function renderPager(active){
+    const maxShow = 11;
+    const start = Math.max(1, active - Math.floor(maxShow/2));
+    const end = start + maxShow - 1;
+
+    let html = `<span class="pagebtn" data-page="prev">◀</span>`;
+    for(let p=start; p<=end; p++){
+      html += `<span class="pagebtn ${p===active?"active":""}" data-page="${p}">${p}</span>`;
+    }
+    html += `<span class="pagebtn" data-page="next">▶</span>`;
+    $("pager").innerHTML = html;
+
+    $("pager").querySelectorAll("[data-page]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        const v = btn.getAttribute("data-page");
+        if(v === "prev"){
+          if(contentPage > 1) openContentPage(contentPage - 1);
+          return;
+        }
+        if(v === "next"){
+          openContentPage(contentPage + 1);
+          return;
+        }
+        const p = parseInt(v,10);
+        if(Number.isFinite(p)) openContentPage(p);
+      });
+    });
+  }
+
+  function baseContentQuery(){
+    return query(colContent, orderBy("time","desc"), limit(PAGE_SIZE));
+  }
+
+  async function openContentPage(page){
+    if(!currentIsAdmin) return showAlert("관리자 권한이 없습니다.");
+    contentPage = page;
+
+    if(page === 1){
+      stopContentRealtime();
+      const q = baseContentQuery();
+      contentFirstUnsub = onSnapshot(q, (snap)=>{
+        const docs = snap.docs;
+        pageCursors[1] = docs.length ? docs[docs.length-1] : null;
+        renderContentRows(docs);
+        renderPager(1);
+      });
+      return;
+    }
+
+    stopContentRealtime();
+
+    try{
+      if(!pageCursors[1]){
+        const first = await getDocs(baseContentQuery());
+        if(first.docs.length){
+          pageCursors[1] = first.docs[first.docs.length-1];
+        }else{
+          contentPage = 1;
+          renderPager(1);
+          renderContentRows([]);
+          return;
+        }
+      }
+
+      for(let p=2; p<=page; p++){
+        if(pageCursors[p-1] == null){
+          const prevCursor = pageCursors[p-2] || pageCursors[1];
+          const prevQ = query(colContent, orderBy("time","desc"), startAfter(prevCursor), limit(PAGE_SIZE));
+          const prevSnap = await getDocs(prevQ);
+          if(prevSnap.docs.length){
+            pageCursors[p-1] = prevSnap.docs[prevSnap.docs.length-1];
+          }else{
+            contentPage = p-1;
+            break;
+          }
+        }
+      }
+
+      const prevLast = pageCursors[page-1];
+      if(!prevLast){
+        contentPage = Math.max(1, page-1);
+        renderPager(contentPage);
+        return;
+      }
+
+      const q = query(colContent, orderBy("time","desc"), startAfter(prevLast), limit(PAGE_SIZE));
+      const snap = await getDocs(q);
+
+      if(snap.docs.length === 0){
+        contentPage = Math.max(1, page-1);
+        renderPager(contentPage);
+        return;
+      }
+
+      pageCursors[page] = snap.docs[snap.docs.length-1];
+      renderContentRows(snap.docs);
+      renderPager(contentPage);
+    }catch(e){
+      showAlert("페이지 로딩 중 오류가 발생하였습니다.");
+      contentPage = 1;
+      renderPager(1);
+      renderContentRows([]);
+    }
+  }
+
+  // 관리자 권한 모달
+  const adminRoleModal = $("adminRoleModal");
+  function openAdminRoleModal(){
+    if(!currentIsAdmin) return showAlert("관리자 권한이 없습니다.");
+    adminRoleSet = new Set();
+    $("adminRoleSearch").value = "";
+    $("adminRoleListWrap").style.display = "none";
+    renderAdminRoleSelected();
+    renderAdminRoleList();
+    adminRoleModal.classList.add("show");
+    adminRoleModal.setAttribute("aria-hidden","false");
+  }
+  function closeAdminRoleModal(){
+    adminRoleModal.classList.remove("show");
+    adminRoleModal.setAttribute("aria-hidden","true");
+  }
+  $("adminRoleBtn").addEventListener("click", openAdminRoleModal);
+  $("adminRoleCloseTop").addEventListener("click", closeAdminRoleModal);
+  adminRoleModal.addEventListener("click", (e)=>{ if(e.target===adminRoleModal) closeAdminRoleModal(); });
+
+  $("adminRoleToggleListBtn").addEventListener("click", ()=>{
+    const wrap = $("adminRoleListWrap");
+    wrap.style.display = (wrap.style.display === "none") ? "block" : "none";
+  });
+  $("adminRoleSearch").addEventListener("input", renderAdminRoleList);
+
+  function renderAdminRoleSelected(){
+    const el = $("adminRoleSelected");
+    if(adminRoleSet.size === 0){
+      el.innerHTML = `<span style="color:rgba(255,255,255,0.65); font-weight:900;">선택된 유저가 없습니다.</span>`;
+      return;
+    }
+    el.innerHTML = Array.from(adminRoleSet).map(n => `
+      <span class="selchip">
+        ${n}
+        <span class="xbtn" data-arx="${n}">×</span>
+      </span>
+    `).join("");
+
+    el.querySelectorAll("[data-arx]").forEach(btn=>{
+      btn.addEventListener("click", ()=>{
+        adminRoleSet.delete(btn.getAttribute("data-arx"));
+        renderAdminRoleSelected();
+      });
+    });
+  }
+
+  function renderAdminRoleList(){
+    const list = $("adminRoleList");
+    const q = lowerNick($("adminRoleSearch").value);
+
+    const users = Array.from(usersCache.keys()).sort((a,b)=>a.localeCompare(b));
+    const filtered = q ? users.filter(n => n.includes(q)) : users;
+
+    list.innerHTML = filtered.length ? filtered.map(n=>{
+      const u = usersCache.get(n) || {};
+      const badges = [];
+      if(u.isAdmin) badges.push("관리자");
+      if(u.hidden) badges.push("숨김");
+      const tag = badges.length ? badges.join(" · ") : "유저";
+      return `
+        <div class="userrow" data-arn="${n}">
+          <div class="name">${n}</div>
+          <div class="tag">${tag}</div>
+        </div>
+      `;
+    }).join("") : `<div style="color:rgba(255,255,255,0.7); font-weight:900;">검색 결과가 없습니다.</div>`;
+
+    list.querySelectorAll("[data-arn]").forEach(row=>{
+      row.addEventListener("click", ()=>{
+        const n = row.getAttribute("data-arn");
+        if(!n) return;
+        adminRoleSet.add(n);
+        renderAdminRoleSelected();
+      });
+    });
+  }
+
+  async function applyAdminRole(isAdminValue){
+    if(!currentIsAdmin) return showAlert("관리자 권한이 없습니다.");
+    const targets = Array.from(adminRoleSet);
+    if(targets.length === 0) return showAlert("선택된 유저가 없습니다.");
+
+    const ok = confirm(isAdminValue ? "선택 유저를 관리자 임명하시겠습니까?" : "선택 유저를 관리자 해임하시겠습니까?");
+    if(!ok) return;
+
+    try{
+      await Promise.all(targets.map(n => updateDoc(doc(db,"users",n), { isAdmin: isAdminValue })));
+      adminRoleSet = new Set();
+      renderAdminRoleSelected();
+      renderAdminRoleList();
+      setTinyStatus("statsMsg", "갱신 되었습니다.");
+    }catch(e){
+      showAlert("관리자 권한 적용 중 오류가 발생하였습니다.");
+    }
+  }
+  $("adminRoleGrantBtn").addEventListener("click", ()=> applyAdminRole(true));
+  $("adminRoleRevokeBtn").addEventListener("click", ()=> applyAdminRole(false));
+
+  (async ()=>{
+    try{ await refreshUsersCacheOnce(); }catch{}
+  })();
+</script>
+</body>
+</html>
