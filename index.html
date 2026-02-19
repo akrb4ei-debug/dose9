@@ -134,6 +134,34 @@
     $("toast").textContent = msg || "";
     if(msg) setTimeout(()=>{ if($("toast").textContent===msg) $("toast").textContent=""; }, 3500);
   }
+  function describeFsError(e){
+    const code = e?.code ? String(e.code) : "";
+    const msg = e?.message ? String(e.message) : String(e||"");
+    if(code.includes("permission-denied") || msg.includes("permission-denied")){
+      return "Firestore 권한이 거부되었습니다. (Rules 확인 필요)";
+    }
+    if(code.includes("resource-exhausted") || msg.includes("resource-exhausted") || msg.toLowerCase().includes("quota")){
+      return "Firestore 할당량(읽기/쓰기) 한도를 초과했습니다. (오늘 0시 이후 복구되거나 Blaze 업그레이드 필요)";
+    }
+    if(code.includes("failed-precondition") || msg.includes("failed-precondition")){
+      return "필요한 Firestore 인덱스가 없습니다. (콘솔 에러에 뜨는 index 링크를 눌러 생성 필요)";
+    }
+    if(code.includes("unavailable") || msg.includes("unavailable")){
+      return "네트워크/Firestore가 일시적으로 불안정합니다. 잠시 후 재시도해 주세요.";
+    }
+    return "알 수 없는 오류가 발생했습니다. (F12 콘솔 확인 필요)";
+  }
+
+  async function safe(label, fn){
+    try{
+      return await fn();
+    }catch(e){
+      console.error("[ERROR]", label, e);
+      alert(`${label} 중 오류가 발생했습니다.\n\n${describeFsError(e)}\n\n자세한 내용은 F12 콘솔을 확인해 주세요.`);
+      throw e;
+    }
+  }
+
 
   function escapeHtml(s){
     return String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;").replaceAll("'","&#039;");
@@ -158,6 +186,7 @@
     snap.forEach(d=>m.set(d.id, d.data()));
     usersCache = m;
     renderDeptSelects();
+    renderAdminWorkUserSelect();
   }
 
   function renderTop(){
@@ -232,17 +261,26 @@ Firebase 콘솔 → Firestore Database → 규칙(Rules)에서
 
   // ===== Refresh =====
   async function refreshAll(){
-    await Promise.all([
-      loadStatsOnce(),
-      loadOnlineOnce(),
-      refreshContentSummary(),
-      resetContentPagingAndLoad(),
-    ]);
-    if(isAdmin()){
-      await resetAdminContentPagingAndLoad();
+    // ✅ 일부 로드가 실패해도 나머지는 계속 진행되도록 개별 try/catch로 실행합니다.
+    const tasks = [
+      ["유저 통계 갱신", async()=>{ await loadStatsOnce(); }],
+      ["접속 목록 갱신", async()=>{ await loadOnlineOnce(); }],
+      ["컨텐츠 요약 갱신", async()=>{ await refreshContentSummary(); }],
+      ["컨텐츠 목록 갱신", async()=>{ await resetContentPagingAndLoad(); }],
+    ];
+
+    for(const [label, fn] of tasks){
+      try{ await fn(); }
+      catch(e){ console.error("refreshAll partial fail:", label, e); }
     }
-    renderMyInfo();
-    renderUserDirectory();
+
+    if(isAdmin()){
+      try{ await resetAdminContentPagingAndLoad(); }catch(e){ console.error("admin content refresh fail", e); }
+    }
+
+    try{ renderMyInfo(); }catch(e){ console.error(e); }
+    try{ renderUserDirectory(); }catch(e){ console.error(e); }
+
     setToast("갱신 되었습니다.");
   }
   window.refreshAll = refreshAll;
@@ -954,6 +992,10 @@ Firebase 콘솔 → Firestore Database → 규칙(Rules)에서
     resetContentPagingAndLoad();
     if(isAdmin()) resetAdminContentPagingAndLoad();
   }
+  window.loadStatsOnce = loadStatsOnce;
+  window.loadOnlineOnce = loadOnlineOnce;
+  window.refreshContentSummary = refreshContentSummary;
+  window.resetContentPagingAndLoad = resetContentPagingAndLoad;
   window.setContentFilter = setContentFilter;
 
   // ===== Content paging (numbered) =====
@@ -1009,16 +1051,21 @@ Firebase 콘솔 → Firestore Database → 규칙(Rules)에서
     const pager = $("contentPager");
     if(!pager) return;
 
+    // ✅ 20개(페이지 사이즈) 이상일 때만 다음 페이지가 "존재 가능"합니다.
     const maxPageIndex = contentPage + (contentHasMore ? 1 : 0);
-    const start = Math.max(0, contentPage-3);
-    const end = Math.min(maxPageIndex, contentPage+3);
+    const start = Math.max(0, contentPage - 3);
+    const end = Math.min(maxPageIndex, contentPage + 3);
 
-    let html = '';
-    html += '<button class="pagebtn" onclick="goContentPage(' + Math.max(0, contentPage-1) + ')" ' + (contentPage===0?'disabled':'') + '>이전</button>';
+    let html = "";
+    html += `<button class="pagebtn" onclick="goContentPage(${Math.max(0, contentPage-1)})" ${contentPage===0?"disabled":""}>이전</button>`;
 
     for(let i=start;i<=end;i++){
-      html += '<button class="pagebtn ' + (i===contentPage?'active':'') + '" onclick="goContentPage(' + i + ')">' + (i+1) + '</button>';
+      html += `<button class="pagebtn ${i===contentPage?"active":""}" onclick="goContentPage(${i})">${i+1}</button>`;
     }
+
+    html += `<button class="pagebtn" onclick="${contentHasMore ? `goContentPage(${contentPage+1})` : "void(0)"}" ${contentHasMore ? "" : "disabled"}>다음</button>`;
+    pager.innerHTML = html;
+  }
 
     if(contentHasMore){
       html += '<button class="pagebtn" onclick="goContentPage(' + (contentPage+1) + ')">다음</button>';
@@ -1085,15 +1132,19 @@ Firebase 콘솔 → Firestore Database → 규칙(Rules)에서
     if(!pager) return;
 
     const maxPageIndex = adminContentPage + (adminContentHasMore ? 1 : 0);
-    const start = Math.max(0, adminContentPage-3);
-    const end = Math.min(maxPageIndex, adminContentPage+3);
+    const start = Math.max(0, adminContentPage - 3);
+    const end = Math.min(maxPageIndex, adminContentPage + 3);
 
-    let html = '';
-    html += '<button class="pagebtn" onclick="goAdminContentPage(' + Math.max(0, adminContentPage-1) + ')" ' + (adminContentPage===0?'disabled':'') + '>이전</button>';
+    let html = "";
+    html += `<button class="pagebtn" onclick="goAdminContentPage(${Math.max(0, adminContentPage-1)})" ${adminContentPage===0?"disabled":""}>이전</button>`;
 
     for(let i=start;i<=end;i++){
-      html += '<button class="pagebtn ' + (i===adminContentPage?'active':'') + '" onclick="goAdminContentPage(' + i + ')">' + (i+1) + '</button>';
+      html += `<button class="pagebtn ${i===adminContentPage?"active":""}" onclick="goAdminContentPage(${i})">${i+1}</button>`;
     }
+
+    html += `<button class="pagebtn" onclick="${adminContentHasMore ? `goAdminContentPage(${adminContentPage+1})` : "void(0)"}" ${adminContentHasMore ? "" : "disabled"}>다음</button>`;
+    pager.innerHTML = html;
+  }
 
     if(adminContentHasMore){
       html += '<button class="pagebtn" onclick="goAdminContentPage(' + (adminContentPage+1) + ')">다음</button>';
@@ -1289,6 +1340,14 @@ Firebase 콘솔 → Firestore Database → 규칙(Rules)에서
       sel.value = chatDept;
     }
   }
+
+  function renderAdminWorkUserSelect(){
+    const sel = $("adminWorkUser");
+    if(!sel) return;
+    const names = Array.from(usersCache.keys()).sort((a,b)=>a.localeCompare(b,"ko"));
+    sel.innerHTML = `<option value="">(유저 선택)</option>` + names.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
+  }
+
 
   function openChatSmart(){
     const dept = currentUserData?.department;
@@ -1505,6 +1564,21 @@ Firebase 콘솔 → Firestore Database → 규칙(Rules)에서
 
   // ===== Boot globals =====
 
+
+  // ✅ 버튼이 "안 먹는" 느낌일 때 원인 파악을 위해, 숨겨진 에러를 알림으로 표시합니다.
+  window.addEventListener('unhandledrejection', (e)=>{
+    try{
+      const msg = e?.reason?.message || String(e.reason || e);
+      console.error('UnhandledRejection:', e.reason);
+      if(msg.includes('permission-denied')) alert('작업이 차단되었습니다: Firestore 권한(permission-denied)\nRules를 확인해 주세요.');
+      else if(msg.includes('resource-exhausted')) alert('작업이 차단되었습니다: Firestore 할당량 초과(resource-exhausted)\n오늘 한도 초과일 수 있습니다.');
+      else alert('오류가 발생했습니다. 콘솔(F12)을 확인해 주세요.\n' + msg);
+    }catch(_){}
+  });
+  window.addEventListener('error', (e)=>{
+    console.error('WindowError:', e?.error || e);
+  });
+
   // ✅ 로그인 입력창에서 Enter를 누르면 로그인합니다.
   document.addEventListener("keydown",(e)=>{
     if(document.getElementById("loginBox") && !document.getElementById("loginBox").classList.contains("hidden")){
@@ -1518,6 +1592,7 @@ Firebase 콘솔 → Firestore Database → 규칙(Rules)에서
     }
   });
 
+  window.loadStatsOnce = loadStatsOnce;
   window.setContentFilter = setContentFilter;
 </script>
 </head>
