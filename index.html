@@ -52,6 +52,7 @@
   button.danger{border-color:#5b2b2b;background:#241314}
   button.danger:hover{background:#2c1618}
   button.pillbtn{padding:7px 11px;border-radius:999px}
+  button:disabled{opacity:.5;cursor:not-allowed}
   input,select{
     background:#0f0f12;color:#fff;border:1px solid var(--border2);
     padding:8px 10px;border-radius:12px;margin:3px;
@@ -67,18 +68,12 @@
   .right{margin-left:auto}
   .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
 
-  /* ===== 테이블(유저 통계 컴팩트) ===== */
+  /* ===== 테이블 ===== */
   .tableWrap{border:1px solid #23232a;border-radius:14px;overflow:auto;background:#0f0f12}
-  table{width:100%;border-collapse:collapse;min-width:760px}
+  table{width:100%;border-collapse:collapse;min-width:520px}
   th,td{border-bottom:1px solid #23232a;padding:10px 10px;text-align:left;font-size:13px;vertical-align:middle}
   th{position:sticky;top:0;background:#101014;color:#e8e8ee;font-weight:750;z-index:1}
   tr:hover td{background:#121218}
-  .clickRow{cursor:pointer}
-  .detailRow td{padding:0;border-bottom:none}
-  .detailBox{
-    padding:12px 12px;background:#0b0b0e;border-top:1px solid #23232a;
-    display:flex;gap:10px;flex-wrap:wrap;align-items:center
-  }
 
   /* ===== 컨텐츠 필터 ===== */
   .dropWrap{position:relative;display:inline-block}
@@ -124,28 +119,27 @@
   .u{ text-decoration: underline; text-decoration-thickness: 2px; }
   .s{ text-decoration: line-through; text-decoration-thickness: 2px; opacity:.85; }
 
-  /* ===== 관리자 패널(전면 오버레이 드로어) ===== */
+  /* ===== 관리자 패널: 전면 드로어(스크롤 박스 없앰) ===== */
   .drawerBack{
     position:fixed; inset:0; background:rgba(0,0,0,.6);
     z-index:9000; display:flex; justify-content:flex-end;
   }
   .drawer{
     width:min(980px, 96vw);
-    height:100%;
+    height:auto;
     background:linear-gradient(180deg,var(--panel),var(--panel2));
     border-left:1px solid var(--border);
     box-shadow:-20px 0 60px rgba(0,0,0,.45);
     padding:16px;
-    overflow:auto;
+    overflow: visible; /* ✅ 내부 스크롤 박스 제거 */
   }
   .drawerTop{
-    position:sticky; top:0;
     background:rgba(20,20,22,.92); backdrop-filter: blur(10px);
     border:1px solid var(--border);
     border-radius:14px;
     padding:10px 12px;
     display:flex; align-items:center; gap:10px; justify-content:space-between;
-    z-index:1;
+    margin-bottom:12px;
   }
   details.adminSec{
     border:1px solid #23232a;border-radius:14px;background:#0f0f12;
@@ -160,16 +154,18 @@
   .sumHint{font-weight:500;color:var(--muted);font-size:12px;margin-left:auto}
   .secBody{padding-top:10px}
 
-  .barWrap{margin-top:10px;display:flex;flex-direction:column;gap:8px}
-  .barRow{display:grid;grid-template-columns:200px 1fr 90px;gap:10px;align-items:center}
-  .barBg{height:10px;border:1px solid #2f2f36;border-radius:999px;overflow:hidden;background:#0a0a0c}
-  .barFill{height:100%;background:var(--accent)}
+  /* 관리자 페이징 */
+  .adminPager{
+    margin-top:10px;
+    display:flex;gap:8px;align-items:center;flex-wrap:wrap;
+    padding:8px 10px;border:1px solid #23232a;border-radius:14px;background:#0b0b0e;
+  }
 </style>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-  getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc,
+  getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc,
   query, where, orderBy, limit, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -193,9 +189,6 @@ let currentUser=null;
 let currentUserData=null;
 let usersCache=new Map();
 
-let autoTimer=null;
-let sortMode="rank_desc";
-
 let contentDocsCache=[];
 let contentFilter="ALL";
 let contentPage=0;
@@ -208,7 +201,9 @@ let editBaseParticipants=[];
 let editSelected=new Set();
 let editSearchQ="";
 
-let statsExpandedUser=null; // 유저 통계 디테일 펼치기(1명만)
+/* 관리자 유저 목록 페이징(스크롤 박스 대신) */
+let adminUserPage=0;
+const ADMIN_PAGE_SIZE=10;
 
 const RANKS=["군의관","하사","중사","상사","원사","소위","중위","대위","소령","중령","대령"];
 const DEPTS=[
@@ -219,8 +214,6 @@ const DEPTS=[
 function $(id){return document.getElementById(id);}
 function show(id,f){const el=$(id); if(el) el.classList.toggle("hidden",!f);}
 function isAdmin(){return !!currentUserData?.isAdmin || !!currentUserData?.isadmin;}
-function stopAuto(){ if(autoTimer){ clearInterval(autoTimer); autoTimer=null; } }
-function startAuto(){ stopAuto(); autoTimer=setInterval(()=>refreshAll(false), 60*1000); }
 
 function err(e){
   if(e?.code==="permission-denied") return "Firestore 권한 문제(Rules 확인 필요)";
@@ -244,7 +237,6 @@ function normalizeUserDoc(d){
   if(out.rankname!==undefined && out.rank===undefined) out.rank=out.rankname;
   return out;
 }
-function rankIndex(rank){ const i=RANKS.indexOf(rank||""); return i>=0?i:-1; }
 function toDateOrNull(ts){
   if(!ts) return null;
   if(ts instanceof Date) return ts;
@@ -262,7 +254,7 @@ function fmtKST(ts){
    ✅ 컨텐츠 수정 모달: 절대 자동 오픈 금지(강제 숨김)
    ========================= */
 function hardCloseModal(){
-  const m=document.getElementById("contentModal");
+  const m=$("contentModal");
   if(!m) return;
 
   const active=document.activeElement;
@@ -273,17 +265,17 @@ function hardCloseModal(){
 
   m.setAttribute("inert","");
   m.classList.add("hidden");
-  m.hidden = true; // ✅ 브라우저 레벨 강제 숨김
+  m.hidden = true;
 }
 function hardOpenModal(){
-  const m=document.getElementById("contentModal");
+  const m=$("contentModal");
   if(!m) return;
 
   m.hidden = false;
   m.classList.remove("hidden");
   m.removeAttribute("inert");
 
-  setTimeout(()=>{ document.getElementById("mClose")?.focus?.(); },0);
+  setTimeout(()=>$("mClose")?.focus?.(),0);
 }
 function closeEditModal(){
   hardCloseModal();
@@ -292,19 +284,35 @@ function closeEditModal(){
 }
 
 /* =========================
-   ✅ 관리자 패널: 전면 드로어
+   ✅ 관리자 패널: 안 지워짐 방지(강제 숨김)
    ========================= */
-function closeAdminDrawer(){
-  show("adminDrawerBack", false);
+function hardCloseDrawer(){
+  const back=$("adminDrawerBack");
+  if(!back) return;
+
+  const active=document.activeElement;
+  if(active && back.contains(active)) active.blur?.();
+
+  back.setAttribute("inert","");
+  back.classList.add("hidden");
+  back.hidden = true; // ✅ 강제 숨김
 }
-function openAdminDrawer(){
-  if(!isAdmin()) return;
-  show("adminDrawerBack", true);
-  setTimeout(()=>{ document.getElementById("adminDrawerClose")?.focus?.(); },0);
+function hardOpenDrawer(){
+  const back=$("adminDrawerBack");
+  if(!back) return;
+
+  back.hidden = false;
+  back.classList.remove("hidden");
+  back.removeAttribute("inert");
+
+  setTimeout(()=>$("adminDrawerClose")?.focus?.(),0);
 }
 function toggleAdminDrawer(){
-  const isOpen = !$("adminDrawerBack").classList.contains("hidden");
-  if(isOpen) closeAdminDrawer(); else openAdminDrawer();
+  if(!isAdmin()) return;
+  const back=$("adminDrawerBack");
+  const isOpen = back && !back.hidden;
+  if(isOpen) hardCloseDrawer();
+  else hardOpenDrawer();
 }
 
 /* ===== 로그인/유저 ===== */
@@ -328,22 +336,21 @@ async function login(){
     show("mainBox",true);
 
     await refreshAll(true);
-    startAuto();
   }catch(e){ alert(err(e)); console.error(e); }
 }
-
 function logout(){
-  stopAuto();
   currentUser=null; currentUserData=null;
   usersCache=new Map();
-  contentDocsCache=[]; contentPage=0; contentFilter="ALL"; sortMode="rank_desc"; filterOpen=false;
-  statsExpandedUser=null;
+  contentDocsCache=[]; contentPage=0; contentFilter="ALL"; filterOpen=false;
+  adminUserPage=0;
+
   $("loginPw").value="";
   closeEditModal();
-  closeAdminDrawer();
-  show("mainBox",false); show("loginBox",true);
-}
+  hardCloseDrawer();
 
+  show("mainBox",false);
+  show("loginBox",true);
+}
 function renderTopBar(){
   $("userInfo").innerHTML=`
     <span class="chip"><b>${escapeHtml(currentUser)}</b></span>
@@ -353,15 +360,11 @@ function renderTopBar(){
   `;
   show("adminToggleBtn", isAdmin());
 }
-
 async function loadUsers(){
   const snap=await getDocs(colUsers);
   usersCache=new Map();
   snap.forEach(d=>usersCache.set(d.id, normalizeUserDoc(d.data())));
-  if(isAdmin()){
-    renderAdminUserTable();
-    renderAdminWorkUserSelect();
-  }
+  if(isAdmin()) renderAdminUserTable();
 }
 
 /* ===== 근태 ===== */
@@ -383,6 +386,7 @@ async function checkOut(){
   }catch(e){ alert(err(e)); console.error(e); }
 }
 
+/* ===== 접속 목록 ===== */
 async function loadOnline(){
   try{
     const openQ=query(colWork,where("checkOut","==",null));
@@ -407,180 +411,31 @@ async function loadOnline(){
   }
 }
 
-/* ===== 유저 통계(컴팩트 테이블 + 1줄 디테일 펼치기) ===== */
+/* ===== 유저 통계: 유저 목록 + 접속(O/X)만 ===== */
 async function loadStats(){
   try{
-    const seven=new Date(); seven.setDate(seven.getDate()-7);
-
     const openQ=query(colWork,where("checkOut","==",null));
     const openSnap=await getDocs(openQ);
     const openSet=new Set();
     openSnap.forEach(d=>{const r=d.data(); if(r?.nickname) openSet.add(r.nickname);});
 
-    const recentQ=query(colWork,where("checkIn",">=",seven));
-    const recentSnap=await getDocs(recentQ);
-
-    const map=new Map();
-    usersCache.forEach((_,name)=>map.set(name,{total:0,open:openSet.has(name), lastIn:null, lastOut:null}));
-
-    recentSnap.forEach(d=>{
-      const r=d.data(); if(!r?.nickname) return;
-      if(!map.has(r.nickname)) map.set(r.nickname,{total:0,open:openSet.has(r.nickname), lastIn:null, lastOut:null});
-      const ci=toDateOrNull(r.checkIn);
-      const co=toDateOrNull(r.checkOut);
-      const st=map.get(r.nickname);
-
-      if(ci && (!st.lastIn || ci>st.lastIn)) st.lastIn=ci;
-      if(co && (!st.lastOut || co>st.lastOut)) st.lastOut=co;
-
-      if(ci && co){
-        st.total += Math.max(0, Math.floor((co-ci)/1000));
-      }
-    });
-
-    renderStatsTable(map);
-
-    if(isAdmin() && !$("adminDrawerBack").classList.contains("hidden")){
-      renderGraphFromStats(map);
-    }
+    renderStatsSimple(openSet);
   }catch(e){ alert(err(e)); console.error(e); }
 }
-
-function sortedUserEntries(map){
-  const entries=Array.from(usersCache.entries()).map(([name,ud])=>{
-    const st=map.get(name)||{total:0,open:false,lastIn:null,lastOut:null};
-    return {name,ud,st};
-  });
-  const cmpName=(a,b)=>a.name.localeCompare(b.name,"ko");
-
-  if(sortMode==="rank_desc"){
-    entries.sort((a,b)=>{
-      const ra=rankIndex(a.ud.rank), rb=rankIndex(b.ud.rank);
-      if(ra!==rb) return rb-ra;
-      return cmpName(a,b);
-    });
-  }else if(sortMode==="rank_asc"){
-    entries.sort((a,b)=>{
-      const ra=rankIndex(a.ud.rank), rb=rankIndex(b.ud.rank);
-      if(ra!==rb) return ra-rb;
-      return cmpName(a,b);
-    });
-  }else if(sortMode==="online_first"){
-    entries.sort((a,b)=>{
-      if(a.st.open!==b.st.open) return (b.st.open?1:0)-(a.st.open?1:0);
-      return cmpName(a,b);
-    });
-  }else{
-    entries.sort(cmpName);
-  }
-  return entries;
-}
-
-function renderStatsTable(map){
-  const entries=sortedUserEntries(map);
-
-  let html = `
-    <div class="tableWrap">
-      <table>
-        <thead>
-          <tr>
-            <th style="min-width:160px;">닉네임</th>
-            <th style="min-width:110px;">계급</th>
-            <th style="min-width:180px;">부서</th>
-            <th style="min-width:90px;">접속</th>
-            <th style="min-width:140px;">최근7일</th>
-            <th style="min-width:170px;">마지막 출근</th>
-            <th style="min-width:170px;">마지막 퇴근</th>
-          </tr>
-        </thead>
-        <tbody>
-  `;
-
-  for(const it of entries){
-    const {name,ud,st}=it;
-    const isExpanded = (statsExpandedUser===name);
-    const lastInTxt = st.lastIn ? fmtKST(st.lastIn) : "-";
-    const lastOutTxt = st.lastOut ? fmtKST(st.lastOut) : "-";
-    const hours = Math.floor((st.total||0)/3600);
-
-    html += `
-      <tr class="clickRow" data-strow="${escapeHtml(name)}">
-        <td><b>${escapeHtml(name)}</b> ${ud.isHidden?`<span class="badge">숨김</span>`:""}</td>
-        <td><span class="badge">${escapeHtml(ud.rank||"-")}</span></td>
-        <td><span class="badge">${escapeHtml(ud.department||"-")}</span></td>
-        <td><span class="badge">${st.open?"O":"X"}</span></td>
-        <td><b>${hours}h</b></td>
-        <td class="small">${escapeHtml(lastInTxt)}</td>
-        <td class="small">${escapeHtml(lastOutTxt)}</td>
+function renderStatsSimple(openSet){
+  const names=Array.from(usersCache.keys()).sort((a,b)=>a.localeCompare(b,"ko"));
+  const tbody=$("statsTbody");
+  tbody.innerHTML = names.map(n=>{
+    const ud=usersCache.get(n);
+    const canShow = isAdmin() ? true : !ud?.isHidden; // 일반 유저는 숨김 유저 통계에도 안 보이게 할지 여부
+    if(!canShow) return "";
+    return `
+      <tr>
+        <td><b>${escapeHtml(n)}</b></td>
+        <td><span class="badge">${openSet.has(n) ? "O" : "X"}</span></td>
       </tr>
     `;
-
-    if(isExpanded){
-      html += `
-        <tr class="detailRow">
-          <td colspan="7">
-            <div class="detailBox">
-              <span class="tag">유저: <b>${escapeHtml(name)}</b></span>
-              <span class="tag">접속: <b>${st.open?"O":"X"}</b></span>
-              <span class="tag">최근7일: <b>${hours}시간</b></span>
-              ${isAdmin()?`<button class="pillbtn danger" data-force="${escapeHtml(name)}" type="button">강제퇴근</button>`:""}
-              <span class="small">※ 행을 다시 클릭하면 접힙니다.</span>
-            </div>
-          </td>
-        </tr>
-      `;
-    }
-  }
-
-  html += `</tbody></table></div>`;
-  $("statsArea").innerHTML = html;
-
-  // 펼치기 토글
-  document.querySelectorAll("[data-strow]").forEach(tr=>{
-    tr.onclick=()=>{
-      const u=tr.getAttribute("data-strow");
-      statsExpandedUser = (statsExpandedUser===u) ? null : u;
-      renderStatsTable(map);
-    };
-  });
-
-  // 강제퇴근
-  document.querySelectorAll("[data-force]").forEach(btn=>{
-    btn.onclick=async(e)=>{
-      e.stopPropagation();
-      try{
-        const name=btn.getAttribute("data-force");
-        if(!confirm(`${name} 님을 강제 퇴근 처리하시겠습니까?`)) return;
-        const q=query(colWork,where("nickname","==",name),where("checkOut","==",null));
-        const snap=await getDocs(q);
-        for(const d of snap.docs){
-          await updateDoc(doc(db,"workRecords",d.id),{checkOut:serverTimestamp()});
-        }
-        await loadStats(); await loadOnline();
-      }catch(e2){ alert(err(e2)); console.error(e2); }
-    };
-  });
-}
-
-/* ===== 그래프(관리자 드로어에 표시) ===== */
-function renderGraphFromStats(map){
-  const entries=sortedUserEntries(map);
-  const maxSec=Math.max(1, ...entries.map(e=>e.st.total||0));
-  $("graphArea").innerHTML=`
-    <div class="small">* 최근 7일 누적 근무시간(시간) 기준 그래프입니다.</div>
-    <div class="barWrap">
-      ${entries.map(e=>{
-        const hours=Math.floor((e.st.total||0)/3600);
-        const pct=Math.round(((e.st.total||0)/maxSec)*100);
-        return `
-          <div class="barRow">
-            <div><b>${escapeHtml(e.name)}</b> <span class="badge">${escapeHtml(e.ud.rank||"-")}</span></div>
-            <div class="barBg"><div class="barFill" style="width:${pct}%;"></div></div>
-            <div class="small" style="text-align:right;">${hours}h</div>
-          </div>`;
-      }).join("")}
-    </div>
-  `;
+  }).join("") || `<tr><td colspan="2" class="small">표시할 유저가 없습니다.</td></tr>`;
 }
 
 /* ===== 컨텐츠 ===== */
@@ -868,10 +723,12 @@ async function saveEditModal(){
   }catch(e){ alert(err(e)); console.error(e); }
 }
 
-/* ===== 관리자: 유저/근태 일부(간단 버전) ===== */
+/* ===== 관리자: 유저 관리(스크롤 박스 대신 10명씩 페이징) ===== */
 function renderAdminUserTable(){
+  if(!isAdmin()) return;
   const tbody=$("adminUserTbody");
-  if(!tbody) return;
+  const pager=$("adminPager");
+  if(!tbody || !pager) return;
 
   const q=($("adminUserSearch")?.value||"").trim().toLowerCase();
   const rows=[];
@@ -881,7 +738,14 @@ function renderAdminUserTable(){
   }
   rows.sort((a,b)=>a.name.localeCompare(b.name,"ko"));
 
-  tbody.innerHTML = rows.map(({name,ud})=>{
+  const total=rows.length;
+  const pageCount=Math.max(1, Math.ceil(total/ADMIN_PAGE_SIZE));
+  if(adminUserPage>=pageCount) adminUserPage=pageCount-1;
+
+  const start=adminUserPage*ADMIN_PAGE_SIZE;
+  const pageRows=rows.slice(start, start+ADMIN_PAGE_SIZE);
+
+  tbody.innerHTML = pageRows.map(({name,ud})=>{
     const rankOptions = `<option value="">-</option>` + RANKS.map(r=>`<option value="${r}" ${ud.rank===r?"selected":""}>${r}</option>`).join("");
     const deptOptions = `<option value="">-</option>` + DEPTS.map(d=>`<option value="${d}" ${ud.department===d?"selected":""}>${d}</option>`).join("");
     const adminChecked = ud.isAdmin===true ? "checked" : "";
@@ -889,23 +753,20 @@ function renderAdminUserTable(){
     const pw = (ud.password ?? "").toString();
     return `
       <tr data-user="${escapeHtml(name)}">
-        <td>
-          <div class="row">
-            <input type="checkbox" class="adminPick" />
-            <b>${escapeHtml(name)}</b>
-          </div>
+        <td style="min-width:220px;">
+          <b>${escapeHtml(name)}</b>
           <div class="small mono">pw:
             <span class="pwText" data-pw="${escapeHtml(pw)}">••••</span>
             <button class="pillbtn ghost pwToggle" type="button">보기</button>
           </div>
         </td>
-        <td><select class="rankSel wide">${rankOptions}</select></td>
-        <td><select class="deptSel wide">${deptOptions}</select></td>
-        <td>
+        <td style="min-width:200px;"><select class="rankSel wide">${rankOptions}</select></td>
+        <td style="min-width:240px;"><select class="deptSel wide">${deptOptions}</select></td>
+        <td style="min-width:140px;">
           <label class="row"><input type="checkbox" class="adminChk" ${adminChecked}/> <span class="small">관리자</span></label>
           <label class="row"><input type="checkbox" class="hiddenChk" ${hiddenChecked}/> <span class="small">숨김</span></label>
         </td>
-        <td>
+        <td style="min-width:360px;">
           <div class="row">
             <input class="pwInput wide" placeholder="새 비밀번호" />
             <button class="pillbtn pwSet" type="button">설정</button>
@@ -917,6 +778,21 @@ function renderAdminUserTable(){
       </tr>
     `;
   }).join("");
+
+  pager.innerHTML = `
+    <span class="small">총 ${total}명 · ${adminUserPage+1}/${pageCount} 페이지</span>
+    <button class="pillbtn" id="adminPrev" ${adminUserPage===0?"disabled":""}>이전</button>
+    <button class="pillbtn" id="adminNext" ${adminUserPage>=pageCount-1?"disabled":""}>다음</button>
+  `;
+
+  $("adminPrev")?.addEventListener("click", ()=>{
+    adminUserPage=Math.max(0, adminUserPage-1);
+    renderAdminUserTable();
+  });
+  $("adminNext")?.addEventListener("click", ()=>{
+    adminUserPage=Math.min(pageCount-1, adminUserPage+1);
+    renderAdminUserTable();
+  });
 
   tbody.querySelectorAll("tr").forEach(tr=>{
     const user=tr.getAttribute("data-user");
@@ -959,16 +835,17 @@ function renderAdminUserTable(){
 
         setStatus("저장되었습니다.");
         await loadStats(); await loadOnline(); await loadContent();
-        renderAdminWorkUserSelect();
       }catch(e){ alert(err(e)); console.error(e); }
     });
   });
 }
+
 async function adminAddUser(){
   const nick=($("adminAddNick").value||"").trim();
   const pw=($("adminAddPw").value||"").trim();
   if(!nick) return alert("닉네임을 입력해 주세요.");
   if(!pw) return alert("비밀번호를 입력해 주세요.");
+
   try{
     const exists=await getDoc(doc(db,"users",nick));
     if(exists.exists()) return alert("이미 존재하는 유저입니다.");
@@ -983,62 +860,43 @@ async function adminAddUser(){
 
     $("adminAddNick").value="";
     $("adminAddPw").value="";
+    adminUserPage=0;
     await loadUsers();
     setStatus("유저가 추가되었습니다.");
   }catch(e){ alert(err(e)); console.error(e); }
 }
-async function adminBulkSetAdmin(flag){
-  const picks=Array.from(document.querySelectorAll("#adminUserTbody .adminPick"))
-    .filter(x=>x.checked)
-    .map(x=>x.closest("tr")?.getAttribute("data-user"))
-    .filter(Boolean);
 
-  if(picks.length===0) return alert("선택된 유저가 없습니다.");
-  if(!confirm(`${picks.length}명에게 관리자 권한을 ${flag?"부여":"해임"}하시겠습니까?`)) return;
-
-  try{
-    for(const u of picks){
-      await updateDoc(doc(db,"users",u), { isAdmin: flag });
-      const ud=usersCache.get(u)||{};
-      ud.isAdmin=flag; usersCache.set(u,ud);
-    }
-    renderAdminUserTable();
-    await loadStats(); await loadOnline();
-    setStatus("적용되었습니다.");
-  }catch(e){ alert(err(e)); console.error(e); }
-}
-function renderAdminWorkUserSelect(){
-  const sel=$("adminWorkUser"); if(!sel) return;
-  const names=Array.from(usersCache.keys()).sort((a,b)=>a.localeCompare(b,"ko"));
-  sel.innerHTML=`<option value="">유저 선택</option>` + names.map(n=>`<option value="${escapeHtml(n)}">${escapeHtml(n)}</option>`).join("");
-}
-
-/* ===== 전체 갱신 ===== */
-async function refreshAll(showToast){
+/* ===== 수동 새로고침 ===== */
+async function refreshAll(toast){
   try{ await loadUsers(); }catch(e){ console.error(e); }
   try{ await loadStats(); }catch(e){ console.error(e); }
   try{ await loadOnline(); }catch(e){ console.error(e); }
   try{ await loadContent(); }catch(e){ console.error(e); }
-  if(showToast) setStatus("갱신되었습니다.");
+  if(toast) setStatus("갱신되었습니다.");
 }
 
 /* ===== 이벤트 ===== */
 document.addEventListener("DOMContentLoaded", ()=>{
-  // ✅ 1) 페이지 들어오자마자 수정 모달이 뜨는 문제: 무조건 닫기(2중 안전)
-  hardCloseModal();
-  closeEditModal();
-  setTimeout(()=>{ hardCloseModal(); closeEditModal(); }, 0);
+  // ✅ 처음 로드 시: 모달/드로어 무조건 닫기(2중 안전)
+  hardCloseModal(); closeEditModal();
+  hardCloseDrawer();
+  setTimeout(()=>{ hardCloseModal(); hardCloseDrawer(); },0);
 
   // 모달 배경 클릭 닫기
   $("contentModal")?.addEventListener("click",(e)=>{
     if(e.target?.id==="contentModal") closeEditModal();
   });
 
-  // ESC 닫기 + 드로어 닫기
+  // 드로어 배경 클릭 닫기
+  $("adminDrawerBack")?.addEventListener("click",(e)=>{
+    if(e.target?.id==="adminDrawerBack") hardCloseDrawer();
+  });
+
+  // ESC로 닫기
   document.addEventListener("keydown",(e)=>{
     if(e.key==="Escape"){
       closeEditModal();
-      closeAdminDrawer();
+      hardCloseDrawer();
       toggleFilterMenu(false);
     }
   });
@@ -1054,20 +912,13 @@ document.addEventListener("DOMContentLoaded", ()=>{
   $("plantBtn").addEventListener("click",()=>createContent("송전소"));
   $("escortBtn").addEventListener("click",()=>createContent("차량수호"));
 
-  $("sortSel").addEventListener("change",(e)=>{ sortMode=e.target.value; loadStats(); });
-
-  // 관리자 드로어(관리 버튼 누르면 "앞에 딱")
+  // 관리 버튼: 앞에 딱(드로어)
   $("adminToggleBtn").addEventListener("click",toggleAdminDrawer);
-  $("adminDrawerBack")?.addEventListener("click",(e)=>{
-    if(e.target?.id==="adminDrawerBack") closeAdminDrawer();
-  });
-  $("adminDrawerClose")?.addEventListener("click",closeAdminDrawer);
+  $("adminDrawerClose")?.addEventListener("click",hardCloseDrawer);
 
-  // 관리자 내부
-  $("adminUserSearch")?.addEventListener("input",renderAdminUserTable);
+  // 관리자 유저 검색/추가
+  $("adminUserSearch")?.addEventListener("input",()=>{ adminUserPage=0; renderAdminUserTable(); });
   $("adminAddBtn")?.addEventListener("click",adminAddUser);
-  $("bulkAdminOn")?.addEventListener("click",()=>adminBulkSetAdmin(true));
-  $("bulkAdminOff")?.addEventListener("click",()=>adminBulkSetAdmin(false));
 
   // 컨텐츠 필터
   $("filterBtn").addEventListener("click", ()=>toggleFilterMenu());
@@ -1088,7 +939,6 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
   setFilterLabel();
 });
-
 </script>
 </head>
 
@@ -1107,12 +957,6 @@ document.addEventListener("DOMContentLoaded", ()=>{
     <div class="row" id="userInfo"></div>
     <div class="row">
       <span id="statusMsg" class="small"></span>
-      <select id="sortSel" class="wide" title="유저 통계 정렬">
-        <option value="rank_desc">계급 높은순</option>
-        <option value="rank_asc">계급 낮은순</option>
-        <option value="online_first">접속자 우선</option>
-        <option value="name">이름순</option>
-      </select>
       <button id="refreshBtn">새로고침</button>
       <button id="adminToggleBtn" class="ghost hidden">관리</button>
       <button id="logoutBtn">로그아웃</button>
@@ -1126,7 +970,6 @@ document.addEventListener("DOMContentLoaded", ()=>{
         <h3>근태</h3>
         <button id="inBtn">출근</button>
         <button id="outBtn">퇴근</button>
-        <div class="small" style="margin-top:8px;">* 통계는 최근 7일 기준으로 계산됩니다.</div>
       </div>
 
       <div class="card">
@@ -1146,7 +989,6 @@ document.addEventListener("DOMContentLoaded", ()=>{
       <div class="card">
         <div class="row" style="justify-content:space-between;">
           <h3 style="margin:0;">컨텐츠 기록</h3>
-
           <div class="row">
             <div id="filterWrap" class="dropWrap">
               <button id="filterBtn" class="pillbtn dropBtn" type="button">
@@ -1160,7 +1002,6 @@ document.addEventListener("DOMContentLoaded", ()=>{
                 <button id="fEsc" class="dropItem" type="button">차량수호만 보기</button>
               </div>
             </div>
-
             <span class="badge" id="contentCount">0건</span>
           </div>
         </div>
@@ -1173,35 +1014,38 @@ document.addEventListener("DOMContentLoaded", ()=>{
     <div class="col">
       <div class="card">
         <h3>유저 통계</h3>
-        <div class="small" style="margin-bottom:10px;">
-          * 표 형태로 정리했습니다. 행을 클릭하면 1명만 상세가 펼쳐집니다.
+        <div class="small" style="margin-bottom:10px;">* 유저 목록 + 접속 여부(O/X)만 표시합니다.</div>
+
+        <div class="tableWrap">
+          <table style="min-width:380px;">
+            <thead>
+              <tr>
+                <th>닉네임</th>
+                <th>접속</th>
+              </tr>
+            </thead>
+            <tbody id="statsTbody"></tbody>
+          </table>
         </div>
-        <div id="statsArea"></div>
       </div>
     </div>
 
   </div>
 </div>
 
-<!-- ✅ 관리자 드로어(전면) -->
-<div id="adminDrawerBack" class="drawerBack hidden" aria-hidden="false">
+<!-- ✅ 관리자 드로어(전면) : hidden + inert + hidden 속성까지 -->
+<div id="adminDrawerBack" class="drawerBack hidden" inert hidden>
   <div class="drawer" role="dialog" aria-modal="true">
     <div class="drawerTop">
       <div>
         <b style="font-size:15px;">관리자 패널</b>
         <div class="small">* “관리” 버튼을 한 번 더 누르거나 배경 클릭/ESC로 닫힙니다.</div>
+        <div class="small">* 내부 스크롤 박스를 제거하고, 유저 목록은 10명씩 넘깁니다.</div>
       </div>
       <div class="row">
         <button id="adminDrawerClose" class="pillbtn ghost" type="button">닫기</button>
       </div>
     </div>
-
-    <details class="adminSec" open>
-      <summary>그래프 <span class="sumHint">최근 7일 누적 근무시간</span></summary>
-      <div class="secBody">
-        <div id="graphArea"></div>
-      </div>
-    </details>
 
     <details class="adminSec" open>
       <summary>유저 관리 <span class="sumHint">화이트리스트 / 계급 / 부서 / 숨김 / 비밀번호</span></summary>
@@ -1214,12 +1058,10 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
         <div class="row" style="margin-top:8px;">
           <input id="adminUserSearch" class="wide" placeholder="유저 검색(닉네임)" />
-          <button id="bulkAdminOn" type="button">선택 관리자 부여</button>
-          <button id="bulkAdminOff" class="danger" type="button">선택 관리자 해임</button>
         </div>
 
-        <div style="overflow:auto;max-height:520px;border:1px solid #23232a;border-radius:14px;margin-top:10px;background:#0f0f12;">
-          <table>
+        <div class="tableWrap" style="margin-top:10px;">
+          <table style="min-width:1100px;">
             <thead>
               <tr>
                 <th style="min-width:220px;">유저</th>
@@ -1232,6 +1074,8 @@ document.addEventListener("DOMContentLoaded", ()=>{
             <tbody id="adminUserTbody"></tbody>
           </table>
         </div>
+
+        <div id="adminPager" class="adminPager"></div>
       </div>
     </details>
   </div>
@@ -1256,7 +1100,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
             <span class="small">* 체크박스로 추가/삭제합니다.</span>
           </div>
 
-          <div class="row" style="margin-top:8px;justify-content:space-between;">
+          <div class="row" style="margin-top:8px;">
             <input id="mSearch" class="wide" placeholder="검색(닉네임)" style="width:100%;">
           </div>
 
