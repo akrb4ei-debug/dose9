@@ -104,9 +104,24 @@ body::before{
 
     .grid{
       display:grid;
-      grid-template-columns: 1.1fr 0.9fr;
+      grid-template-columns: 1fr;
       gap: 16px;
       align-items:start;
+      max-width: 1180px;
+      margin: 0 auto;
+    }
+    body.admin-open .grid{
+      grid-template-columns: 1fr 420px;
+      max-width: 1480px;
+    }
+    .adminCol{
+      max-height: calc(100vh - 210px);
+      overflow:auto;
+      overscroll-behavior: contain;
+    }
+    body.admin-open [data-view="dashboard"].card:first-of-type{
+      transform: translateX(-6px);
+      transition: transform .18s ease;
     }
     @media (max-width: 980px){
       .grid{ grid-template-columns: 1fr; }
@@ -280,6 +295,8 @@ body::before{
     let currentUser=null;
     let currentUserData=null;
     let usersCache=new Map();
+    let lastUsersLoadAt=0;
+    const USERS_COOLDOWN_MS = 5*60*1000; // 5분
 
     // content paging
     let contentPage=0;
@@ -458,13 +475,20 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       if(!silent) setStatus("갱신되었습니다.");
     }
 
-    async function loadUsersOnce(){
+    async function loadUsersOnce({force=false}={}){
+      const now=Date.now();
+      if(!force && lastUsersLoadAt && (now-lastUsersLoadAt)<USERS_COOLDOWN_MS){
+        const remain=Math.ceil((USERS_COOLDOWN_MS-(now-lastUsersLoadAt))/1000);
+        setStatus(`유저 목록 갱신 쿨타임: ${remain}초 남았습니다.`);
+        return;
+      }
       const s=await getDocs(colUsers);
       usersCache=new Map();
       s.forEach(d=>usersCache.set(d.id, normalizeUser(d.data())));
       // 내 data 최신 반영
       const mine=usersCache.get(currentUser);
       if(mine) currentUserData=mine;
+      lastUsersLoadAt = Date.now();
     }
 
     // KPI: 온라인 수 / 오늘 출근(카운트) / 오늘 누적 / 주간 누적
@@ -503,6 +527,10 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       }
       // 계급 정렬 옵션(유저 개인 설정은 새로고침 시 초기화 요청 → 기억 안 함)
       const sort=$("sortUsers").value;
+      if(sort==="onlineOnly"){
+        // 온라인만 표시합니다.
+        for(let i=rows.length-1;i>=0;i--){ if(!rows[i].u.isOnline) rows.splice(i,1); }
+      }
       rows.sort((a,b)=>{
         const ra=RANKS.indexOf(a.u.rank||"");
         const rb=RANKS.indexOf(b.u.rank||"");
@@ -1397,19 +1425,53 @@ async function ensureUserDocDefaultsOnce(userId, userData){
     }
 
     // ---------- EVENTS ----------
-    function setTab(name){
-      document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active", t.dataset.tab===name));
-      document.querySelectorAll("[data-view]").forEach(v=>v.hidden = v.dataset.view!==name);
-      if(name==="admin" && isAdmin()){
+
+    let lastNonAdminTab = "dashboard";
+    function closeAdminPanel(){
+      document.body.classList.remove("admin-open");
+      const admin=$("adminCol");
+      if(admin){
+        // 포커스가 패널 안에 있으면 먼저 해제합니다.
+        const active=document.activeElement;
+        if(active && admin.contains(active)) active.blur?.();
+        admin.hidden=true;
+        admin.setAttribute("aria-hidden","true");
+      }
+    }
+    function openAdminPanel(){
+      if(!isAdmin()) return;
+      document.body.classList.add("admin-open");
+      const admin=$("adminCol");
+      if(admin){
+        admin.hidden=false;
+        admin.setAttribute("aria-hidden","false");
+        // 관리자 카드 렌더는 열릴 때만 수행하여 렉을 줄입니다.
         renderAdminUserCards();
         loadWorkPage(0);
+        admin.scrollTop=0;
       }
-      if(name==="chat"){
-        loadChat();
+    }
+    function toggleAdminPanel(){
+      if(!isAdmin()) return;
+      const open = document.body.classList.contains("admin-open");
+      if(open) closeAdminPanel();
+      else openAdminPanel();
+    }
+
+    function setTab(name){
+      if(name==="admin"){
+        // 관리자 탭은 "대시보드 유지 + 우측 패널 토글" 방식입니다.
+        toggleAdminPanel();
+        // 탭 표시 상태는 마지막 일반 탭을 유지합니다.
+        document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active", t.dataset.tab===lastNonAdminTab));
+        return;
       }
-      if(name==="graph"){
-        renderGraph();
-      }
+      lastNonAdminTab = name;
+      closeAdminPanel();
+      document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active", t.dataset.tab===name));
+      document.querySelectorAll("[data-view]").forEach(v=>v.hidden = v.dataset.view!==name);
+      if(name==="chat") loadChat();
+      if(name==="graph") renderGraph();
     }
 
     window.addEventListener("DOMContentLoaded", ()=>{
@@ -1460,7 +1522,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       $("btnWorkSave").addEventListener("click", saveEditWork);
 
       // admin
-      $("btnAdmin").addEventListener("click", ()=>setTab("admin"));
+      $("btnAdmin").addEventListener("click", toggleAdminPanel);
       $("adminSearch").addEventListener("input", renderAdminUserCards);
       $("btnAddUser").addEventListener("click", adminAddUser);
 
@@ -1592,6 +1654,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
                   <option value="onlineFirst">정렬: 접속자 우선</option>
                   <option value="rankHigh">정렬: 계급 높은순</option>
                   <option value="rankLow">정렬: 계급 낮은순</option>
+                  <option value="onlineOnly">정렬: 온라인만</option>
                 </select>
               </div>
               <div class="tableWrap" style="margin-top:10px;">
@@ -1620,98 +1683,10 @@ async function ensureUserDocDefaultsOnce(userId, userData){
           </div>
         </div>
 
-        <!-- RIGHT -->
-        <div class="card" data-view="dashboard">
-          <h3>안내</h3>
-          <div class="muted">
-            • <b>리드 최소화</b>: 실시간 리스너(onSnapshot)를 사용하지 않습니다.<br>
-            • <b>7일 제한</b>: 컨텐츠/근무 기록 관리 화면은 최근 7일만 읽습니다.<br>
-            • <b>0시 필터</b>: 오늘 통계는 0시 기준(todayKey)로 누적됩니다.<br>
-            • <b>요약필드</b>: 통계는 workRecords를 스캔하지 않고 users 요약값으로 표시합니다.
-          </div>
-          <div class="box" style="margin-top:12px;">
-            <div class="row">
-              <b>주요 위험(예측)</b>
-            </div>
-            <div class="muted" style="margin-top:8px;">
-              1) Firestore Rules가 느슨하면 사용자 데이터가 노출될 수 있습니다.<br>
-              2) serverTimestamp는 저장 직후 잠깐 null처럼 보일 수 있어, 출근 직후 즉시 퇴근 시 “잠시 후 재시도”가 뜰 수 있습니다.<br>
-              3) 참여자 수가 큰 컨텐츠 작성은 users 업데이트 쓰기 횟수가 늘 수 있습니다(리드는 유지).
-            </div>
-          </div>
-        </div>
+        
 
-        <!-- CONTENT VIEW -->
-        <div class="card" data-view="content" hidden style="grid-column:1/-1;">
-          <div class="row">
-            <h3 style="margin:0;">컨텐츠 기록 (최근 7일)</h3>
-            <span class="spacer"></span>
-            <select id="contentFilter" class="w220">
-              <option value="ALL">전체 보기</option>
-              <option value="보급">보급만 보기</option>
-              <option value="송전소">송전소만 보기</option>
-              <option value="차량수호">차량수호만 보기</option>
-            </select>
-          </div>
-          <div class="row" style="margin-top:10px;">
-            <button id="btnPrevContent" class="pill">이전</button>
-            <button id="btnNextContent" class="pill">다음</button>
-            <span id="contentPageInfo" class="tinyStatus"></span>
-          </div>
-          <div id="contentList" class="timeline" style="margin-top:12px;"></div>
-        </div>
-
-        <!-- CHAT VIEW -->
-        <div class="card" data-view="chat" hidden style="grid-column:1/-1;">
-          <div class="row">
-            <h3 style="margin:0;">부서 소통방</h3>
-            <span class="spacer"></span>
-            <span class="badge dim">부서: <b id="chatDept">-</b></span>
-          </div>
-          <div class="row" style="margin-top:12px; align-items:flex-start;">
-            <div style="flex:1;">
-              <div class="box">
-                <b>공지</b>
-                <div id="noticeBox" style="margin-top:10px;"></div>
-                <div id="noticeCompose" hidden style="margin-top:10px;">
-                  <textarea id="noticeText" placeholder="공지 내용을 입력합니다."></textarea>
-                  <div class="row" style="margin-top:10px;">
-                    <button id="btnPostNotice" class="pill primary">공지 등록</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div style="flex:1;">
-              <div class="box">
-                <b>채팅</b>
-                <div id="chatList" class="timeline" style="margin-top:10px;"></div>
-                <div class="row" style="margin-top:10px;">
-                  <input id="chatText" class="w320" placeholder="메시지 입력" />
-                  <button id="btnSendChat" class="pill primary">전송</button>
-                  <span id="chatInfo" class="tinyStatus"></span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="tiny" style="margin-top:10px;">
-            • 채팅/공지는 이 탭을 열었을 때만 읽습니다(수동 갱신). • 부서장/관리자만 공지 등록 가능합니다.
-          </div>
-        </div>
-
-        <!-- GRAPH VIEW -->
-        <div class="card" data-view="graph" hidden style="grid-column:1/-1;">
-          <div class="row">
-            <h3 style="margin:0;">그래프</h3>
-            <span class="spacer"></span>
-            <span class="tiny">users 요약필드 기반 (workRecords 스캔 없음)</span>
-          </div>
-          <div class="box" style="margin-top:12px;">
-            <canvas id="chart" height="120"></canvas>
-          </div>
-        </div>
-
-        <!-- ADMIN VIEW -->
-        <div class="card" data-view="admin" hidden style="grid-column:1/-1;">
+        <!-- ADMIN SIDE -->
+        <div id="adminCol" class="card adminCol" data-view="dashboard" hidden aria-hidden="true">
           <div class="row">
             <h3 style="margin:0;">관리자 패널</h3>
             <span class="spacer"></span>
@@ -1827,7 +1802,79 @@ async function ensureUserDocDefaultsOnce(userId, userData){
     </div>
   </div>
 
-  <!-- Edit Modal -->
+  
+
+<!-- CONTENT VIEW -->
+        <div class="card" data-view="content" hidden style="grid-column:1/-1;">
+          <div class="row">
+            <h3 style="margin:0;">컨텐츠 기록 (최근 7일)</h3>
+            <span class="spacer"></span>
+            <select id="contentFilter" class="w220">
+              <option value="ALL">전체 보기</option>
+              <option value="보급">보급만 보기</option>
+              <option value="송전소">송전소만 보기</option>
+              <option value="차량수호">차량수호만 보기</option>
+            </select>
+          </div>
+          <div class="row" style="margin-top:10px;">
+            <button id="btnPrevContent" class="pill">이전</button>
+            <button id="btnNextContent" class="pill">다음</button>
+            <span id="contentPageInfo" class="tinyStatus"></span>
+          </div>
+          <div id="contentList" class="timeline" style="margin-top:12px;"></div>
+        </div>
+
+        <!-- CHAT VIEW -->
+        <div class="card" data-view="chat" hidden style="grid-column:1/-1;">
+          <div class="row">
+            <h3 style="margin:0;">부서 소통방</h3>
+            <span class="spacer"></span>
+            <span class="badge dim">부서: <b id="chatDept">-</b></span>
+          </div>
+          <div class="row" style="margin-top:12px; align-items:flex-start;">
+            <div style="flex:1;">
+              <div class="box">
+                <b>공지</b>
+                <div id="noticeBox" style="margin-top:10px;"></div>
+                <div id="noticeCompose" hidden style="margin-top:10px;">
+                  <textarea id="noticeText" placeholder="공지 내용을 입력합니다."></textarea>
+                  <div class="row" style="margin-top:10px;">
+                    <button id="btnPostNotice" class="pill primary">공지 등록</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style="flex:1;">
+              <div class="box">
+                <b>채팅</b>
+                <div id="chatList" class="timeline" style="margin-top:10px;"></div>
+                <div class="row" style="margin-top:10px;">
+                  <input id="chatText" class="w320" placeholder="메시지 입력" />
+                  <button id="btnSendChat" class="pill primary">전송</button>
+                  <span id="chatInfo" class="tinyStatus"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="tiny" style="margin-top:10px;">
+            • 채팅/공지는 이 탭을 열었을 때만 읽습니다(수동 갱신). • 부서장/관리자만 공지 등록 가능합니다.
+          </div>
+        </div>
+
+        <!-- GRAPH VIEW -->
+        <div class="card" data-view="graph" hidden style="grid-column:1/-1;">
+          <div class="row">
+            <h3 style="margin:0;">그래프</h3>
+            <span class="spacer"></span>
+            <span class="tiny">users 요약필드 기반 (workRecords 스캔 없음)</span>
+          </div>
+          <div class="box" style="margin-top:12px;">
+            <canvas id="chart" height="120"></canvas>
+          </div>
+        </div>
+
+        <!-- ADMIN VIEW -->
+        <!-- Edit Modal -->
   <div id="editModal" class="overlay" hidden>
     <div class="modal" role="dialog" aria-modal="true">
       <div class="mTop">
