@@ -7,25 +7,26 @@
 
 <style>
   :root{
-    --bg:#111;
-    --panel:#1a1a1a;
-    --border:#333;
-    --border2:#444;
-    --txt:#eee;
-    --muted:#aaa;
-    --chip:#222;
+    --bg:#0f0f10;
+    --panel:#141416;
+    --panel2:#101013;
+    --border:#2a2a2f;
+    --border2:#3a3a42;
+    --txt:#f2f2f4;
+    --muted:#b6b6c2;
+    --chip:#1e1e24;
+    --accent:#e6e6ea;
   }
   body{margin:0;background:var(--bg);color:var(--txt);font-family:Segoe UI,Apple SD Gothic Neo,Malgun Gothic,system-ui}
   .top{
     padding:14px 22px;background:var(--panel);border-bottom:1px solid var(--border);
     display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap
   }
-  .container{
-    display:flex;gap:20px;padding:20px;max-width:1500px;margin:0 auto;
-  }
+  .container{display:flex;gap:20px;padding:20px;max-width:1500px;margin:0 auto;}
   .col{flex:1;min-width:340px}
   .card{
-    background:var(--panel);padding:15px;border:1px solid var(--border);border-radius:12px;margin-bottom:15px;
+    background:linear-gradient(180deg,var(--panel),var(--panel2));
+    padding:15px;border:1px solid var(--border);border-radius:14px;margin-bottom:15px;
   }
   h2,h3{margin:0 0 10px 0}
   .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
@@ -35,32 +36,32 @@
     background:var(--chip);border:1px solid var(--border2);border-radius:999px;padding:6px 10px;font-size:12px
   }
   button{
-    background:#222;color:#fff;border:1px solid var(--border2);
-    padding:7px 12px;border-radius:8px;cursor:pointer;margin:3px;
+    background:#1c1c22;color:#fff;border:1px solid var(--border2);
+    padding:7px 12px;border-radius:10px;cursor:pointer;margin:3px;
   }
-  button:hover{background:#333;}
+  button:hover{background:#24242c;}
   button.ghost{background:transparent}
-  button.danger{border-color:#8b2f2f;background:#2a1414}
-  button.danger:hover{background:#3a1717}
+  button.danger{border-color:#5b2b2b;background:#241314}
+  button.danger:hover{background:#2c1618}
   button.pillbtn{padding:6px 10px;border-radius:999px}
   input,select{
-    background:#111;color:#fff;border:1px solid var(--border2);
-    padding:7px 10px;border-radius:8px;margin:3px;
+    background:#0f0f12;color:#fff;border:1px solid var(--border2);
+    padding:7px 10px;border-radius:10px;margin:3px;
   }
   input.wide{width:260px;max-width:100%}
   select.wide{width:260px;max-width:100%}
   .hidden{display:none}
   .stat{
-    background:#111;border:1px solid #222;border-radius:10px;
+    background:#0f0f12;border:1px solid #23232a;border-radius:12px;
     padding:10px 12px;margin-bottom:8px;line-height:1.55
   }
-  .hr{height:1px;background:#2a2a2a;margin:12px 0}
-  .badge{font-size:11px;padding:2px 8px;border:1px solid #444;border-radius:999px;color:#ddd}
+  .hr{height:1px;background:#23232a;margin:12px 0}
+  .badge{font-size:11px;padding:2px 8px;border:1px solid var(--border2);border-radius:999px;color:#e6e6ea}
   .right{margin-left:auto}
   .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
   .table{width:100%;border-collapse:collapse}
-  .table th,.table td{border-bottom:1px solid #2a2a2a;padding:8px 6px;text-align:left;font-size:13px;vertical-align:top}
-  .table th{color:#cfcfcf;font-weight:600}
+  .table th,.table td{border-bottom:1px solid #23232a;padding:8px 6px;text-align:left;font-size:13px;vertical-align:top}
+  .table th{color:#e8e8ee;font-weight:600}
   .anim{transition:max-height .25s ease, opacity .25s ease, transform .25s ease}
   .collapse{max-height:0; opacity:0; transform:translateY(-6px); overflow:hidden}
   .expand{max-height:1200px; opacity:1; transform:translateY(0); overflow:hidden}
@@ -68,30 +69,54 @@
   /* 그래프 */
   .barWrap{margin-top:10px;display:flex;flex-direction:column;gap:8px}
   .barRow{display:grid;grid-template-columns:180px 1fr 90px;gap:10px;align-items:center}
-  .barBg{height:10px;border:1px solid #333;border-radius:999px;overflow:hidden;background:#0c0c0c}
-  .barFill{height:100%;background:#dcdcdc}
+  .barBg{height:10px;border:1px solid #2f2f36;border-radius:999px;overflow:hidden;background:#0a0a0c}
+  .barFill{height:100%;background:var(--accent)}
 
   /* 모달 */
   .modalBack{
-    position:fixed;inset:0;background:rgba(0,0,0,.6);
+    position:fixed;inset:0;background:rgba(0,0,0,.65);
     display:flex;align-items:center;justify-content:center;padding:18px;z-index:9999;
   }
   .modal{
-    width:min(900px, 96vw);
-    background:#141414;border:1px solid #2a2a2a;border-radius:14px;
-    box-shadow:0 20px 60px rgba(0,0,0,.4);
+    width:min(980px, 96vw);
+    background:#111114;border:1px solid #2a2a30;border-radius:16px;
+    box-shadow:0 20px 60px rgba(0,0,0,.45);
     overflow:hidden;
   }
-  .modalTop{padding:14px 16px;border-bottom:1px solid #2a2a2a;display:flex;justify-content:space-between;gap:10px;align-items:center}
+  .modalTop{padding:14px 16px;border-bottom:1px solid #23232a;display:flex;justify-content:space-between;gap:10px;align-items:center}
   .modalBody{padding:14px 16px;max-height:72vh;overflow:auto}
-  .modalFoot{padding:12px 16px;border-top:1px solid #2a2a2a;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+  .modalFoot{padding:12px 16px;border-top:1px solid #23232a;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .box{border:1px solid #2a2a2a;border-radius:12px;padding:10px;background:#101010}
+  .box{border:1px solid #23232a;border-radius:14px;padding:10px;background:#0e0e11}
   .list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
-  .itemRow{display:flex;gap:8px;align-items:center;justify-content:space-between;border:1px solid #222;border-radius:10px;padding:8px 10px;background:#0f0f0f}
-  .tag{font-size:11px;border:1px solid #444;border-radius:999px;padding:2px 8px;color:#ddd}
+  .itemRow{display:flex;gap:8px;align-items:center;justify-content:space-between;border:1px solid #23232a;border-radius:12px;padding:8px 10px;background:#0c0c0f}
+  .tag{font-size:11px;border:1px solid var(--border2);border-radius:999px;padding:2px 8px;color:#e6e6ea}
   .u{ text-decoration: underline; text-decoration-thickness: 2px; }
   .s{ text-decoration: line-through; text-decoration-thickness: 2px; opacity:.85; }
+
+  /* 필터 드롭다운 */
+  .dropWrap{position:relative;display:inline-block}
+  .dropBtn{display:inline-flex;align-items:center;gap:6px}
+  .dropMenu{
+    position:absolute;right:0;top:calc(100% + 6px);
+    background:#101013;border:1px solid #2a2a30;border-radius:12px;
+    min-width:180px;padding:8px;z-index:50;
+    box-shadow:0 16px 40px rgba(0,0,0,.35);
+  }
+  .dropItem{
+    width:100%;text-align:left;padding:9px 10px;border-radius:10px;
+    border:1px solid transparent;background:transparent;color:var(--txt);cursor:pointer;
+  }
+  .dropItem:hover{background:#17171d;border-color:#2a2a30}
+
+  /* 페이지 번호 */
+  .pager{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  .pageNum{
+    min-width:34px;justify-content:center;
+    padding:6px 10px;border-radius:999px;border:1px solid var(--border2);
+    background:#121218;color:#fff;cursor:pointer;
+  }
+  .pageNum.active{background:#20202a;border-color:#4a4a58}
 </style>
 
 <script type="module">
@@ -101,6 +126,7 @@ import {
   query, where, orderBy, limit, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
+/* ✅ Firebase 설정 */
 const firebaseConfig={
   apiKey:"AIzaSyAJ6MhR1JsGbvieb8akAi4Zpas_W3uaNJ4",
   authDomain:"dosep-b6ee3.firebaseapp.com",
@@ -114,26 +140,27 @@ const colUsers=collection(db,"users");
 const colWork=collection(db,"workRecords");
 const colContent=collection(db,"contentRecords");
 
+/* ===== 전역 상태 ===== */
 let currentUser=null;
 let currentUserData=null;
 let usersCache=new Map();
-
-let contentPage=0;
-const PAGE_SIZE=20;
 
 let autoTimer=null;
 let sortMode="rank_desc";
 let lastStatsMap=null;
 
-let contentDocsCache = []; // 현재 로드된(최대 n페이지) contentRecords docs 캐시
-let contentFilter = "ALL"; // ALL / 보급 / 송전소 / 차량수호
+let contentDocsCache=[];
+let contentFilter="ALL"; // ALL/보급/송전소/차량수호
+let contentPage=0;
+const PAGE_SIZE=20;
+let filterOpen=false;
 
-// 모달 상태
-let editDocId = null;
-let editDocData = null;
-let editBaseParticipants = [];
-let editSelected = new Set();
-let editSearchQ = "";
+/* 모달 */
+let editDocId=null;
+let editDocData=null;
+let editBaseParticipants=[];
+let editSelected=new Set();
+let editSearchQ="";
 
 const RANKS=["군의관","하사","중사","상사","원사","소위","중위","대위","소령","중령","대령"];
 const DEPTS=[
@@ -141,86 +168,65 @@ const DEPTS=[
   "제1공수특수전여단","제3공수특전여단","제820방첩부대","국군의무사령부"
 ];
 
+/* ===== 유틸 ===== */
 function $(id){return document.getElementById(id);}
 function show(id,f){const el=$(id); if(el) el.classList.toggle("hidden",!f);}
 function isAdmin(){return !!currentUserData?.isAdmin || !!currentUserData?.isadmin;}
+function stopAuto(){ if(autoTimer){ clearInterval(autoTimer); autoTimer=null; } }
+function startAuto(){ stopAuto(); autoTimer=setInterval(()=>refreshAll(false), 60*1000); }
 
 function err(e){
-  if(e?.code==="permission-denied") return "Firestore 권한 문제(Rules 확인)";
-  if(e?.code==="resource-exhausted") return "할당량 초과(오늘 0시 이후 복구 또는 업그레이드)";
-  if(e?.code==="failed-precondition") return "Firestore 인덱스 필요(콘솔 링크로 생성)";
+  if(e?.code==="permission-denied") return "Firestore 권한 문제(Rules 확인 필요)";
+  if(e?.code==="resource-exhausted") return "할당량 초과(오늘 0시 이후 복구 또는 업그레이드 필요)";
+  if(e?.code==="failed-precondition") return "Firestore 인덱스가 필요합니다(콘솔에서 생성)";
   return "오류 발생 (F12 콘솔 확인)";
 }
-
-function stopAuto(){ if(autoTimer){ clearInterval(autoTimer); autoTimer=null; } }
-function startAuto(){
-  stopAuto();
-  autoTimer = setInterval(()=>{ refreshAll(false); }, 60*1000);
-}
-
 function setStatus(msg){
   const el=$("statusMsg"); if(!el) return;
   el.textContent=msg||"";
   if(msg){ setTimeout(()=>{ if(el) el.textContent=""; }, 1400); }
 }
-
 function escapeHtml(s){
   return String(s||"").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 function normalizeUserDoc(d){
-  const out = {...d};
-  if(out.isadmin!==undefined && out.isAdmin===undefined) out.isAdmin = out.isadmin;
-  if(out.ishidden!==undefined && out.isHidden===undefined) out.isHidden = out.ishidden;
-  if(out.dept!==undefined && out.department===undefined) out.department = out.dept;
-  if(out.rankname!==undefined && out.rank===undefined) out.rank = out.rankname;
+  const out={...d};
+  if(out.isadmin!==undefined && out.isAdmin===undefined) out.isAdmin=out.isadmin;
+  if(out.ishidden!==undefined && out.isHidden===undefined) out.isHidden=out.ishidden;
+  if(out.dept!==undefined && out.department===undefined) out.department=out.dept;
+  if(out.rankname!==undefined && out.rank===undefined) out.rank=out.rankname;
   return out;
 }
-function rankIndex(rank){
-  const i=RANKS.indexOf(rank||"");
-  return i>=0?i: -1;
-}
+function rankIndex(rank){ const i=RANKS.indexOf(rank||""); return i>=0?i:-1; }
 function toDateOrNull(ts){
   if(!ts) return null;
   if(ts instanceof Date) return ts;
-  if(typeof ts.toDate === "function") return ts.toDate();
-  if(typeof ts.seconds === "number") return new Date(ts.seconds*1000);
+  if(typeof ts.toDate==="function") return ts.toDate();
+  if(typeof ts.seconds==="number") return new Date(ts.seconds*1000);
   return null;
 }
 function toDatetimeLocalValue(d){
   if(!d) return "";
   const pad=n=>String(n).padStart(2,"0");
-  const yyyy=d.getFullYear();
-  const mm=pad(d.getMonth()+1);
-  const dd=pad(d.getDate());
-  const hh=pad(d.getHours());
-  const mi=pad(d.getMinutes());
-  return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
-function parseDatetimeLocal(str){
-  if(!str) return null;
-  const d = new Date(str);
-  if(isNaN(d.getTime())) return null;
-  return d;
-}
+function parseDatetimeLocal(str){ if(!str) return null; const d=new Date(str); return isNaN(d.getTime())?null:d; }
 function fmtKST(ts){
-  const d=toDateOrNull(ts);
-  if(!d) return "-";
+  const d=toDateOrNull(ts); if(!d) return "-";
   const pad=n=>String(n).padStart(2,"0");
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/* =========================
-   로그인/기본
-   ========================= */
+/* ===== 로그인/유저 ===== */
 async function login(){
   try{
     const id=$("loginId").value.trim();
     const pw=$("loginPw").value;
 
     const snap=await getDoc(doc(db,"users",id));
-    if(!snap.exists()) return alert("등록된 유저 없음");
+    if(!snap.exists()) return alert("등록된 유저가 아닙니다.");
     const data=normalizeUserDoc(snap.data());
-    if(String(data.password ?? "")!==String(pw)) return alert("비밀번호 오류");
+    if(String(data.password ?? "")!==String(pw)) return alert("비밀번호가 올바르지 않습니다.");
 
     currentUser=id;
     currentUserData=data;
@@ -233,28 +239,20 @@ async function login(){
 
     await refreshAll(true);
     startAuto();
-  }catch(e){
-    alert(err(e));
-    console.error(e);
-  }
+  }catch(e){ alert(err(e)); console.error(e); }
 }
+
 function logout(){
   stopAuto();
-  currentUser=null;
-  currentUserData=null;
-  usersCache=new Map();
-  contentDocsCache=[];
-  contentPage=0;
-  contentFilter="ALL";
-  sortMode="rank_desc";
-  lastStatsMap=null;
-
+  currentUser=null; currentUserData=null;
+  usersCache=new Map(); lastStatsMap=null;
+  contentDocsCache=[]; contentPage=0; contentFilter="ALL"; sortMode="rank_desc"; filterOpen=false;
   $("loginPw").value="";
-  show("mainBox",false);
-  show("loginBox",true);
+  show("mainBox",false); show("loginBox",true);
 }
+
 function renderTopBar(){
-  $("userInfo").innerHTML = `
+  $("userInfo").innerHTML=`
     <span class="chip"><b>${escapeHtml(currentUser)}</b></span>
     <span class="chip">계급 <b>${escapeHtml(currentUserData.rank||"-")}</b></span>
     <span class="chip">부서 <b>${escapeHtml(currentUserData.department||"-")}</b></span>
@@ -263,6 +261,7 @@ function renderTopBar(){
   show("adminToggleBtn", isAdmin());
   show("adminPanel", false);
 }
+
 async function loadUsers(){
   const snap=await getDocs(colUsers);
   usersCache=new Map();
@@ -271,13 +270,11 @@ async function loadUsers(){
   renderAdminWorkUserSelect();
 }
 
-/* =========================
-   근태(출/퇴)
-   ========================= */
+/* ===== 근태 ===== */
 async function checkIn(){
   try{
     const q=query(colWork,where("nickname","==",currentUser),where("checkOut","==",null),limit(1));
-    if(!(await getDocs(q)).empty) return alert("이미 출근중");
+    if(!(await getDocs(q)).empty) return alert("이미 출근중입니다.");
     await addDoc(colWork,{nickname:currentUser,checkIn:serverTimestamp(),checkOut:null});
     await loadStats(); await loadOnline();
   }catch(e){ alert(err(e)); console.error(e); }
@@ -286,7 +283,7 @@ async function checkOut(){
   try{
     const q=query(colWork,where("nickname","==",currentUser),where("checkOut","==",null),limit(1));
     const snap=await getDocs(q);
-    if(snap.empty) return alert("출근 기록 없음");
+    if(snap.empty) return alert("출근 기록이 없습니다.");
     await updateDoc(doc(db,"workRecords",snap.docs[0].id),{checkOut:serverTimestamp()});
     await loadStats(); await loadOnline();
   }catch(e){ alert(err(e)); console.error(e); }
@@ -294,85 +291,69 @@ async function checkOut(){
 
 async function loadOnline(){
   try{
-    const openQ = query(colWork, where("checkOut","==",null));
-    const openSnap = await getDocs(openQ);
+    const openQ=query(colWork,where("checkOut","==",null));
+    const openSnap=await getDocs(openQ);
     const openList=[];
-    openSnap.forEach(d=>{
-      const r=d.data();
-      if(r?.nickname) openList.push(r.nickname);
-    });
+    openSnap.forEach(d=>{const r=d.data(); if(r?.nickname) openList.push(r.nickname);});
 
-    const adm=isAdmin();
-    const filtered = openList.filter(n=>{
-      const ud = usersCache.get(n);
+    const filtered=openList.filter(n=>{
+      const ud=usersCache.get(n);
       if(!ud) return true;
-      if(adm) return true;
+      if(isAdmin()) return true;
       return !ud.isHidden;
     });
 
     filtered.sort((a,b)=>a.localeCompare(b,"ko"));
-    $("onlineArea").innerHTML = filtered.length
+    $("onlineArea").innerHTML=filtered.length
       ? filtered.map(n=>`<div class="stat"><b>${escapeHtml(n)}</b></div>`).join("")
       : `<div class="small">현재 출근중인 유저가 없습니다.</div>`;
   }catch(e){
     console.error(e);
-    $("onlineArea").innerHTML = `<div class="small">접속 목록을 불러오지 못했습니다.</div>`;
+    $("onlineArea").innerHTML=`<div class="small">접속 목록을 불러오지 못했습니다.</div>`;
   }
 }
 
 async function loadStats(){
   try{
-    const seven=new Date();
-    seven.setDate(seven.getDate()-7);
+    const seven=new Date(); seven.setDate(seven.getDate()-7);
 
-    const openQ = query(colWork, where("checkOut","==",null));
-    const openSnap = await getDocs(openQ);
-    const openSet = new Set();
-    openSnap.forEach(d=>{
-      const r=d.data();
-      if(r?.nickname) openSet.add(r.nickname);
-    });
+    const openQ=query(colWork,where("checkOut","==",null));
+    const openSnap=await getDocs(openQ);
+    const openSet=new Set();
+    openSnap.forEach(d=>{const r=d.data(); if(r?.nickname) openSet.add(r.nickname);});
 
-    const recentQ = query(colWork, where("checkIn",">=", seven));
-    const recentSnap = await getDocs(recentQ);
+    const recentQ=query(colWork,where("checkIn",">=",seven));
+    const recentSnap=await getDocs(recentQ);
 
     const map=new Map();
     usersCache.forEach((_,name)=>map.set(name,{total:0,open:openSet.has(name)}));
 
     recentSnap.forEach(d=>{
-      const r=d.data();
-      if(!r?.nickname) return;
+      const r=d.data(); if(!r?.nickname) return;
       if(!map.has(r.nickname)) map.set(r.nickname,{total:0,open:openSet.has(r.nickname)});
       if(r.checkIn && r.checkOut){
-        const ci=toDateOrNull(r.checkIn);
-        const co=toDateOrNull(r.checkOut);
-        if(!ci || !co) return;
-        const sec=Math.max(0, Math.floor((co-ci)/1000));
-        map.get(r.nickname).total+=sec;
+        const ci=toDateOrNull(r.checkIn), co=toDateOrNull(r.checkOut);
+        if(!ci||!co) return;
+        map.get(r.nickname).total += Math.max(0, Math.floor((co-ci)/1000));
       }
     });
 
-    lastStatsMap = map;
+    lastStatsMap=map;
     renderStats(map);
 
     if(isAdmin()){
-      const panel = $("graphPanel");
-      if(panel && panel.classList.contains("expand")){
-        renderGraphFromStats(map);
-      }
+      const panel=$("graphPanel");
+      if(panel && panel.classList.contains("expand")) renderGraphFromStats(map);
     }
-  }catch(e){
-    alert(err(e));
-    console.error(e);
-  }
+  }catch(e){ alert(err(e)); console.error(e); }
 }
 
 function sortedUserEntries(map){
-  const entries = Array.from(usersCache.entries()).map(([name,ud])=>{
-    const st = map.get(name)||{total:0,open:false};
-    return {name, ud, st};
+  const entries=Array.from(usersCache.entries()).map(([name,ud])=>{
+    const st=map.get(name)||{total:0,open:false};
+    return {name,ud,st};
   });
-  const cmpName = (a,b)=>a.name.localeCompare(b.name,"ko");
+  const cmpName=(a,b)=>a.name.localeCompare(b.name,"ko");
 
   if(sortMode==="rank_desc"){
     entries.sort((a,b)=>{
@@ -398,7 +379,7 @@ function sortedUserEntries(map){
 }
 
 function renderStats(map){
-  const entries = sortedUserEntries(map);
+  const entries=sortedUserEntries(map);
   let html="";
   for(const it of entries){
     const {name,ud,st}=it;
@@ -435,18 +416,45 @@ function renderStats(map){
   }
 }
 
-/* =========================
-   컨텐츠 V4: 성공/실패 + 수정 + 필터 + 관리자 삭제
-   ========================= */
-
-function contentNeedsOutcome(type){
-  return type==="보급" || type==="차량수호";
-}
+/* ===== 컨텐츠 ===== */
+function contentNeedsOutcome(type){ return type==="보급" || type==="차량수호"; }
 function getOutcomeLabel(type, outcome){
   if(!contentNeedsOutcome(type)) return "";
   if(outcome===true) return "O";
   if(outcome===false) return "X";
   return "-";
+}
+function canEditContent(docData){
+  if(!docData) return false;
+  if(isAdmin()) return true;
+  return docData.writer===currentUser;
+}
+function canSeeContent(docData){
+  if(!docData) return false;
+  if(isAdmin()) return true;
+  const writerHidden=usersCache.get(docData.writer)?.isHidden;
+  return !writerHidden;
+}
+function applyContentFilter(list){
+  if(contentFilter==="ALL") return list;
+  return list.filter(x=>x.data?.type===contentFilter);
+}
+
+/* 필터 드롭다운 */
+function toggleFilterMenu(force){
+  filterOpen = (force!==undefined) ? !!force : !filterOpen;
+  show("filterMenu", filterOpen);
+  $("filterCaret").textContent = filterOpen ? "▲" : "▼";
+}
+function setFilterLabel(){
+  $("filterLabel").textContent = (contentFilter==="ALL") ? "전체 보기" : `${contentFilter}만 보기`;
+}
+function setContentFilter(v){
+  contentFilter=v;
+  contentPage=0;
+  toggleFilterMenu(false);
+  setFilterLabel();
+  renderContentList();
 }
 
 async function createContent(type){
@@ -455,60 +463,87 @@ async function createContent(type){
 
   let arr=names.split(",").map(x=>x.trim()).filter(x=>x);
   if(!arr.includes(currentUser)) arr.unshift(currentUser);
-
-  // ✅ 0명 저장 금지
   if(arr.length===0) return alert("참여자가 0명이면 저장하지 않습니다.");
 
-  const payload = {
+  const payload={
     type,
-    writer: currentUser,
-    participants: arr,
-    time: serverTimestamp(),
-    outcome: null, // 보급/차량수호만 사용
-    edited: null // { mode:'self'|'admin', by:'닉', at:Timestamp, added:[...], removed:[...] }
+    writer:currentUser,
+    participants:arr,
+    time:serverTimestamp(),
+    outcome:null,
+    edited:null
   };
 
-  // 보급/차량수호는 작성 시 성공여부 선택 가능(원치 않으면 -)
   if(contentNeedsOutcome(type)){
-    const pick = prompt(`${type} 성공 여부를 입력해 주세요.\nO=성공 / X=실패 / 엔터=미설정(-)`, "");
+    const pick=prompt(`${type} 성공 여부\nO=성공 / X=실패 / 엔터=미설정(-)`, "");
     if(pick===null) return;
-    const p = pick.trim().toUpperCase();
+    const p=pick.trim().toUpperCase();
     if(p==="O") payload.outcome=true;
     else if(p==="X") payload.outcome=false;
     else payload.outcome=null;
   }
 
-  await addDoc(colContent, payload);
+  await addDoc(colContent,payload);
   await loadContent();
 }
 
-function canEditContent(docData){
-  if(!docData) return false;
-  if(isAdmin()) return true;
-  return docData.writer===currentUser;
+async function loadContent(){
+  try{
+    const seven=new Date(); seven.setDate(seven.getDate()-7);
+    // 7일치 최대 300건 로드(20~30명 규모 가정)
+    const q=query(colContent, where("time",">=",seven), orderBy("time","desc"), limit(300));
+    const snap=await getDocs(q);
+    contentDocsCache=snap.docs;
+    renderContentList();
+  }catch(e){ alert(err(e)); console.error(e); }
 }
 
-function canSeeContent(docData){
-  if(!docData) return false;
-  if(isAdmin()) return true;
-  // 일반 유저: 숨김 유저(writer)가 작성한 기록은 비표시
-  const writerHidden = usersCache.get(docData.writer)?.isHidden;
-  return !writerHidden;
-}
+function renderPager(pageCount){
+  const wrap=$("pageArea");
+  wrap.innerHTML="";
+  const pager=document.createElement("div");
+  pager.className="pager";
 
-function applyContentFilter(list){
-  if(contentFilter==="ALL") return list;
-  return list.filter(x => x.data?.type===contentFilter);
+  const prev=document.createElement("button");
+  prev.textContent="이전";
+  prev.className="pillbtn";
+  prev.disabled=(contentPage===0);
+  prev.onclick=()=>{ contentPage=Math.max(0, contentPage-1); renderContentList(); };
+  pager.appendChild(prev);
+
+  const maxShow=7;
+  let start=Math.max(0, contentPage - Math.floor(maxShow/2));
+  let end=Math.min(pageCount-1, start + maxShow - 1);
+  start=Math.max(0, end - maxShow + 1);
+
+  for(let i=start;i<=end;i++){
+    const b=document.createElement("button");
+    b.className="pageNum"+(i===contentPage?" active":"");
+    b.textContent=String(i+1);
+    b.onclick=()=>{ contentPage=i; renderContentList(); };
+    pager.appendChild(b);
+  }
+
+  const next=document.createElement("button");
+  next.textContent="다음";
+  next.className="pillbtn";
+  next.disabled=(contentPage>=pageCount-1);
+  next.onclick=()=>{ contentPage=Math.min(pageCount-1, contentPage+1); renderContentList(); };
+  pager.appendChild(next);
+
+  wrap.appendChild(pager);
 }
 
 function renderContentList(){
   const visible = contentDocsCache
-    .map(d => ({id:d.id, data:d.data()}))
-    .filter(x => canSeeContent(x.data));
+    .map(d=>({id:d.id, data:d.data()}))
+    .filter(x=>canSeeContent(x.data));
 
   const filtered = applyContentFilter(visible);
+  const total = filtered.length;
+  const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  if(contentPage >= pageCount) contentPage = pageCount-1;
 
-  // 현재 페이지 분할(20개)
   const start = contentPage*PAGE_SIZE;
   const end = (contentPage+1)*PAGE_SIZE;
   const pageItems = filtered.slice(start, end);
@@ -516,115 +551,51 @@ function renderContentList(){
   let html="";
   for(const it of pageItems){
     const r=it.data;
-    const t = fmtKST(r.time);
+    const t=fmtKST(r.time);
 
-    const outcomeTxt = contentNeedsOutcome(r.type)
-      ? ` <span class="badge">결과 ${getOutcomeLabel(r.type, r.outcome)}</span>`
-      : "";
+    const outcomeTxt=contentNeedsOutcome(r.type)
+      ? ` <span class="badge">결과 ${getOutcomeLabel(r.type,r.outcome)}</span>` : "";
 
     let editInfo="";
     if(r.edited && r.edited.mode==="admin"){
-      editInfo = `<div class="small">수정:${escapeHtml(r.edited.by||"-")}</div>`;
+      editInfo=`<div class="small">수정:${escapeHtml(r.edited.by||"-")}</div>`;
     }else if(r.edited && r.edited.mode==="self"){
-      editInfo = `<div class="small">(수정됨)</div>`;
+      editInfo=`<div class="small">(수정됨)</div>`;
     }
 
-    // 작성자 수정(self)일 때는 added/removed 표시(밑줄/취소선)
-    let partHtml="";
-    const parts = Array.isArray(r.participants) ? r.participants : [];
-    const added = new Set((r.edited && r.edited.mode==="self" && Array.isArray(r.edited.added)) ? r.edited.added : []);
-    const removed = new Set((r.edited && r.edited.mode==="self" && Array.isArray(r.edited.removed)) ? r.edited.removed : []);
+    const parts=Array.isArray(r.participants)?r.participants:[];
+    const added=new Set((r.edited?.mode==="self" && Array.isArray(r.edited.added))?r.edited.added:[]);
+    const removed=new Set((r.edited?.mode==="self" && Array.isArray(r.edited.removed))?r.edited.removed:[]);
 
-    // 현재 참여자(남아있는 사람) 표시: added이면 밑줄
-    const shown = parts.map(p=>{
-      const cls = added.has(p) ? "u" : "";
-      return `<span class="${cls}">${escapeHtml(p)}</span>`;
-    });
+    const shown=parts.map(p=>`<span class="${added.has(p)?"u":""}">${escapeHtml(p)}</span>`);
+    const removedShown=Array.from(removed).map(p=>`<span class="s">${escapeHtml(p)}</span>`);
+    const partHtml=[...shown,...removedShown].length ? [...shown,...removedShown].join(", ") : "-";
 
-    // removed 표시: 취소선(현재 배열엔 없으니 따로 붙임)
-    const removedShown = Array.from(removed).map(p=>`<span class="s">${escapeHtml(p)}</span>`);
-
-    const combined = [...shown, ...removedShown];
-    partHtml = combined.length ? combined.join(", ") : "-";
-
-    const canEdit = canEditContent(r);
-
-    html += `<div class="stat">
+    html+=`<div class="stat">
       <div class="row">
-        <b>${escapeHtml(r.type)}</b>
-        ${outcomeTxt}
+        <b>${escapeHtml(r.type)}</b>${outcomeTxt}
         <span class="right small">${escapeHtml(t)}</span>
       </div>
-      <div><b>${escapeHtml(r.writer)}</b></div>
+      <div><b>${escapeHtml(r.writer||"-")}</b></div>
       ${editInfo}
       <div class="small" style="margin-top:6px;">참여자: ${partHtml}</div>
-
       <div class="row" style="margin-top:8px;">
-        ${canEdit ? `<button class="pillbtn" data-edit="${escapeHtml(it.id)}">수정</button>` : ""}
-        ${isAdmin() ? `<button class="pillbtn danger" data-cdel="${escapeHtml(it.id)}">삭제</button>` : ""}
+        ${canEditContent(r)?`<button class="pillbtn" data-edit="${escapeHtml(it.id)}">수정</button>`:""}
+        ${isAdmin()?`<button class="pillbtn danger" data-cdel="${escapeHtml(it.id)}">삭제</button>`:""}
       </div>
     </div>`;
   }
 
-  $("contentArea").innerHTML = html || `<div class="small">기록 없음</div>`;
+  $("contentArea").innerHTML=html || `<div class="small">기록 없음</div>`;
+  $("contentCount").textContent=`${total}건`;
+  renderPager(pageCount);
 
-  // 버튼 바인딩
   document.querySelectorAll("[data-edit]").forEach(btn=>{
-    btn.onclick = ()=> openEditModal(btn.getAttribute("data-edit"));
+    btn.onclick=()=>openEditModal(btn.getAttribute("data-edit"));
   });
   document.querySelectorAll("[data-cdel]").forEach(btn=>{
-    btn.onclick = ()=> adminDeleteContent(btn.getAttribute("data-cdel"));
+    btn.onclick=()=>adminDeleteContent(btn.getAttribute("data-cdel"));
   });
-
-  // 페이지네이션 버튼
-  $("pageArea").innerHTML = "";
-  const total = filtered.length;
-  const hasPrev = contentPage>0;
-  const hasNext = total > (contentPage+1)*PAGE_SIZE;
-
-  if(hasPrev){
-    const prev=document.createElement("button");
-    prev.textContent="이전 페이지";
-    prev.onclick=()=>{ contentPage--; renderContentList(); };
-    $("pageArea").appendChild(prev);
-  }
-  if(hasNext){
-    const next=document.createElement("button");
-    next.textContent="다음 페이지";
-    next.onclick=()=>{ contentPage++; renderContentList(); };
-    $("pageArea").appendChild(next);
-  }
-
-  $("contentCount").textContent = `${total}건`;
-}
-
-async function loadContent(){
-  try{
-    const seven=new Date();
-    seven.setDate(seven.getDate()-7);
-
-    // ✅ 7일치만 + (contentPage+1)*PAGE_SIZE 만큼만 조회(기존 최적화 유지)
-    const q=query(
-      colContent,
-      where("time",">=",seven),
-      orderBy("time","desc"),
-      limit(Math.max(20, (contentPage+1)*PAGE_SIZE))
-    );
-
-    const snap=await getDocs(q);
-    contentDocsCache = snap.docs;
-    // 렌더는 필터/페이지 기준으로 처리
-    renderContentList();
-  }catch(e){
-    alert(err(e));
-    console.error(e);
-  }
-}
-
-function onChangeContentFilter(){
-  contentFilter = $("contentFilter").value;
-  contentPage = 0;
-  renderContentList();
 }
 
 async function adminDeleteContent(id){
@@ -636,184 +607,148 @@ async function adminDeleteContent(id){
     await loadContent();
   }catch(e){ alert(err(e)); console.error(e); }
 }
-
 async function adminDeleteAllContent(){
   if(!isAdmin()) return;
   if(!confirm("컨텐츠 기록을 전체 삭제하시겠습니까?")) return;
   if(!confirm("정말로 삭제합니다. 되돌릴 수 없습니다.")) return;
   try{
-    // ⚠️ 안전: 현재 7일치만 지울지/전체를 지울지 애매해서,
-    // 여기서는 “현재 화면에 보이는(7일치 로드된) 문서만” 삭제합니다.
-    // (원하면 전체 삭제를 별도로 구현 가능)
-    const ids = contentDocsCache.map(d=>d.id);
-    for(const id of ids){
-      await deleteDoc(doc(db,"contentRecords",id));
-    }
+    const ids=contentDocsCache.map(d=>d.id);
+    for(const id of ids) await deleteDoc(doc(db,"contentRecords",id));
     setStatus("전체 삭제 완료");
     contentPage=0;
     await loadContent();
   }catch(e){ alert(err(e)); console.error(e); }
 }
 
-/* --------- 컨텐츠 수정 모달 --------- */
-
+/* ===== 모달(수정) ===== */
 function openEditModal(docId){
-  const found = contentDocsCache.find(d=>d.id===docId);
+  const found=contentDocsCache.find(d=>d.id===docId);
   if(!found) return alert("문서를 찾지 못했습니다. 새로고침 후 다시 시도해 주세요.");
-  const data = found.data();
 
+  const data=found.data();
   if(!canEditContent(data)) return alert("수정 권한이 없습니다.");
 
-  editDocId = docId;
-  editDocData = data;
-  editBaseParticipants = Array.isArray(data.participants) ? [...data.participants] : [];
-  editSelected = new Set(editBaseParticipants);
-  editSearchQ = "";
+  editDocId=docId;
+  editDocData=data;
+  editBaseParticipants=Array.isArray(data.participants)?[...data.participants]:[];
+  editSelected=new Set(editBaseParticipants);
+  editSelected.add(data.writer||currentUser);
 
-  // 작성자 자동 포함(수정 시에도 강제)
-  editSelected.add(data.writer || currentUser);
-
-  // 상단 표시
-  $("mTitle").textContent = `컨텐츠 수정 · ${data.type}`;
-  $("mMeta").innerHTML = `
+  $("mTitle").textContent=`컨텐츠 수정 · ${data.type}`;
+  $("mMeta").innerHTML=`
     <span class="tag">작성자 ${escapeHtml(data.writer||"-")}</span>
     <span class="tag">시간 ${escapeHtml(fmtKST(data.time))}</span>
-    ${contentNeedsOutcome(data.type) ? `<span class="tag">결과 ${getOutcomeLabel(data.type, data.outcome)}</span>` : `<span class="tag">결과 -</span>`}
+    ${contentNeedsOutcome(data.type)?`<span class="tag">결과 ${getOutcomeLabel(data.type,data.outcome)}</span>`:`<span class="tag">결과 -</span>`}
   `;
 
-  // 성공/실패 UI
   if(contentNeedsOutcome(data.type)){
-    show("mOutcomeBox", true);
-    $("mOutcome").value = (data.outcome===true ? "O" : (data.outcome===false ? "X" : "-"));
+    show("mOutcomeBox",true);
+    $("mOutcome").value=(data.outcome===true?"O":(data.outcome===false?"X":"-"));
   }else{
-    show("mOutcomeBox", false);
+    show("mOutcomeBox",false);
   }
 
-  // 검색 초기화
-  $("mSearch").value = "";
-  $("mSearch").oninput = ()=>{
-    editSearchQ = $("mSearch").value.trim().toLowerCase();
-    renderModalUserList();
-  };
+  $("mSearch").value="";
+  editSearchQ="";
+  $("mSearch").oninput=()=>{ editSearchQ=$("mSearch").value.trim().toLowerCase(); renderModalUserList(); };
 
   renderModalUserList();
   renderModalSelected();
+
   show("contentModal", true);
 }
-
 function closeEditModal(){
   show("contentModal", false);
-  editDocId=null;
-  editDocData=null;
-  editBaseParticipants=[];
-  editSelected=new Set();
-  editSearchQ="";
+  editDocId=null; editDocData=null;
+  editBaseParticipants=[]; editSelected=new Set(); editSearchQ="";
 }
-
 function renderModalUserList(){
-  const list = $("mUserList");
-  const names = Array.from(usersCache.keys()).sort((a,b)=>a.localeCompare(b,"ko"));
+  const list=$("mUserList");
+  const names=Array.from(usersCache.keys()).sort((a,b)=>a.localeCompare(b,"ko"));
+  const q=editSearchQ;
+  const filtered=q?names.filter(n=>n.toLowerCase().includes(q)):names;
 
-  const q = editSearchQ;
-  const filtered = q ? names.filter(n=>n.toLowerCase().includes(q)) : names;
-
-  list.innerHTML = filtered.map(n=>{
-    const checked = editSelected.has(n) ? "checked" : "";
+  list.innerHTML=filtered.map(n=>{
+    const checked=editSelected.has(n)?"checked":"";
     return `
       <label class="itemRow" style="cursor:pointer;">
         <span><b>${escapeHtml(n)}</b></span>
         <input type="checkbox" data-pick="${escapeHtml(n)}" ${checked}/>
-      </label>
-    `;
+      </label>`;
   }).join("");
 
   list.querySelectorAll("input[type='checkbox'][data-pick]").forEach(cb=>{
-    cb.onchange = ()=>{
-      const name = cb.getAttribute("data-pick");
+    cb.onchange=()=>{
+      const name=cb.getAttribute("data-pick");
       if(cb.checked) editSelected.add(name);
       else editSelected.delete(name);
-
-      // 작성자(또는 로그인 유저) 자동 포함 강제
-      const writer = editDocData?.writer || currentUser;
-      editSelected.add(writer);
-
+      editSelected.add(editDocData?.writer||currentUser);
       renderModalSelected();
-      renderModalUserList(); // 체크 상태 갱신
+      renderModalUserList();
     };
   });
 }
-
 function renderModalSelected(){
-  const box = $("mSelected");
-  const arr = Array.from(editSelected).sort((a,b)=>a.localeCompare(b,"ko"));
-  box.innerHTML = arr.length ? arr.map(n=>`<span class="badge">${escapeHtml(n)}</span>`).join(" ") : `<span class="small">선택된 인원이 없습니다.</span>`;
+  const box=$("mSelected");
+  const arr=Array.from(editSelected).sort((a,b)=>a.localeCompare(b,"ko"));
+  $("mSelectedCount").textContent=`${arr.length}명 선택`;
+  box.innerHTML=arr.length ? arr.map(n=>`<span class="badge">${escapeHtml(n)}</span>`).join(" ")
+                          : `<span class="small">선택된 인원이 없습니다.</span>`;
+}
+function modalSelectAll(){
+  Array.from(usersCache.keys()).forEach(n=>editSelected.add(n));
+  editSelected.add(editDocData?.writer||currentUser);
+  renderModalSelected(); renderModalUserList();
+}
+function modalClearAll(){
+  editSelected=new Set();
+  editSelected.add(editDocData?.writer||currentUser);
+  renderModalSelected(); renderModalUserList();
 }
 
 async function saveEditModal(){
   if(!editDocId || !editDocData) return;
 
-  const type = editDocData.type;
-  const writer = editDocData.writer || currentUser;
+  const type=editDocData.type;
+  const writer=editDocData.writer||currentUser;
 
-  // 참여자
-  let participants = Array.from(editSelected).map(x=>x.trim()).filter(Boolean);
-
-  // ✅ 0명 저장 금지 + 작성자 포함 강제
+  let participants=Array.from(editSelected).map(x=>x.trim()).filter(Boolean);
   if(!participants.includes(writer)) participants.unshift(writer);
   if(participants.length===0) return alert("참여자가 0명이면 저장하지 않습니다.");
 
-  // outcome
-  let outcome = editDocData.outcome ?? null;
+  let outcome=editDocData.outcome ?? null;
   if(contentNeedsOutcome(type)){
-    const v = $("mOutcome").value;
+    const v=$("mOutcome").value;
     if(v==="O") outcome=true;
     else if(v==="X") outcome=false;
     else outcome=null;
   }
 
-  // delta 계산
-  const before = new Set(editBaseParticipants);
-  const after = new Set(participants);
-
-  const added = [];
-  const removed = [];
+  const before=new Set(editBaseParticipants);
+  const after=new Set(participants);
+  const added=[], removed=[];
   for(const p of after){ if(!before.has(p)) added.push(p); }
   for(const p of before){ if(!after.has(p)) removed.push(p); }
 
-  // edited 메타
-  let edited = null;
-  if(isAdmin() && currentUser !== writer){
-    // 관리자 수정(작성자 아님)
-    edited = { mode:"admin", by: currentUser, at: serverTimestamp() };
+  let edited=null;
+  if(isAdmin() && currentUser!==writer){
+    edited={mode:"admin", by:currentUser, at:serverTimestamp()};
   }else{
-    // 작성자(또는 자기) 수정
-    // 표시 요구사항: (수정됨) + added/removed 시각표현
-    edited = { mode:"self", by: writer, at: serverTimestamp(), added, removed };
+    edited={mode:"self", by:writer, at:serverTimestamp(), added, removed};
   }
 
-  // 실제 저장
   try{
-    await updateDoc(doc(db,"contentRecords",editDocId), {
-      participants,
-      outcome,
-      edited
-    });
-
+    await updateDoc(doc(db,"contentRecords",editDocId), { participants, outcome, edited });
     setStatus("저장되었습니다.");
     closeEditModal();
     await loadContent();
-  }catch(e){
-    alert(err(e));
-    console.error(e);
-  }
+  }catch(e){ alert(err(e)); console.error(e); }
 }
 
-/* =========================
-   관리자 패널(V3 유지) + V3 근태기록관리 + 그래프
-   ========================= */
+/* ===== 관리자 패널 ===== */
 function toggleAdminPanel(){
   if(!isAdmin()) return;
-  const open = !$("adminPanel").classList.contains("hidden");
+  const open=!$("adminPanel").classList.contains("hidden");
   show("adminPanel", open?false:true);
   if(!open){
     renderAdminUserTable();
@@ -821,13 +756,44 @@ function toggleAdminPanel(){
   }
 }
 
+/* 그래프 */
+function toggleGraph(){
+  if(!isAdmin()) return;
+  const panel=$("graphPanel");
+  const isOpen=panel.classList.contains("expand");
+  panel.classList.toggle("expand", !isOpen);
+  panel.classList.toggle("collapse", isOpen);
+  $("graphBtn").textContent = isOpen ? "그래프 펼치기" : "그래프 접기";
+  if(!isOpen && lastStatsMap) renderGraphFromStats(lastStatsMap);
+}
+function renderGraphFromStats(map){
+  const entries=sortedUserEntries(map);
+  const maxSec=Math.max(1, ...entries.map(e=>e.st.total||0));
+  $("graphArea").innerHTML=`
+    <div class="small">* 최근 7일 누적 근무시간(시간) 기준 그래프입니다.</div>
+    <div class="barWrap">
+      ${entries.map(e=>{
+        const hours=Math.floor((e.st.total||0)/3600);
+        const pct=Math.round(((e.st.total||0)/maxSec)*100);
+        return `
+          <div class="barRow">
+            <div><b>${escapeHtml(e.name)}</b> <span class="badge">${escapeHtml(e.ud.rank||"-")}</span></div>
+            <div class="barBg"><div class="barFill" style="width:${pct}%;"></div></div>
+            <div class="small" style="text-align:right;">${hours}h</div>
+          </div>`;
+      }).join("")}
+    </div>
+  `;
+}
+
+/* 유저 테이블 */
 function renderAdminUserTable(){
   if(!isAdmin()) return;
-  const tbody = $("adminUserTbody");
+  const tbody=$("adminUserTbody");
   if(!tbody) return;
 
-  const q = $("adminUserSearch")?.value?.trim()?.toLowerCase() || "";
-  const rows = [];
+  const q=($("adminUserSearch")?.value||"").trim().toLowerCase();
+  const rows=[];
   for(const [name,ud] of usersCache.entries()){
     if(q && !name.toLowerCase().includes(q)) continue;
     rows.push({name,ud});
@@ -837,9 +803,9 @@ function renderAdminUserTable(){
   tbody.innerHTML = rows.map(({name,ud})=>{
     const rankOptions = `<option value="">-</option>` + RANKS.map(r=>`<option value="${r}" ${ud.rank===r?"selected":""}>${r}</option>`).join("");
     const deptOptions = `<option value="">-</option>` + DEPTS.map(d=>`<option value="${d}" ${ud.department===d?"selected":""}>${d}</option>`).join("");
-    const adminChecked = (ud.isAdmin===true) ? "checked" : "";
-    const hiddenChecked = (ud.isHidden===true) ? "checked" : "";
-    const pw = (ud.password!==undefined && ud.password!==null) ? String(ud.password) : "";
+    const adminChecked = ud.isAdmin===true ? "checked" : "";
+    const hiddenChecked = ud.isHidden===true ? "checked" : "";
+    const pw = (ud.password ?? "").toString();
     return `
       <tr data-user="${escapeHtml(name)}">
         <td>
@@ -847,7 +813,8 @@ function renderAdminUserTable(){
             <input type="checkbox" class="adminPick" />
             <b>${escapeHtml(name)}</b>
           </div>
-          <div class="small mono">pw: <span class="pwText" data-pw="${escapeHtml(pw)}">••••</span>
+          <div class="small mono">pw:
+            <span class="pwText" data-pw="${escapeHtml(pw)}">••••</span>
             <button class="pillbtn ghost pwToggle" type="button">보기</button>
           </div>
         </td>
@@ -872,7 +839,7 @@ function renderAdminUserTable(){
   }).join("");
 
   tbody.querySelectorAll("tr").forEach(tr=>{
-    const user = tr.getAttribute("data-user");
+    const user=tr.getAttribute("data-user");
 
     tr.querySelector(".pwToggle")?.addEventListener("click",()=>{
       const span=tr.querySelector(".pwText");
@@ -880,14 +847,13 @@ function renderAdminUserTable(){
     });
 
     tr.querySelector(".pwSet")?.addEventListener("click", async ()=>{
-      const v = tr.querySelector(".pwInput")?.value ?? "";
+      const v=(tr.querySelector(".pwInput")?.value||"").trim();
       if(!v) return alert("새 비밀번호를 입력해 주세요.");
       try{
-        await updateDoc(doc(db,"users",user), { password: v });
-        const ud = usersCache.get(user)||{};
-        ud.password = v;
-        usersCache.set(user, ud);
-        tr.querySelector(".pwText")?.setAttribute("data-pw", escapeHtml(String(v)));
+        await updateDoc(doc(db,"users",user), { password:v });
+        const ud=usersCache.get(user)||{};
+        ud.password=v; usersCache.set(user,ud);
+        tr.querySelector(".pwText")?.setAttribute("data-pw", escapeHtml(v));
         tr.querySelector(".pwInput").value="";
         setStatus("비밀번호가 설정되었습니다.");
       }catch(e){ alert(err(e)); console.error(e); }
@@ -895,10 +861,10 @@ function renderAdminUserTable(){
 
     tr.querySelector(".saveRow")?.addEventListener("click", async ()=>{
       try{
-        const rank = tr.querySelector(".rankSel")?.value || "";
-        const dept = tr.querySelector(".deptSel")?.value || "";
-        const admin = !!tr.querySelector(".adminChk")?.checked;
-        const hidden = !!tr.querySelector(".hiddenChk")?.checked;
+        const rank=tr.querySelector(".rankSel")?.value || "";
+        const dept=tr.querySelector(".deptSel")?.value || "";
+        const admin=!!tr.querySelector(".adminChk")?.checked;
+        const hidden=!!tr.querySelector(".hiddenChk")?.checked;
 
         await updateDoc(doc(db,"users",user), {
           rank: rank || "",
@@ -907,17 +873,12 @@ function renderAdminUserTable(){
           isHidden: hidden
         });
 
-        const ud = usersCache.get(user)||{};
-        ud.rank = rank || "";
-        ud.department = dept || "";
-        ud.isAdmin = admin;
-        ud.isHidden = hidden;
-        usersCache.set(user, ud);
+        const ud=usersCache.get(user)||{};
+        ud.rank=rank||""; ud.department=dept||""; ud.isAdmin=admin; ud.isHidden=hidden;
+        usersCache.set(user,ud);
 
         setStatus("저장되었습니다.");
-        await loadStats();
-        await loadOnline();
-        await loadContent();
+        await loadStats(); await loadOnline(); await loadContent();
         renderAdminWorkUserSelect();
       }catch(e){ alert(err(e)); console.error(e); }
     });
@@ -929,9 +890,7 @@ function renderAdminUserTable(){
         usersCache.delete(user);
         renderAdminUserTable();
         renderAdminWorkUserSelect();
-        await loadStats();
-        await loadOnline();
-        await loadContent();
+        await loadStats(); await loadOnline(); await loadContent();
         setStatus("삭제되었습니다.");
       }catch(e){ alert(err(e)); console.error(e); }
     });
@@ -939,12 +898,12 @@ function renderAdminUserTable(){
 }
 
 async function adminAddUser(){
-  const nick = $("adminAddNick").value.trim();
-  const pw = $("adminAddPw").value.trim();
+  const nick=($("adminAddNick").value||"").trim();
+  const pw=($("adminAddPw").value||"").trim();
   if(!nick) return alert("닉네임을 입력해 주세요.");
   if(!pw) return alert("비밀번호를 입력해 주세요.");
   try{
-    const exists = await getDoc(doc(db,"users",nick));
+    const exists=await getDoc(doc(db,"users",nick));
     if(exists.exists()) return alert("이미 존재하는 유저입니다.");
 
     await setDoc(doc(db,"users",nick), {
@@ -963,7 +922,7 @@ async function adminAddUser(){
 }
 
 async function adminBulkSetAdmin(flag){
-  const picks = Array.from(document.querySelectorAll("#adminUserTbody .adminPick"))
+  const picks=Array.from(document.querySelectorAll("#adminUserTbody .adminPick"))
     .filter(x=>x.checked)
     .map(x=>x.closest("tr")?.getAttribute("data-user"))
     .filter(Boolean);
@@ -974,78 +933,43 @@ async function adminBulkSetAdmin(flag){
   try{
     for(const u of picks){
       await updateDoc(doc(db,"users",u), { isAdmin: flag });
-      const ud = usersCache.get(u)||{};
-      ud.isAdmin = flag;
-      usersCache.set(u, ud);
+      const ud=usersCache.get(u)||{};
+      ud.isAdmin=flag; usersCache.set(u,ud);
     }
     renderAdminUserTable();
-    await loadStats();
-    await loadOnline();
+    await loadStats(); await loadOnline();
     setStatus("적용되었습니다.");
   }catch(e){ alert(err(e)); console.error(e); }
-}
-
-/* 그래프 */
-function toggleGraph(){
-  if(!isAdmin()) return;
-  const panel=$("graphPanel");
-  const isOpen = panel.classList.contains("expand");
-  panel.classList.toggle("expand", !isOpen);
-  panel.classList.toggle("collapse", isOpen);
-  $("graphBtn").textContent = isOpen ? "그래프 펼치기" : "그래프 접기";
-  if(!isOpen && lastStatsMap) renderGraphFromStats(lastStatsMap);
-}
-function renderGraphFromStats(map){
-  const entries = sortedUserEntries(map);
-  const maxSec = Math.max(1, ...entries.map(e=>e.st.total||0));
-  const wrap = $("graphArea");
-  if(!wrap) return;
-
-  wrap.innerHTML = `
-    <div class="small">* 최근 7일 누적 근무시간(시간) 기준 그래프입니다.</div>
-    <div class="barWrap">
-      ${entries.map(e=>{
-        const hours = Math.floor((e.st.total||0)/3600);
-        const pct = Math.round(((e.st.total||0)/maxSec)*100);
-        return `
-          <div class="barRow">
-            <div><b>${escapeHtml(e.name)}</b> <span class="badge">${escapeHtml(e.ud.rank||"-")}</span></div>
-            <div class="barBg"><div class="barFill" style="width:${pct}%;"></div></div>
-            <div class="small" style="text-align:right;">${hours}h</div>
-          </div>
-        `;
-      }).join("")}
-    </div>
-  `;
 }
 
 /* 근태 기록 관리 */
 function renderAdminWorkUserSelect(){
   if(!isAdmin()) return;
-  const sel = $("adminWorkUser");
-  if(!sel) return;
-  const names = Array.from(usersCache.keys()).sort((a,b)=>a.localeCompare(b,"ko"));
-  const cur = sel.value || "";
-  sel.innerHTML = `<option value="">유저 선택</option>` + names.map(n=>`<option value="${escapeHtml(n)}" ${n===cur?"selected":""}>${escapeHtml(n)}</option>`).join("");
+  const sel=$("adminWorkUser"); if(!sel) return;
+  const names=Array.from(usersCache.keys()).sort((a,b)=>a.localeCompare(b,"ko"));
+  const cur=sel.value||"";
+  sel.innerHTML=`<option value="">유저 선택</option>` + names.map(n=>`<option value="${escapeHtml(n)}" ${n===cur?"selected":""}>${escapeHtml(n)}</option>`).join("");
 }
 
 async function adminLoadWorkRecords(){
   if(!isAdmin()) return;
-  const user = $("adminWorkUser").value;
+  const user=$("adminWorkUser").value;
   if(!user) return alert("유저를 선택해 주세요.");
 
   try{
-    const q = query(colWork, where("nickname","==",user), orderBy("checkIn","desc"), limit(50));
-    const snap = await getDocs(q);
+    const q=query(colWork, where("nickname","==",user), orderBy("checkIn","desc"), limit(50));
+    const snap=await getDocs(q);
 
-    const rows = snap.docs.map(d=>{
+    const rows=snap.docs.map(d=>{
       const r=d.data();
-      const ci=toDatetimeLocalValue(toDateOrNull(r.checkIn));
-      const co=toDatetimeLocalValue(toDateOrNull(r.checkOut));
-      return {id:d.id, ci, co};
+      return {
+        id:d.id,
+        ci:toDatetimeLocalValue(toDateOrNull(r.checkIn)),
+        co:toDatetimeLocalValue(toDateOrNull(r.checkOut))
+      };
     });
 
-    const tbody = $("adminWorkTbody");
+    const tbody=$("adminWorkTbody");
     tbody.innerHTML = rows.map(r=>`
       <tr data-id="${escapeHtml(r.id)}">
         <td class="mono">${escapeHtml(r.id.slice(-8))}</td>
@@ -1061,17 +985,18 @@ async function adminLoadWorkRecords(){
     `).join("");
 
     tbody.querySelectorAll("tr").forEach(tr=>{
-      const id = tr.getAttribute("data-id");
+      const id=tr.getAttribute("data-id");
+
       tr.querySelector(".save")?.addEventListener("click", async ()=>{
-        const ciStr = tr.querySelector(".ci")?.value || "";
-        const coStr = tr.querySelector(".co")?.value || "";
-        const ci = parseDatetimeLocal(ciStr);
+        const ci=parseDatetimeLocal(tr.querySelector(".ci")?.value||"");
+        const coStr=tr.querySelector(".co")?.value||"";
         const co = coStr ? parseDatetimeLocal(coStr) : null;
+
         if(!ci) return alert("출근 시간이 올바르지 않습니다.");
         if(co && co < ci) return alert("퇴근 시간은 출근 시간보다 빠를 수 없습니다.");
 
         try{
-          await updateDoc(doc(db,"workRecords",id), { checkIn: ci, checkOut: co ? co : null });
+          await updateDoc(doc(db,"workRecords",id), { checkIn: ci, checkOut: co?co:null });
           setStatus("저장되었습니다.");
           await loadStats(); await loadOnline();
         }catch(e){ alert(err(e)); console.error(e); }
@@ -1090,25 +1015,20 @@ async function adminLoadWorkRecords(){
 
     $("adminWorkHint").innerHTML = `<span class="small">현재 선택: <b>${escapeHtml(user)}</b> · 최대 50건 표시</span>`;
     setStatus("근태 기록을 불러왔습니다.");
-  }catch(e){
-    alert(err(e));
-    console.error(e);
-  }
+  }catch(e){ alert(err(e)); console.error(e); }
 }
 
 async function adminDeleteAllWorkOfUser(){
   if(!isAdmin()) return;
-  const user = $("adminWorkUser").value;
+  const user=$("adminWorkUser").value;
   if(!user) return alert("유저를 선택해 주세요.");
   if(!confirm(`${user}의 근태 기록을 전부 삭제하시겠습니까?`)) return;
   if(!confirm("정말로 삭제합니다. 되돌릴 수 없습니다.")) return;
 
   try{
-    const q = query(colWork, where("nickname","==",user));
-    const snap = await getDocs(q);
-    for(const d of snap.docs){
-      await deleteDoc(doc(db,"workRecords",d.id));
-    }
+    const q=query(colWork, where("nickname","==",user));
+    const snap=await getDocs(q);
+    for(const d of snap.docs) await deleteDoc(doc(db,"workRecords",d.id));
     $("adminWorkTbody").innerHTML="";
     $("adminWorkHint").innerHTML="";
     setStatus("유저 근태 전체 삭제 완료");
@@ -1122,10 +1042,8 @@ async function adminDeleteAllWork(){
   if(!confirm("정말로 삭제합니다. 되돌릴 수 없습니다.")) return;
 
   try{
-    const snap = await getDocs(colWork);
-    for(const d of snap.docs){
-      await deleteDoc(doc(db,"workRecords",d.id));
-    }
+    const snap=await getDocs(colWork);
+    for(const d of snap.docs) await deleteDoc(doc(db,"workRecords",d.id));
     $("adminWorkTbody").innerHTML="";
     $("adminWorkHint").innerHTML="";
     setStatus("전체 근태 삭제 완료");
@@ -1133,9 +1051,7 @@ async function adminDeleteAllWork(){
   }catch(e){ alert(err(e)); console.error(e); }
 }
 
-/* =========================
-   새로고침(전체)
-   ========================= */
+/* ===== 새로고침(전체) ===== */
 async function refreshAll(showToast){
   try{ await loadUsers(); }catch(e){ console.error(e); }
   try{ await loadStats(); }catch(e){ console.error(e); }
@@ -1144,10 +1060,17 @@ async function refreshAll(showToast){
   if(showToast) setStatus("갱신되었습니다.");
 }
 
-/* =========================
-   바인딩
-   ========================= */
-document.addEventListener("DOMContentLoaded",()=>{
+/* ===== 이벤트 바인딩 ===== */
+document.addEventListener("DOMContentLoaded", ()=>{
+  /* ✅ V6: 모달 자동 오픈 방지(기본 내장) */
+  show("contentModal", false);
+  closeEditModal();
+
+  /* ✅ V6: 모달 배경 클릭 시 닫기 */
+  $("contentModal")?.addEventListener("click",(e)=>{
+    if(e.target?.id==="contentModal") closeEditModal();
+  });
+
   $("loginBtn").addEventListener("click",login);
   $("logoutBtn").addEventListener("click",logout);
   $("refreshBtn").addEventListener("click",()=>refreshAll(true));
@@ -1159,12 +1082,7 @@ document.addEventListener("DOMContentLoaded",()=>{
   $("plantBtn").addEventListener("click",()=>createContent("송전소"));
   $("escortBtn").addEventListener("click",()=>createContent("차량수호"));
 
-  $("sortSel").addEventListener("change",(e)=>{
-    sortMode = e.target.value;
-    loadStats();
-  });
-
-  $("contentFilter").addEventListener("change", onChangeContentFilter);
+  $("sortSel").addEventListener("change",(e)=>{ sortMode=e.target.value; loadStats(); });
 
   $("adminToggleBtn").addEventListener("click",toggleAdminPanel);
   $("adminUserSearch").addEventListener("input",renderAdminUserTable);
@@ -1176,13 +1094,27 @@ document.addEventListener("DOMContentLoaded",()=>{
   $("adminWorkLoadBtn").addEventListener("click",adminLoadWorkRecords);
   $("adminWorkDelUserBtn").addEventListener("click",adminDeleteAllWorkOfUser);
   $("adminWorkDelAllBtn").addEventListener("click",adminDeleteAllWork);
-
   $("adminContentDelAllBtn").addEventListener("click",adminDeleteAllContent);
 
-  // 모달
+  /* 필터 드롭다운 */
+  $("filterBtn").addEventListener("click", ()=>toggleFilterMenu());
+  document.addEventListener("click",(e)=>{
+    // 드롭다운 바깥 클릭 시 닫기
+    if(!e.target.closest("#filterWrap")) toggleFilterMenu(false);
+  });
+  $("fAll").addEventListener("click", ()=>setContentFilter("ALL"));
+  $("fSup").addEventListener("click", ()=>setContentFilter("보급"));
+  $("fPlt").addEventListener("click", ()=>setContentFilter("송전소"));
+  $("fEsc").addEventListener("click", ()=>setContentFilter("차량수호"));
+
+  /* 모달 버튼 */
   $("mClose").addEventListener("click",closeEditModal);
   $("mCancel").addEventListener("click",closeEditModal);
   $("mSave").addEventListener("click",saveEditModal);
+  $("mAll").addEventListener("click",modalSelectAll);
+  $("mClear").addEventListener("click",modalClearAll);
+
+  setFilterLabel();
 });
 </script>
 </head>
@@ -1241,18 +1173,27 @@ document.addEventListener("DOMContentLoaded",()=>{
       <div class="card">
         <div class="row" style="justify-content:space-between;">
           <h3 style="margin:0;">컨텐츠 기록</h3>
+
           <div class="row">
-            <select id="contentFilter">
-              <option value="ALL">전체 보기</option>
-              <option value="보급">보급만 보기</option>
-              <option value="송전소">송전소만 보기</option>
-              <option value="차량수호">차량수호만 보기</option>
-            </select>
+            <div id="filterWrap" class="dropWrap">
+              <button id="filterBtn" class="pillbtn dropBtn" type="button">
+                <span id="filterLabel">전체 보기</span>
+                <span id="filterCaret">▼</span>
+              </button>
+              <div id="filterMenu" class="dropMenu hidden">
+                <button id="fAll" class="dropItem" type="button">전체 보기</button>
+                <button id="fSup" class="dropItem" type="button">보급만 보기</button>
+                <button id="fPlt" class="dropItem" type="button">송전소만 보기</button>
+                <button id="fEsc" class="dropItem" type="button">차량수호만 보기</button>
+              </div>
+            </div>
+
             <span class="badge" id="contentCount">0건</span>
           </div>
         </div>
+
         <div id="contentArea" style="margin-top:10px;"></div>
-        <div id="pageArea" class="row" style="margin-top:10px;"></div>
+        <div id="pageArea"></div>
       </div>
     </div>
 
@@ -1263,17 +1204,15 @@ document.addEventListener("DOMContentLoaded",()=>{
         <div id="statsArea"></div>
       </div>
 
-      <!-- 관리자 패널 -->
       <div id="adminPanel" class="card hidden">
         <h3>관리자 패널</h3>
-        <div class="small">* 유저 등록=화이트리스트이며, 계급/부서/숨김/관리자/비밀번호/근태기록/컨텐츠삭제를 관리합니다.</div>
+        <div class="small">* 유저 등록=화이트리스트이며, 계급/부서/숨김/관리자/비밀번호/근태/컨텐츠를 관리합니다.</div>
 
         <div class="hr"></div>
 
-        <!-- 그래프 -->
         <div class="row">
           <button id="graphBtn" class="pillbtn" type="button">그래프 펼치기</button>
-          <span class="small">* 그래프는 최근 7일 누적시간 기반입니다.</span>
+          <span class="small">* 그래프는 최근 7일 누적시간 기준입니다.</span>
         </div>
         <div id="graphPanel" class="anim collapse" style="margin-top:10px;">
           <div id="graphArea"></div>
@@ -1281,7 +1220,6 @@ document.addEventListener("DOMContentLoaded",()=>{
 
         <div class="hr"></div>
 
-        <!-- 유저 추가/검색/일괄 -->
         <div class="row">
           <input id="adminAddNick" class="wide" placeholder="추가할 닉네임" />
           <input id="adminAddPw" class="wide" placeholder="초기 비밀번호" />
@@ -1296,7 +1234,7 @@ document.addEventListener("DOMContentLoaded",()=>{
 
         <div class="hr"></div>
 
-        <div style="overflow:auto;max-height:420px;border:1px solid #2a2a2a;border-radius:12px;">
+        <div style="overflow:auto;max-height:420px;border:1px solid #23232a;border-radius:12px;">
           <table class="table">
             <thead>
               <tr>
@@ -1313,11 +1251,9 @@ document.addEventListener("DOMContentLoaded",()=>{
 
         <div class="hr"></div>
 
-        <!-- 근태 기록 관리 -->
         <h3 style="margin-top:0;">근태 기록 관리</h3>
         <div class="small" style="margin-bottom:10px;">
-          * 유저 선택 후 ‘최근 기록 불러오기’를 누르면 최대 50건을 불러옵니다.<br>
-          * 출근/퇴근 시간을 수정할 수 있으며, 퇴근이 출근보다 빠르면 저장되지 않습니다.
+          * 유저 선택 후 ‘최근 기록 불러오기’를 누르면 최대 50건을 표시합니다.
         </div>
 
         <div class="row">
@@ -1329,7 +1265,7 @@ document.addEventListener("DOMContentLoaded",()=>{
 
         <div id="adminWorkHint" class="small" style="margin-top:8px;"></div>
 
-        <div style="overflow:auto;max-height:420px;border:1px solid #2a2a2a;border-radius:12px;margin-top:10px;">
+        <div style="overflow:auto;max-height:420px;border:1px solid #23232a;border-radius:12px;margin-top:10px;">
           <table class="table">
             <thead>
               <tr>
@@ -1345,25 +1281,23 @@ document.addEventListener("DOMContentLoaded",()=>{
 
         <div class="hr"></div>
 
-        <!-- V4: 관리자 컨텐츠 전체삭제 -->
         <h3 style="margin-top:0;">컨텐츠 기록 관리</h3>
-        <div class="small">* 현재 로드된 최근 7일 기록(화면 범위)을 전체 삭제합니다.</div>
+        <div class="small">* 최근 7일 범위(현재 로드된 기록)를 전체 삭제합니다.</div>
         <div class="row" style="margin-top:8px;">
           <button id="adminContentDelAllBtn" class="danger" type="button">컨텐츠 기록 전체 삭제</button>
         </div>
-
       </div>
     </div>
 
   </div>
 </div>
 
-<!-- 컨텐츠 수정 모달 -->
+<!-- ✅ V6: 모달은 반드시 hidden 기본 -->
 <div id="contentModal" class="modalBack hidden">
   <div class="modal">
     <div class="modalTop">
       <div>
-        <div id="mTitle" style="font-weight:700;">컨텐츠 수정</div>
+        <div id="mTitle" style="font-weight:800;">컨텐츠 수정</div>
         <div id="mMeta" class="row" style="margin-top:6px;"></div>
       </div>
       <button id="mClose" class="pillbtn ghost" type="button">닫기</button>
@@ -1376,7 +1310,17 @@ document.addEventListener("DOMContentLoaded",()=>{
             <b>참여자 선택</b>
             <span class="small">* 체크박스로 추가/삭제합니다.</span>
           </div>
-          <input id="mSearch" class="wide" placeholder="검색(닉네임)" style="width:100%;margin-top:8px;">
+
+          <div class="row" style="margin-top:8px;justify-content:space-between;">
+            <input id="mSearch" class="wide" placeholder="검색(닉네임)" style="width:100%;">
+          </div>
+
+          <div class="row" style="margin-top:8px;">
+            <button id="mAll" class="pillbtn" type="button">전체 선택</button>
+            <button id="mClear" class="pillbtn ghost" type="button">전체 해제</button>
+            <span id="mSelectedCount" class="right small">0명 선택</span>
+          </div>
+
           <div id="mUserList" class="list"></div>
         </div>
 
@@ -1402,8 +1346,8 @@ document.addEventListener("DOMContentLoaded",()=>{
           </div>
 
           <div class="small" style="margin-top:10px;">
-            * 작성자가 수정한 경우: (수정됨) + 추가=밑줄, 삭제=취소선으로 표시됩니다.<br>
-            * 관리자가(작성자 아닌) 수정한 경우: 작성자 아래에 수정:닉네임이 표시됩니다.
+            * 작성자 수정: (수정됨) + 추가=밑줄, 삭제=취소선으로 표시됩니다.<br>
+            * 관리자(작성자 아님) 수정: 작성자 아래에 수정:닉네임이 표시됩니다.
           </div>
         </div>
       </div>
