@@ -66,13 +66,11 @@
   .collapse{max-height:0; opacity:0; transform:translateY(-6px); overflow:hidden}
   .expand{max-height:1200px; opacity:1; transform:translateY(0); overflow:hidden}
 
-  /* 그래프 */
   .barWrap{margin-top:10px;display:flex;flex-direction:column;gap:8px}
   .barRow{display:grid;grid-template-columns:180px 1fr 90px;gap:10px;align-items:center}
   .barBg{height:10px;border:1px solid #2f2f36;border-radius:999px;overflow:hidden;background:#0a0a0c}
   .barFill{height:100%;background:var(--accent)}
 
-  /* 모달 */
   .modalBack{
     position:fixed;inset:0;background:rgba(0,0,0,.65);
     display:flex;align-items:center;justify-content:center;padding:18px;z-index:9999;
@@ -94,7 +92,6 @@
   .u{ text-decoration: underline; text-decoration-thickness: 2px; }
   .s{ text-decoration: line-through; text-decoration-thickness: 2px; opacity:.85; }
 
-  /* 필터 드롭다운 */
   .dropWrap{position:relative;display:inline-block}
   .dropBtn{display:inline-flex;align-items:center;gap:6px}
   .dropMenu{
@@ -109,7 +106,6 @@
   }
   .dropItem:hover{background:#17171d;border-color:#2a2a30}
 
-  /* 페이지 번호 */
   .pager{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px}
   .pageNum{
     min-width:34px;justify-content:center;
@@ -150,7 +146,7 @@ let sortMode="rank_desc";
 let lastStatsMap=null;
 
 let contentDocsCache=[];
-let contentFilter="ALL"; // ALL/보급/송전소/차량수호
+let contentFilter="ALL";
 let contentPage=0;
 const PAGE_SIZE=20;
 let filterOpen=false;
@@ -215,6 +211,20 @@ function fmtKST(ts){
   const d=toDateOrNull(ts); if(!d) return "-";
   const pad=n=>String(n).padStart(2,"0");
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/* ✅✅✅ 모달 자동오픈 “절대 방지” 하드락(핵심) ✅✅✅ */
+function hardCloseModal(){
+  const m=document.getElementById("contentModal");
+  if(!m) return;
+  m.classList.add("hidden");
+  m.setAttribute("aria-hidden","true");
+}
+function hardOpenModal(){
+  const m=document.getElementById("contentModal");
+  if(!m) return;
+  m.classList.remove("hidden");
+  m.setAttribute("aria-hidden","false");
 }
 
 /* ===== 로그인/유저 ===== */
@@ -490,7 +500,6 @@ async function createContent(type){
 async function loadContent(){
   try{
     const seven=new Date(); seven.setDate(seven.getDate()-7);
-    // 7일치 최대 300건 로드(20~30명 규모 가정)
     const q=query(colContent, where("time",">=",seven), orderBy("time","desc"), limit(300));
     const snap=await getDocs(q);
     contentDocsCache=snap.docs;
@@ -655,10 +664,10 @@ function openEditModal(docId){
   renderModalUserList();
   renderModalSelected();
 
-  show("contentModal", true);
+  hardOpenModal(); /* ✅ 하드 오픈 */
 }
 function closeEditModal(){
-  show("contentModal", false);
+  hardCloseModal(); /* ✅ 하드 클로즈 */
   editDocId=null; editDocData=null;
   editBaseParticipants=[]; editSelected=new Set(); editSearchQ="";
 }
@@ -745,7 +754,9 @@ async function saveEditModal(){
   }catch(e){ alert(err(e)); console.error(e); }
 }
 
-/* ===== 관리자 패널 ===== */
+/* ===== 관리자 패널 / 그래프 / 유저관리 / 근태관리 ===== */
+/* 아래는 기존 V6와 동일(기능 유지) */
+
 function toggleAdminPanel(){
   if(!isAdmin()) return;
   const open=!$("adminPanel").classList.contains("hidden");
@@ -756,7 +767,6 @@ function toggleAdminPanel(){
   }
 }
 
-/* 그래프 */
 function toggleGraph(){
   if(!isAdmin()) return;
   const panel=$("graphPanel");
@@ -786,7 +796,6 @@ function renderGraphFromStats(map){
   `;
 }
 
-/* 유저 테이블 */
 function renderAdminUserTable(){
   if(!isAdmin()) return;
   const tbody=$("adminUserTbody");
@@ -942,7 +951,6 @@ async function adminBulkSetAdmin(flag){
   }catch(e){ alert(err(e)); console.error(e); }
 }
 
-/* 근태 기록 관리 */
 function renderAdminWorkUserSelect(){
   if(!isAdmin()) return;
   const sel=$("adminWorkUser"); if(!sel) return;
@@ -1051,7 +1059,7 @@ async function adminDeleteAllWork(){
   }catch(e){ alert(err(e)); console.error(e); }
 }
 
-/* ===== 새로고침(전체) ===== */
+/* ===== 전체 새로고침 ===== */
 async function refreshAll(showToast){
   try{ await loadUsers(); }catch(e){ console.error(e); }
   try{ await loadStats(); }catch(e){ console.error(e); }
@@ -1062,11 +1070,11 @@ async function refreshAll(showToast){
 
 /* ===== 이벤트 바인딩 ===== */
 document.addEventListener("DOMContentLoaded", ()=>{
-  /* ✅ V6: 모달 자동 오픈 방지(기본 내장) */
-  show("contentModal", false);
+  /* ✅✅✅ 시작 즉시 모달은 무조건 닫습니다(자동오픈 봉인) */
+  hardCloseModal();
   closeEditModal();
 
-  /* ✅ V6: 모달 배경 클릭 시 닫기 */
+  /* ✅ 모달 배경 클릭 시 닫기 */
   $("contentModal")?.addEventListener("click",(e)=>{
     if(e.target?.id==="contentModal") closeEditModal();
   });
@@ -1096,10 +1104,8 @@ document.addEventListener("DOMContentLoaded", ()=>{
   $("adminWorkDelAllBtn").addEventListener("click",adminDeleteAllWork);
   $("adminContentDelAllBtn").addEventListener("click",adminDeleteAllContent);
 
-  /* 필터 드롭다운 */
   $("filterBtn").addEventListener("click", ()=>toggleFilterMenu());
   document.addEventListener("click",(e)=>{
-    // 드롭다운 바깥 클릭 시 닫기
     if(!e.target.closest("#filterWrap")) toggleFilterMenu(false);
   });
   $("fAll").addEventListener("click", ()=>setContentFilter("ALL"));
@@ -1107,7 +1113,6 @@ document.addEventListener("DOMContentLoaded", ()=>{
   $("fPlt").addEventListener("click", ()=>setContentFilter("송전소"));
   $("fEsc").addEventListener("click", ()=>setContentFilter("차량수호"));
 
-  /* 모달 버튼 */
   $("mClose").addEventListener("click",closeEditModal);
   $("mCancel").addEventListener("click",closeEditModal);
   $("mSave").addEventListener("click",saveEditModal);
@@ -1292,8 +1297,8 @@ document.addEventListener("DOMContentLoaded", ()=>{
   </div>
 </div>
 
-<!-- ✅ V6: 모달은 반드시 hidden 기본 -->
-<div id="contentModal" class="modalBack hidden">
+<!-- ✅✅✅ 모달: hidden + aria-hidden 기본(자동오픈 봉인) -->
+<div id="contentModal" class="modalBack hidden" aria-hidden="true">
   <div class="modal">
     <div class="modalTop">
       <div>
