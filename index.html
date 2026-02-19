@@ -111,14 +111,14 @@ body::before{
       margin: 0 auto;
     }
     body.admin-open .grid{
-      grid-template-columns: 1fr 420px;
-      max-width: 1480px;
-    }
+grid-template-columns: minmax(220px, 1fr) minmax(720px, 1.3fr) 720px;
+      max-width: 1840px;
+}
     .adminCol{
-      max-height: calc(100vh - 210px);
+max-height: calc(100vh - 160px);
       overflow:auto;
       overscroll-behavior: contain;
-    }
+}
     body.admin-open [data-view="dashboard"].card:first-of-type{
       transform: translateX(-6px);
       transition: transform .18s ease;
@@ -314,30 +314,7 @@ body.admin-open #adminBackdrop{ display:block; }
   --stroke: rgba(255,255,255,0.12);
 }
 
-
-    /* === PATCH: Admin layout shift (3-col feel) === */
-    body.admin-open .grid{
-      /* widen canvas and align to left so dashboard shifts left visibly */
-      max-width: 1880px !important;
-      margin: 0 0 0 28px !important;
-      padding-right: 22px !important;
-      grid-template-columns: 1fr 720px !important;
-    }
-    /* widen admin area and remove the "white drag" scrollbar feel */
-    body.admin-open .adminCol{
-      max-height: none !important;
-      overflow: visible !important;
-    }
-    /* keep dashboard visually compact and not too wide */
-    body.admin-open [data-view="dashboard"]{
-      min-width: 720px;
-    }
-    /* Modern scrollbar */
-    .adminCol::-webkit-scrollbar{width:10px}
-    .adminCol::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:999px}
-    .adminCol::-webkit-scrollbar-track{background:transparent}
-
-  </style>
+</style>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -1616,7 +1593,6 @@ async function ensureUserDocDefaultsOnce(userId, userData){
         loadWorkPage(0);
         admin.scrollTop=0;
       }
-    }
     }
     function toggleAdminPanel(){
       if(!isAdmin()) return;
