@@ -61,23 +61,14 @@
     background:#0f0f12;border:1px solid #23232a;border-radius:14px;
     padding:11px 12px;margin-bottom:9px;line-height:1.55
   }
-  .hr{height:1px;background:#23232a;margin:12px 0}
   .badge{font-size:11px;padding:2px 8px;border:1px solid var(--border2);border-radius:999px;color:#e6e6ea}
   .right{margin-left:auto}
   .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
   .table{width:100%;border-collapse:collapse}
   .table th,.table td{border-bottom:1px solid #23232a;padding:9px 7px;text-align:left;font-size:13px;vertical-align:top}
   .table th{color:#e8e8ee;font-weight:650}
-  .anim{transition:max-height .25s ease, opacity .25s ease, transform .25s ease}
-  .collapse{max-height:0; opacity:0; transform:translateY(-6px); overflow:hidden}
-  .expand{max-height:1200px; opacity:1; transform:translateY(0); overflow:hidden}
 
-  .barWrap{margin-top:10px;display:flex;flex-direction:column;gap:8px}
-  .barRow{display:grid;grid-template-columns:200px 1fr 90px;gap:10px;align-items:center}
-  .barBg{height:10px;border:1px solid #2f2f36;border-radius:999px;overflow:hidden;background:#0a0a0c}
-  .barFill{height:100%;background:var(--accent)}
-
-  /* ✅ 관리자 패널 정돈(아코디언) */
+  /* 관리자 패널 정돈 */
   details.adminSec{
     border:1px solid #23232a;border-radius:14px;background:#0f0f12;
     padding:10px 12px;margin-top:10px;
@@ -91,6 +82,36 @@
   .sumHint{font-weight:500;color:var(--muted);font-size:12px;margin-left:auto}
   .secBody{padding-top:10px}
 
+  .barWrap{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+  .barRow{display:grid;grid-template-columns:200px 1fr 90px;gap:10px;align-items:center}
+  .barBg{height:10px;border:1px solid #2f2f36;border-radius:999px;overflow:hidden;background:#0a0a0c}
+  .barFill{height:100%;background:var(--accent)}
+
+  /* 필터 드롭다운 */
+  .dropWrap{position:relative;display:inline-block}
+  .dropBtn{display:inline-flex;align-items:center;gap:6px}
+  .dropMenu{
+    position:absolute;right:0;top:calc(100% + 6px);
+    background:#101013;border:1px solid #2a2a30;border-radius:12px;
+    min-width:180px;padding:8px;z-index:50;
+    box-shadow:0 16px 40px rgba(0,0,0,.35);
+  }
+  .dropItem{
+    width:100%;text-align:left;padding:9px 10px;border-radius:10px;
+    border:1px solid transparent;background:transparent;color:var(--txt);cursor:pointer;
+  }
+  .dropItem:hover{background:#17171d;border-color:#2a2a30}
+
+  /* 페이지 */
+  .pager{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px}
+  .pageNum{
+    min-width:34px;justify-content:center;
+    padding:6px 10px;border-radius:999px;border:1px solid var(--border2);
+    background:#121218;color:#fff;cursor:pointer;
+  }
+  .pageNum.active{background:#20202a;border-color:#4a4a58}
+
+  /* 모달 */
   .modalBack{
     position:fixed;inset:0;background:rgba(0,0,0,.65);
     display:flex;align-items:center;justify-content:center;padding:18px;z-index:9999;
@@ -111,28 +132,6 @@
   .tag{font-size:11px;border:1px solid var(--border2);border-radius:999px;padding:2px 8px;color:#e6e6ea}
   .u{ text-decoration: underline; text-decoration-thickness: 2px; }
   .s{ text-decoration: line-through; text-decoration-thickness: 2px; opacity:.85; }
-
-  .dropWrap{position:relative;display:inline-block}
-  .dropBtn{display:inline-flex;align-items:center;gap:6px}
-  .dropMenu{
-    position:absolute;right:0;top:calc(100% + 6px);
-    background:#101013;border:1px solid #2a2a30;border-radius:12px;
-    min-width:180px;padding:8px;z-index:50;
-    box-shadow:0 16px 40px rgba(0,0,0,.35);
-  }
-  .dropItem{
-    width:100%;text-align:left;padding:9px 10px;border-radius:10px;
-    border:1px solid transparent;background:transparent;color:var(--txt);cursor:pointer;
-  }
-  .dropItem:hover{background:#17171d;border-color:#2a2a30}
-
-  .pager{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:10px}
-  .pageNum{
-    min-width:34px;justify-content:center;
-    padding:6px 10px;border-radius:999px;border:1px solid var(--border2);
-    background:#121218;color:#fff;cursor:pointer;
-  }
-  .pageNum.active{background:#20202a;border-color:#4a4a58}
 </style>
 
 <script type="module">
@@ -229,18 +228,30 @@ function fmtKST(ts){
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/* ✅ 모달 자동오픈 절대 방지(하드락) */
+/* ✅ 모달 안정화: aria-hidden 제거 + inert 사용 */
 function hardCloseModal(){
   const m=document.getElementById("contentModal");
   if(!m) return;
+
+  // 모달 내부 포커스가 남아있으면 먼저 해제합니다.
+  const active=document.activeElement;
+  if(active && m.contains(active)){
+    active.blur?.();
+    document.body.focus?.();
+  }
+
   m.classList.add("hidden");
-  m.setAttribute("aria-hidden","true");
+  m.setAttribute("inert","");
 }
 function hardOpenModal(){
   const m=document.getElementById("contentModal");
   if(!m) return;
+
   m.classList.remove("hidden");
-  m.setAttribute("aria-hidden","false");
+  m.removeAttribute("inert");
+
+  // 모달이 열리면 닫기 버튼으로 포커스를 이동합니다.
+  setTimeout(()=>{ document.getElementById("mClose")?.focus?.(); },0);
 }
 
 /* ===== 로그인/유저 ===== */
@@ -367,10 +378,7 @@ async function loadStats(){
     lastStatsMap=map;
     renderStats(map);
 
-    if(isAdmin()){
-      const panel=$("graphPanel");
-      if(panel && panel.classList.contains("expand")) renderGraphFromStats(map);
-    }
+    if(isAdmin() && $("graphPanel")?.open) renderGraphFromStats(map);
   }catch(e){ alert(err(e)); console.error(e); }
 }
 
@@ -681,11 +689,13 @@ function openEditModal(docId){
 
   hardOpenModal();
 }
+
 function closeEditModal(){
   hardCloseModal();
   editDocId=null; editDocData=null;
   editBaseParticipants=[]; editSelected=new Set(); editSearchQ="";
 }
+
 function renderModalUserList(){
   const list=$("mUserList");
   const names=Array.from(usersCache.keys()).sort((a,b)=>a.localeCompare(b,"ko"));
@@ -1074,11 +1084,18 @@ async function refreshAll(showToast){
 
 /* ===== 이벤트 ===== */
 document.addEventListener("DOMContentLoaded", ()=>{
+  // ✅ 시작 시 모달이 절대 떠있지 않도록 강제 닫기 처리
   hardCloseModal();
   closeEditModal();
 
+  // ✅ 모달 배경 클릭 시 닫기
   $("contentModal")?.addEventListener("click",(e)=>{
     if(e.target?.id==="contentModal") closeEditModal();
+  });
+
+  // ✅ ESC로 모달 닫기
+  document.addEventListener("keydown",(e)=>{
+    if(e.key==="Escape") closeEditModal();
   });
 
   $("loginBtn").addEventListener("click",login);
@@ -1214,10 +1231,9 @@ document.addEventListener("DOMContentLoaded", ()=>{
         <h3>관리자 패널</h3>
         <div class="small">* 혼잡도를 낮추기 위해 영역별로 접기/펼치기 구조로 정리됩니다.</div>
 
-        <details class="adminSec" open>
+        <details id="graphPanel" class="adminSec" open>
           <summary>그래프 <span class="sumHint">최근 7일 누적 근무시간</span></summary>
           <div class="secBody">
-            <button class="pillbtn" type="button" onclick="(function(){})()">※ 아래 그래프는 통계 갱신 시 자동 반영됩니다.</button>
             <div id="graphArea" style="margin-top:10px;"></div>
           </div>
         </details>
@@ -1302,8 +1318,8 @@ document.addEventListener("DOMContentLoaded", ()=>{
   </div>
 </div>
 
-<!-- 모달 -->
-<div id="contentModal" class="modalBack hidden" aria-hidden="true">
+<!-- ✅ 모달(aria-hidden 제거, inert 적용) -->
+<div id="contentModal" class="modalBack hidden" inert>
   <div class="modal">
     <div class="modalTop">
       <div>
