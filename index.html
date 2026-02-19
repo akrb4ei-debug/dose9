@@ -297,6 +297,8 @@ body::before{
     let usersCache=new Map();
     let lastUsersLoadAt=0;
     const USERS_COOLDOWN_MS = 5*60*1000; // 5분
+const USER_PAGE_SIZE = 10;
+    let usersPage = 0; // 유저 목록 페이지(10명 단위)
 
     // content paging
     let contentPage=0;
@@ -525,32 +527,45 @@ async function ensureUserDocDefaultsOnce(userId, userData){
         if(!isAdmin() && u.isHidden) continue;
         rows.push({id,u});
       }
-      // 계급 정렬 옵션(유저 개인 설정은 새로고침 시 초기화 요청 → 기억 안 함)
+
       const sort=$("sortUsers").value;
+
+      // "온라인만" 옵션은 목록 자체를 필터링합니다.
       if(sort==="onlineOnly"){
-        // 온라인만 표시합니다.
-        for(let i=rows.length-1;i>=0;i--){ if(!rows[i].u.isOnline) rows.splice(i,1); }
+        for(let i=rows.length-1;i>=0;i--){
+          if(!rows[i].u.isOnline) rows.splice(i,1);
+        }
       }
+
       rows.sort((a,b)=>{
         const ra=RANKS.indexOf(a.u.rank||"");
         const rb=RANKS.indexOf(b.u.rank||"");
         const onlineA=!!a.u.isOnline, onlineB=!!b.u.isOnline;
+
         if(sort==="onlineFirst"){
           if(onlineA!==onlineB) return onlineB-onlineA;
         }
+
         if(sort==="rankHigh"){
-          // 대령(높음)이 먼저 → index가 큰게 높음
-          if(ra!==rb) return rb-ra;
+          if(ra!==rb) return rb-ra; // 대령(높음)이 먼저
         }else if(sort==="rankLow"){
           if(ra!==rb) return ra-rb;
         }
+
         return a.id.localeCompare(b.id,"ko");
       });
+
+      // ✅ 10명 단위 페이지네이션
+      const total = rows.length;
+      const totalPages = Math.max(1, Math.ceil(total / USER_PAGE_SIZE));
+      usersPage = Math.min(usersPage, totalPages-1);
+      const start = usersPage * USER_PAGE_SIZE;
+      const pageRows = rows.slice(start, start + USER_PAGE_SIZE);
 
       const tKey=dayKey(todayStart());
       const wsKey=dayKey(weekStartMonday0());
 
-      const tb = rows.map(({id,u})=>{
+      const tb = pageRows.map(({id,u})=>{
         const on = u.isOnline ? `<span class="badge on">접속 O</span>` : `<span class="badge off">접속 X</span>`;
         const rank = `<span class="badge role">${esc(u.rank||"-")}</span>`;
         const dept = `<span class="badge dim">${esc(u.department||"-")}</span>`;
@@ -575,7 +590,21 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       }).join("");
 
       $("userTbody").innerHTML = tb || `<tr><td colspan="10" class="tiny">표시할 유저가 없습니다.</td></tr>`;
+
+      // 페이지 UI
+      const pInfo=$("userPageInfo");
+      if(pInfo) pInfo.textContent = `${usersPage+1} / ${totalPages} (총 ${total}명)`;
+      const prev=$("userPrev"), next=$("userNext");
+      if(prev) prev.disabled = usersPage<=0;
+      if(next) next.disabled = usersPage>=totalPages-1;
+
+      // 쿨타임 표시(유저 목록 읽기 쿨타임)
+      const now=Date.now();
+      const remain=Math.max(0, USERS_COOLDOWN_MS-(now-lastUsersLoadAt));
+      const cd=$("userCooldown");
+      if(cd) cd.textContent = lastUsersLoadAt ? (remain>0?`다음 갱신까지 ${Math.ceil(remain/1000)}초`:"지금 갱신 가능합니다.") : "";
     }
+
 
     // ---------- CHECK IN/OUT with SUMMARY FIELDS ----------
     async function checkIn(){
@@ -873,6 +902,59 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       $("cSelected").innerHTML = arr.map(n=>`<span class="badge">${esc(n)}</span>`).join(" ") || `<span class="tiny">선택 없음</span>`;
       $("cCount").textContent = `${arr.length}명`;
     }
+    // ---------- OCR (TAB 스크린샷 → 닉네임 자동 선택) ----------
+    // - 리드/성능 영향이 없도록, 버튼을 눌렀을 때만 라이브러리를 로드합니다.
+    let _tesseractLoaded = false;
+    async function ensureTesseract(){
+      if(_tesseractLoaded) return;
+      await new Promise((resolve, reject)=>{
+        const s=document.createElement("script");
+        s.src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+        s.onload=()=>resolve();
+        s.onerror=()=>reject(new Error("tesseract load failed"));
+        document.head.appendChild(s);
+      });
+      _tesseractLoaded = true;
+    }
+
+    function pickNamesFromText(text){
+      const raw=(text||"").replace(/\s+/g," ").toLowerCase();
+      const names = Array.from(usersCache.keys());
+      const found=[];
+      for(const n of names){
+        if(raw.includes(String(n).toLowerCase())) found.push(n);
+      }
+      // 긴 닉네임 우선(부분 포함 오탐 줄이기)
+      found.sort((a,b)=>b.length-a.length);
+      return Array.from(new Set(found));
+    }
+
+    async function runOcrForCreate(){
+      try{
+        const file=$("cOcrFile")?.files?.[0];
+        if(!file) return alert("먼저 스크린샷 파일을 선택해 주세요.");
+        $("cOcrResult").textContent = "인식 중입니다… (조금만 기다려 주세요)";
+        await ensureTesseract();
+        const { data } = await Tesseract.recognize(file, "eng+kor");
+        const txt = data?.text || "";
+        const picked = pickNamesFromText(txt);
+
+        if(picked.length===0){
+          $("cOcrResult").textContent = "인식 결과에서 등록된 닉네임을 찾지 못했습니다. (스크린샷 해상도/선명도 확인)";
+          return;
+        }
+
+        picked.forEach(n=>createSelected.add(n));
+        createSelected.add(currentUser);
+        renderCreateUsers();
+        renderCreateSelected();
+        $("cOcrResult").innerHTML = `추천 선택: ${picked.map(n=>`<span class="badge">${esc(n)}</span>`).join(" ")}`;
+      }catch(e){
+        console.error(e);
+        $("cOcrResult").textContent = "OCR 처리 중 오류가 발생했습니다. (콘솔 확인)";
+      }
+    }
+
     function createSelectAll(){
       Array.from(usersCache.keys()).forEach(n=>createSelected.add(n));
       createSelected.add(currentUser);
@@ -1497,7 +1579,10 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       $("btnPrevContent").addEventListener("click", ()=>loadContentPage(Math.max(0, contentPage-1)));
       $("btnNextContent").addEventListener("click", ()=>loadContentPage(contentPage+1));
 
-      $("sortUsers").addEventListener("change", loadUserTable);
+      $("sortUsers").addEventListener("change", ()=>{ usersPage=0; loadUserTable(); });
+
+      $("userPrev").addEventListener("click", ()=>{ usersPage=Math.max(0, usersPage-1); loadUserTable(); });
+      $("userNext").addEventListener("click", ()=>{ usersPage=usersPage+1; loadUserTable(); });
 
       // modals
       $("createModal").addEventListener("click",(e)=>{ if(e.target.id==="createModal") showModal("createModal", false); });
@@ -1506,6 +1591,8 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       $("btnCreateAll").addEventListener("click", createSelectAll);
       $("btnCreateClear").addEventListener("click", createClearAll);
       $("cSearch").addEventListener("input", ()=>{ createSearch=$("cSearch").value.trim(); renderCreateUsers(); });
+      $("btnOcr").addEventListener("click", runOcrForCreate);
+      $("cOcrFile").addEventListener("change", ()=>{ $("cOcrResult").textContent=""; });
       $("btnCreateSave").addEventListener("click", saveCreate);
 
       $("editModal").addEventListener("click",(e)=>{ if(e.target.id==="editModal") showModal("editModal", false); });
@@ -1676,6 +1763,14 @@ async function ensureUserDocDefaultsOnce(userId, userData){
                   <tbody id="userTbody"></tbody>
                 </table>
               </div>
+              
+              <div class="row" style="margin-top:10px;">
+                <button id="userPrev" class="pill">이전</button>
+                <button id="userNext" class="pill">다음</button>
+                <span class="chip" id="userPageInfo">1 / 1</span>
+                <span class="tinyStatus" id="userCooldown"></span>
+              </div>
+
               <div class="tiny" style="margin-top:10px;">
                 • 일반 유저는 숨김 유저가 보이지 않습니다. • 정렬은 새로고침 시 초기화됩니다.
               </div>
@@ -1772,6 +1867,13 @@ async function ensureUserDocDefaultsOnce(userId, userData){
               <button id="btnCreateAll" class="pill">전체</button>
               <button id="btnCreateClear" class="pill">해제</button>
             </div>
+            <div class="row" style="margin-top:10px;">
+              <input id="cOcrFile" type="file" accept="image/*" class="w320" />
+              <button id="btnOcr" class="pill">스크린샷 인식</button>
+              <span class="tiny" id="cOcrHint">TAB 스크린샷을 올리면 등록된 닉네임을 자동 선택합니다.</span>
+            </div>
+            <div class="tiny" id="cOcrResult" style="margin-top:8px;"></div>
+
             <div id="cUserList" class="list"></div>
           </div>
           <div class="box">
