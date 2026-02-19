@@ -42,6 +42,7 @@
   button.ghost{background:transparent}
   button.danger{border-color:#8b2f2f;background:#2a1414}
   button.danger:hover{background:#3a1717}
+  button.pillbtn{padding:6px 10px;border-radius:999px}
   input,select{
     background:#111;color:#fff;border:1px solid var(--border2);
     padding:7px 10px;border-radius:8px;margin:3px;
@@ -51,7 +52,7 @@
   .hidden{display:none}
   .stat{
     background:#111;border:1px solid #222;border-radius:10px;
-    padding:10px 12px;margin-bottom:8px;line-height:1.5
+    padding:10px 12px;margin-bottom:8px;line-height:1.55
   }
   .hr{height:1px;background:#2a2a2a;margin:12px 0}
   .badge{font-size:11px;padding:2px 8px;border:1px solid #444;border-radius:999px;color:#ddd}
@@ -60,14 +61,37 @@
   .table{width:100%;border-collapse:collapse}
   .table th,.table td{border-bottom:1px solid #2a2a2a;padding:8px 6px;text-align:left;font-size:13px;vertical-align:top}
   .table th{color:#cfcfcf;font-weight:600}
-  .pillbtn{padding:6px 10px;border-radius:999px}
   .anim{transition:max-height .25s ease, opacity .25s ease, transform .25s ease}
   .collapse{max-height:0; opacity:0; transform:translateY(-6px); overflow:hidden}
   .expand{max-height:1200px; opacity:1; transform:translateY(0); overflow:hidden}
+
+  /* 그래프 */
   .barWrap{margin-top:10px;display:flex;flex-direction:column;gap:8px}
   .barRow{display:grid;grid-template-columns:180px 1fr 90px;gap:10px;align-items:center}
   .barBg{height:10px;border:1px solid #333;border-radius:999px;overflow:hidden;background:#0c0c0c}
   .barFill{height:100%;background:#dcdcdc}
+
+  /* 모달 */
+  .modalBack{
+    position:fixed;inset:0;background:rgba(0,0,0,.6);
+    display:flex;align-items:center;justify-content:center;padding:18px;z-index:9999;
+  }
+  .modal{
+    width:min(900px, 96vw);
+    background:#141414;border:1px solid #2a2a2a;border-radius:14px;
+    box-shadow:0 20px 60px rgba(0,0,0,.4);
+    overflow:hidden;
+  }
+  .modalTop{padding:14px 16px;border-bottom:1px solid #2a2a2a;display:flex;justify-content:space-between;gap:10px;align-items:center}
+  .modalBody{padding:14px 16px;max-height:72vh;overflow:auto}
+  .modalFoot{padding:12px 16px;border-top:1px solid #2a2a2a;display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .box{border:1px solid #2a2a2a;border-radius:12px;padding:10px;background:#101010}
+  .list{display:flex;flex-direction:column;gap:6px;margin-top:10px}
+  .itemRow{display:flex;gap:8px;align-items:center;justify-content:space-between;border:1px solid #222;border-radius:10px;padding:8px 10px;background:#0f0f0f}
+  .tag{font-size:11px;border:1px solid #444;border-radius:999px;padding:2px 8px;color:#ddd}
+  .u{ text-decoration: underline; text-decoration-thickness: 2px; }
+  .s{ text-decoration: line-through; text-decoration-thickness: 2px; opacity:.85; }
 </style>
 
 <script type="module">
@@ -98,8 +122,18 @@ let contentPage=0;
 const PAGE_SIZE=20;
 
 let autoTimer=null;
-let sortMode="rank_desc"; // 개인용(메모리). 새로고침 시 초기화됨.
-let lastStatsMap=null; // 그래프용 캐시
+let sortMode="rank_desc";
+let lastStatsMap=null;
+
+let contentDocsCache = []; // 현재 로드된(최대 n페이지) contentRecords docs 캐시
+let contentFilter = "ALL"; // ALL / 보급 / 송전소 / 차량수호
+
+// 모달 상태
+let editDocId = null;
+let editDocData = null;
+let editBaseParticipants = [];
+let editSelected = new Set();
+let editSearchQ = "";
 
 const RANKS=["군의관","하사","중사","상사","원사","소위","중위","대위","소령","중령","대령"];
 const DEPTS=[
@@ -121,8 +155,9 @@ function err(e){
 function stopAuto(){ if(autoTimer){ clearInterval(autoTimer); autoTimer=null; } }
 function startAuto(){
   stopAuto();
-  autoTimer = setInterval(()=>{ refreshAll(false); }, 60*1000); // 1분
+  autoTimer = setInterval(()=>{ refreshAll(false); }, 60*1000);
 }
+
 function setStatus(msg){
   const el=$("statusMsg"); if(!el) return;
   el.textContent=msg||"";
@@ -132,7 +167,6 @@ function setStatus(msg){
 function escapeHtml(s){
   return String(s||"").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
-
 function normalizeUserDoc(d){
   const out = {...d};
   if(out.isadmin!==undefined && out.isAdmin===undefined) out.isAdmin = out.isadmin;
@@ -141,12 +175,10 @@ function normalizeUserDoc(d){
   if(out.rankname!==undefined && out.rank===undefined) out.rank = out.rankname;
   return out;
 }
-
 function rankIndex(rank){
   const i=RANKS.indexOf(rank||"");
   return i>=0?i: -1;
 }
-
 function toDateOrNull(ts){
   if(!ts) return null;
   if(ts instanceof Date) return ts;
@@ -170,11 +202,16 @@ function parseDatetimeLocal(str){
   if(isNaN(d.getTime())) return null;
   return d;
 }
+function fmtKST(ts){
+  const d=toDateOrNull(ts);
+  if(!d) return "-";
+  const pad=n=>String(n).padStart(2,"0");
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
 
 /* =========================
    로그인/기본
    ========================= */
-
 async function login(){
   try{
     const id=$("loginId").value.trim();
@@ -201,13 +238,14 @@ async function login(){
     console.error(e);
   }
 }
-
 function logout(){
   stopAuto();
   currentUser=null;
   currentUserData=null;
   usersCache=new Map();
+  contentDocsCache=[];
   contentPage=0;
+  contentFilter="ALL";
   sortMode="rank_desc";
   lastStatsMap=null;
 
@@ -215,18 +253,16 @@ function logout(){
   show("mainBox",false);
   show("loginBox",true);
 }
-
 function renderTopBar(){
   $("userInfo").innerHTML = `
-    <span class="chip"><b>${currentUser}</b></span>
-    <span class="chip">계급 <b>${currentUserData.rank||"-"}</b></span>
-    <span class="chip">부서 <b>${currentUserData.department||"-"}</b></span>
+    <span class="chip"><b>${escapeHtml(currentUser)}</b></span>
+    <span class="chip">계급 <b>${escapeHtml(currentUserData.rank||"-")}</b></span>
+    <span class="chip">부서 <b>${escapeHtml(currentUserData.department||"-")}</b></span>
     <span class="chip">관리자 <b>${isAdmin()?"O":"X"}</b></span>
   `;
   show("adminToggleBtn", isAdmin());
   show("adminPanel", false);
 }
-
 async function loadUsers(){
   const snap=await getDocs(colUsers);
   usersCache=new Map();
@@ -238,7 +274,6 @@ async function loadUsers(){
 /* =========================
    근태(출/퇴)
    ========================= */
-
 async function checkIn(){
   try{
     const q=query(colWork,where("nickname","==",currentUser),where("checkOut","==",null),limit(1));
@@ -247,7 +282,6 @@ async function checkIn(){
     await loadStats(); await loadOnline();
   }catch(e){ alert(err(e)); console.error(e); }
 }
-
 async function checkOut(){
   try{
     const q=query(colWork,where("nickname","==",currentUser),where("checkOut","==",null),limit(1));
@@ -273,12 +307,12 @@ async function loadOnline(){
       const ud = usersCache.get(n);
       if(!ud) return true;
       if(adm) return true;
-      return !ud.isHidden; // 일반 유저는 접속목록에서 숨김 유저 비표시
+      return !ud.isHidden;
     });
 
     filtered.sort((a,b)=>a.localeCompare(b,"ko"));
     $("onlineArea").innerHTML = filtered.length
-      ? filtered.map(n=>`<div class="stat"><b>${n}</b></div>`).join("")
+      ? filtered.map(n=>`<div class="stat"><b>${escapeHtml(n)}</b></div>`).join("")
       : `<div class="small">현재 출근중인 유저가 없습니다.</div>`;
   }catch(e){
     console.error(e);
@@ -286,11 +320,6 @@ async function loadOnline(){
   }
 }
 
-/**
- * ✅ 리드 최적화 유지:
- * - 출근중(open)은 checkOut==null 로만 조회
- * - 시간 통계는 최근 7일(checkIn>=7일)만 조회
- */
 async function loadStats(){
   try{
     const seven=new Date();
@@ -326,14 +355,12 @@ async function loadStats(){
     lastStatsMap = map;
     renderStats(map);
 
-    // 그래프가 열려 있으면 같이 갱신
     if(isAdmin()){
       const panel = $("graphPanel");
       if(panel && panel.classList.contains("expand")){
         renderGraphFromStats(map);
       }
     }
-
   }catch(e){
     alert(err(e));
     console.error(e);
@@ -372,15 +399,14 @@ function sortedUserEntries(map){
 
 function renderStats(map){
   const entries = sortedUserEntries(map);
-
   let html="";
   for(const it of entries){
     const {name,ud,st}=it;
     html+=`<div class="stat">
       <div class="row">
-        <b>${name}</b>
-        <span class="badge">${ud.rank||"-"}</span>
-        <span class="badge">${ud.department||"-"}</span>
+        <b>${escapeHtml(name)}</b>
+        <span class="badge">${escapeHtml(ud.rank||"-")}</span>
+        <span class="badge">${escapeHtml(ud.department||"-")}</span>
         ${ud.isHidden?`<span class="badge">숨김</span>`:""}
         <span class="right small">접속 ${st.open?"O":"X"} · 최근7일 ${Math.floor(st.total/3600)}시간</span>
       </div>
@@ -402,8 +428,7 @@ function renderStats(map){
           for(const d of snap.docs){
             await updateDoc(doc(db,"workRecords",d.id),{checkOut:serverTimestamp()});
           }
-          await loadStats();
-          await loadOnline();
+          await loadStats(); await loadOnline();
         }catch(e){ alert(err(e)); console.error(e); }
       };
     });
@@ -411,23 +436,166 @@ function renderStats(map){
 }
 
 /* =========================
-   컨텐츠(보급/송전소/차량수호) V2 유지
+   컨텐츠 V4: 성공/실패 + 수정 + 필터 + 관리자 삭제
    ========================= */
+
+function contentNeedsOutcome(type){
+  return type==="보급" || type==="차량수호";
+}
+function getOutcomeLabel(type, outcome){
+  if(!contentNeedsOutcome(type)) return "";
+  if(outcome===true) return "O";
+  if(outcome===false) return "X";
+  return "-";
+}
 
 async function createContent(type){
   let names=prompt("참여자(콤마구분)\n※ 본인은 자동 포함됩니다.");
   if(names===null) return;
+
   let arr=names.split(",").map(x=>x.trim()).filter(x=>x);
   if(!arr.includes(currentUser)) arr.unshift(currentUser);
+
+  // ✅ 0명 저장 금지
   if(arr.length===0) return alert("참여자가 0명이면 저장하지 않습니다.");
 
-  await addDoc(colContent,{
+  const payload = {
     type,
-    writer:currentUser,
-    participants:arr,
-    time:serverTimestamp()
+    writer: currentUser,
+    participants: arr,
+    time: serverTimestamp(),
+    outcome: null, // 보급/차량수호만 사용
+    edited: null // { mode:'self'|'admin', by:'닉', at:Timestamp, added:[...], removed:[...] }
+  };
+
+  // 보급/차량수호는 작성 시 성공여부 선택 가능(원치 않으면 -)
+  if(contentNeedsOutcome(type)){
+    const pick = prompt(`${type} 성공 여부를 입력해 주세요.\nO=성공 / X=실패 / 엔터=미설정(-)`, "");
+    if(pick===null) return;
+    const p = pick.trim().toUpperCase();
+    if(p==="O") payload.outcome=true;
+    else if(p==="X") payload.outcome=false;
+    else payload.outcome=null;
+  }
+
+  await addDoc(colContent, payload);
+  await loadContent();
+}
+
+function canEditContent(docData){
+  if(!docData) return false;
+  if(isAdmin()) return true;
+  return docData.writer===currentUser;
+}
+
+function canSeeContent(docData){
+  if(!docData) return false;
+  if(isAdmin()) return true;
+  // 일반 유저: 숨김 유저(writer)가 작성한 기록은 비표시
+  const writerHidden = usersCache.get(docData.writer)?.isHidden;
+  return !writerHidden;
+}
+
+function applyContentFilter(list){
+  if(contentFilter==="ALL") return list;
+  return list.filter(x => x.data?.type===contentFilter);
+}
+
+function renderContentList(){
+  const visible = contentDocsCache
+    .map(d => ({id:d.id, data:d.data()}))
+    .filter(x => canSeeContent(x.data));
+
+  const filtered = applyContentFilter(visible);
+
+  // 현재 페이지 분할(20개)
+  const start = contentPage*PAGE_SIZE;
+  const end = (contentPage+1)*PAGE_SIZE;
+  const pageItems = filtered.slice(start, end);
+
+  let html="";
+  for(const it of pageItems){
+    const r=it.data;
+    const t = fmtKST(r.time);
+
+    const outcomeTxt = contentNeedsOutcome(r.type)
+      ? ` <span class="badge">결과 ${getOutcomeLabel(r.type, r.outcome)}</span>`
+      : "";
+
+    let editInfo="";
+    if(r.edited && r.edited.mode==="admin"){
+      editInfo = `<div class="small">수정:${escapeHtml(r.edited.by||"-")}</div>`;
+    }else if(r.edited && r.edited.mode==="self"){
+      editInfo = `<div class="small">(수정됨)</div>`;
+    }
+
+    // 작성자 수정(self)일 때는 added/removed 표시(밑줄/취소선)
+    let partHtml="";
+    const parts = Array.isArray(r.participants) ? r.participants : [];
+    const added = new Set((r.edited && r.edited.mode==="self" && Array.isArray(r.edited.added)) ? r.edited.added : []);
+    const removed = new Set((r.edited && r.edited.mode==="self" && Array.isArray(r.edited.removed)) ? r.edited.removed : []);
+
+    // 현재 참여자(남아있는 사람) 표시: added이면 밑줄
+    const shown = parts.map(p=>{
+      const cls = added.has(p) ? "u" : "";
+      return `<span class="${cls}">${escapeHtml(p)}</span>`;
+    });
+
+    // removed 표시: 취소선(현재 배열엔 없으니 따로 붙임)
+    const removedShown = Array.from(removed).map(p=>`<span class="s">${escapeHtml(p)}</span>`);
+
+    const combined = [...shown, ...removedShown];
+    partHtml = combined.length ? combined.join(", ") : "-";
+
+    const canEdit = canEditContent(r);
+
+    html += `<div class="stat">
+      <div class="row">
+        <b>${escapeHtml(r.type)}</b>
+        ${outcomeTxt}
+        <span class="right small">${escapeHtml(t)}</span>
+      </div>
+      <div><b>${escapeHtml(r.writer)}</b></div>
+      ${editInfo}
+      <div class="small" style="margin-top:6px;">참여자: ${partHtml}</div>
+
+      <div class="row" style="margin-top:8px;">
+        ${canEdit ? `<button class="pillbtn" data-edit="${escapeHtml(it.id)}">수정</button>` : ""}
+        ${isAdmin() ? `<button class="pillbtn danger" data-cdel="${escapeHtml(it.id)}">삭제</button>` : ""}
+      </div>
+    </div>`;
+  }
+
+  $("contentArea").innerHTML = html || `<div class="small">기록 없음</div>`;
+
+  // 버튼 바인딩
+  document.querySelectorAll("[data-edit]").forEach(btn=>{
+    btn.onclick = ()=> openEditModal(btn.getAttribute("data-edit"));
   });
-  loadContent();
+  document.querySelectorAll("[data-cdel]").forEach(btn=>{
+    btn.onclick = ()=> adminDeleteContent(btn.getAttribute("data-cdel"));
+  });
+
+  // 페이지네이션 버튼
+  $("pageArea").innerHTML = "";
+  const total = filtered.length;
+  const hasPrev = contentPage>0;
+  const hasNext = total > (contentPage+1)*PAGE_SIZE;
+
+  if(hasPrev){
+    const prev=document.createElement("button");
+    prev.textContent="이전 페이지";
+    prev.onclick=()=>{ contentPage--; renderContentList(); };
+    $("pageArea").appendChild(prev);
+  }
+  if(hasNext){
+    const next=document.createElement("button");
+    next.textContent="다음 페이지";
+    next.onclick=()=>{ contentPage++; renderContentList(); };
+    $("pageArea").appendChild(next);
+  }
+
+  $("contentCount").textContent = `${total}건`;
 }
 
 async function loadContent(){
@@ -435,65 +603,214 @@ async function loadContent(){
     const seven=new Date();
     seven.setDate(seven.getDate()-7);
 
+    // ✅ 7일치만 + (contentPage+1)*PAGE_SIZE 만큼만 조회(기존 최적화 유지)
     const q=query(
       colContent,
       where("time",">=",seven),
       orderBy("time","desc"),
-      limit((contentPage+1)*PAGE_SIZE)
+      limit(Math.max(20, (contentPage+1)*PAGE_SIZE))
     );
 
     const snap=await getDocs(q);
-    const docs=snap.docs;
-
-    let html="";
-    docs.slice(contentPage*PAGE_SIZE,(contentPage+1)*PAGE_SIZE).forEach(d=>{
-      const r=d.data();
-      // 일반 유저: 컨텐츠 목록에서 숨김 작성자 기록 숨김
-      if(!isAdmin()){
-        const writerHidden = usersCache.get(r.writer)?.isHidden;
-        if(writerHidden) return;
-      }
-      html+=`<div class="stat">
-        <b>${r.type}</b> | <b>${r.writer}</b><br>
-        참여자: ${Array.isArray(r.participants)?r.participants.join(", "):""}
-      </div>`;
-    });
-
-    $("contentArea").innerHTML=html||"기록 없음";
-
-    $("pageArea").innerHTML="";
-    const hasNext = docs.length > (contentPage+1)*PAGE_SIZE;
-    if(hasNext){
-      const next=document.createElement("button");
-      next.textContent="다음 페이지";
-      next.onclick=()=>{contentPage++;loadContent();}
-      $("pageArea").appendChild(next);
-    }
-    if(contentPage>0){
-      const prev=document.createElement("button");
-      prev.textContent="이전 페이지";
-      prev.onclick=()=>{contentPage--;loadContent();}
-      $("pageArea").appendChild(prev);
-    }
-
+    contentDocsCache = snap.docs;
+    // 렌더는 필터/페이지 기준으로 처리
+    renderContentList();
   }catch(e){
     alert(err(e));
     console.error(e);
   }
 }
 
-async function refreshAll(showToast){
-  try{ await loadUsers(); }catch(e){ console.error(e); }
-  try{ await loadStats(); }catch(e){ console.error(e); }
-  try{ await loadOnline(); }catch(e){ console.error(e); }
-  try{ await loadContent(); }catch(e){ console.error(e); }
-  if(showToast) setStatus("갱신되었습니다.");
+function onChangeContentFilter(){
+  contentFilter = $("contentFilter").value;
+  contentPage = 0;
+  renderContentList();
+}
+
+async function adminDeleteContent(id){
+  if(!isAdmin()) return;
+  if(!confirm("이 컨텐츠 기록을 삭제하시겠습니까?")) return;
+  try{
+    await deleteDoc(doc(db,"contentRecords",id));
+    setStatus("삭제되었습니다.");
+    await loadContent();
+  }catch(e){ alert(err(e)); console.error(e); }
+}
+
+async function adminDeleteAllContent(){
+  if(!isAdmin()) return;
+  if(!confirm("컨텐츠 기록을 전체 삭제하시겠습니까?")) return;
+  if(!confirm("정말로 삭제합니다. 되돌릴 수 없습니다.")) return;
+  try{
+    // ⚠️ 안전: 현재 7일치만 지울지/전체를 지울지 애매해서,
+    // 여기서는 “현재 화면에 보이는(7일치 로드된) 문서만” 삭제합니다.
+    // (원하면 전체 삭제를 별도로 구현 가능)
+    const ids = contentDocsCache.map(d=>d.id);
+    for(const id of ids){
+      await deleteDoc(doc(db,"contentRecords",id));
+    }
+    setStatus("전체 삭제 완료");
+    contentPage=0;
+    await loadContent();
+  }catch(e){ alert(err(e)); console.error(e); }
+}
+
+/* --------- 컨텐츠 수정 모달 --------- */
+
+function openEditModal(docId){
+  const found = contentDocsCache.find(d=>d.id===docId);
+  if(!found) return alert("문서를 찾지 못했습니다. 새로고침 후 다시 시도해 주세요.");
+  const data = found.data();
+
+  if(!canEditContent(data)) return alert("수정 권한이 없습니다.");
+
+  editDocId = docId;
+  editDocData = data;
+  editBaseParticipants = Array.isArray(data.participants) ? [...data.participants] : [];
+  editSelected = new Set(editBaseParticipants);
+  editSearchQ = "";
+
+  // 작성자 자동 포함(수정 시에도 강제)
+  editSelected.add(data.writer || currentUser);
+
+  // 상단 표시
+  $("mTitle").textContent = `컨텐츠 수정 · ${data.type}`;
+  $("mMeta").innerHTML = `
+    <span class="tag">작성자 ${escapeHtml(data.writer||"-")}</span>
+    <span class="tag">시간 ${escapeHtml(fmtKST(data.time))}</span>
+    ${contentNeedsOutcome(data.type) ? `<span class="tag">결과 ${getOutcomeLabel(data.type, data.outcome)}</span>` : `<span class="tag">결과 -</span>`}
+  `;
+
+  // 성공/실패 UI
+  if(contentNeedsOutcome(data.type)){
+    show("mOutcomeBox", true);
+    $("mOutcome").value = (data.outcome===true ? "O" : (data.outcome===false ? "X" : "-"));
+  }else{
+    show("mOutcomeBox", false);
+  }
+
+  // 검색 초기화
+  $("mSearch").value = "";
+  $("mSearch").oninput = ()=>{
+    editSearchQ = $("mSearch").value.trim().toLowerCase();
+    renderModalUserList();
+  };
+
+  renderModalUserList();
+  renderModalSelected();
+  show("contentModal", true);
+}
+
+function closeEditModal(){
+  show("contentModal", false);
+  editDocId=null;
+  editDocData=null;
+  editBaseParticipants=[];
+  editSelected=new Set();
+  editSearchQ="";
+}
+
+function renderModalUserList(){
+  const list = $("mUserList");
+  const names = Array.from(usersCache.keys()).sort((a,b)=>a.localeCompare(b,"ko"));
+
+  const q = editSearchQ;
+  const filtered = q ? names.filter(n=>n.toLowerCase().includes(q)) : names;
+
+  list.innerHTML = filtered.map(n=>{
+    const checked = editSelected.has(n) ? "checked" : "";
+    return `
+      <label class="itemRow" style="cursor:pointer;">
+        <span><b>${escapeHtml(n)}</b></span>
+        <input type="checkbox" data-pick="${escapeHtml(n)}" ${checked}/>
+      </label>
+    `;
+  }).join("");
+
+  list.querySelectorAll("input[type='checkbox'][data-pick]").forEach(cb=>{
+    cb.onchange = ()=>{
+      const name = cb.getAttribute("data-pick");
+      if(cb.checked) editSelected.add(name);
+      else editSelected.delete(name);
+
+      // 작성자(또는 로그인 유저) 자동 포함 강제
+      const writer = editDocData?.writer || currentUser;
+      editSelected.add(writer);
+
+      renderModalSelected();
+      renderModalUserList(); // 체크 상태 갱신
+    };
+  });
+}
+
+function renderModalSelected(){
+  const box = $("mSelected");
+  const arr = Array.from(editSelected).sort((a,b)=>a.localeCompare(b,"ko"));
+  box.innerHTML = arr.length ? arr.map(n=>`<span class="badge">${escapeHtml(n)}</span>`).join(" ") : `<span class="small">선택된 인원이 없습니다.</span>`;
+}
+
+async function saveEditModal(){
+  if(!editDocId || !editDocData) return;
+
+  const type = editDocData.type;
+  const writer = editDocData.writer || currentUser;
+
+  // 참여자
+  let participants = Array.from(editSelected).map(x=>x.trim()).filter(Boolean);
+
+  // ✅ 0명 저장 금지 + 작성자 포함 강제
+  if(!participants.includes(writer)) participants.unshift(writer);
+  if(participants.length===0) return alert("참여자가 0명이면 저장하지 않습니다.");
+
+  // outcome
+  let outcome = editDocData.outcome ?? null;
+  if(contentNeedsOutcome(type)){
+    const v = $("mOutcome").value;
+    if(v==="O") outcome=true;
+    else if(v==="X") outcome=false;
+    else outcome=null;
+  }
+
+  // delta 계산
+  const before = new Set(editBaseParticipants);
+  const after = new Set(participants);
+
+  const added = [];
+  const removed = [];
+  for(const p of after){ if(!before.has(p)) added.push(p); }
+  for(const p of before){ if(!after.has(p)) removed.push(p); }
+
+  // edited 메타
+  let edited = null;
+  if(isAdmin() && currentUser !== writer){
+    // 관리자 수정(작성자 아님)
+    edited = { mode:"admin", by: currentUser, at: serverTimestamp() };
+  }else{
+    // 작성자(또는 자기) 수정
+    // 표시 요구사항: (수정됨) + added/removed 시각표현
+    edited = { mode:"self", by: writer, at: serverTimestamp(), added, removed };
+  }
+
+  // 실제 저장
+  try{
+    await updateDoc(doc(db,"contentRecords",editDocId), {
+      participants,
+      outcome,
+      edited
+    });
+
+    setStatus("저장되었습니다.");
+    closeEditModal();
+    await loadContent();
+  }catch(e){
+    alert(err(e));
+    console.error(e);
+  }
 }
 
 /* =========================
-   관리자 패널 토글 + 유저 관리(V2)
+   관리자 패널(V3 유지) + V3 근태기록관리 + 그래프
    ========================= */
-
 function toggleAdminPanel(){
   if(!isAdmin()) return;
   const open = !$("adminPanel").classList.contains("hidden");
@@ -511,12 +828,10 @@ function renderAdminUserTable(){
 
   const q = $("adminUserSearch")?.value?.trim()?.toLowerCase() || "";
   const rows = [];
-
   for(const [name,ud] of usersCache.entries()){
     if(q && !name.toLowerCase().includes(q)) continue;
     rows.push({name,ud});
   }
-
   rows.sort((a,b)=>a.name.localeCompare(b.name,"ko"));
 
   tbody.innerHTML = rows.map(({name,ud})=>{
@@ -670,10 +985,7 @@ async function adminBulkSetAdmin(flag){
   }catch(e){ alert(err(e)); console.error(e); }
 }
 
-/* =========================
-   V3 추가: 그래프(펼치기/접기)
-   ========================= */
-
+/* 그래프 */
 function toggleGraph(){
   if(!isAdmin()) return;
   const panel=$("graphPanel");
@@ -683,7 +995,6 @@ function toggleGraph(){
   $("graphBtn").textContent = isOpen ? "그래프 펼치기" : "그래프 접기";
   if(!isOpen && lastStatsMap) renderGraphFromStats(lastStatsMap);
 }
-
 function renderGraphFromStats(map){
   const entries = sortedUserEntries(map);
   const maxSec = Math.max(1, ...entries.map(e=>e.st.total||0));
@@ -708,10 +1019,7 @@ function renderGraphFromStats(map){
   `;
 }
 
-/* =========================
-   V3 추가: 관리자 근태 기록 관리(수정/삭제/전체삭제)
-   ========================= */
-
+/* 근태 기록 관리 */
 function renderAdminWorkUserSelect(){
   if(!isAdmin()) return;
   const sel = $("adminWorkUser");
@@ -826,9 +1134,19 @@ async function adminDeleteAllWork(){
 }
 
 /* =========================
+   새로고침(전체)
+   ========================= */
+async function refreshAll(showToast){
+  try{ await loadUsers(); }catch(e){ console.error(e); }
+  try{ await loadStats(); }catch(e){ console.error(e); }
+  try{ await loadOnline(); }catch(e){ console.error(e); }
+  try{ await loadContent(); }catch(e){ console.error(e); }
+  if(showToast) setStatus("갱신되었습니다.");
+}
+
+/* =========================
    바인딩
    ========================= */
-
 document.addEventListener("DOMContentLoaded",()=>{
   $("loginBtn").addEventListener("click",login);
   $("logoutBtn").addEventListener("click",logout);
@@ -846,17 +1164,25 @@ document.addEventListener("DOMContentLoaded",()=>{
     loadStats();
   });
 
+  $("contentFilter").addEventListener("change", onChangeContentFilter);
+
   $("adminToggleBtn").addEventListener("click",toggleAdminPanel);
   $("adminUserSearch").addEventListener("input",renderAdminUserTable);
   $("adminAddBtn").addEventListener("click",adminAddUser);
   $("bulkAdminOn").addEventListener("click",()=>adminBulkSetAdmin(true));
   $("bulkAdminOff").addEventListener("click",()=>adminBulkSetAdmin(false));
 
-  // V3 추가
   $("graphBtn").addEventListener("click",toggleGraph);
   $("adminWorkLoadBtn").addEventListener("click",adminLoadWorkRecords);
   $("adminWorkDelUserBtn").addEventListener("click",adminDeleteAllWorkOfUser);
   $("adminWorkDelAllBtn").addEventListener("click",adminDeleteAllWork);
+
+  $("adminContentDelAllBtn").addEventListener("click",adminDeleteAllContent);
+
+  // 모달
+  $("mClose").addEventListener("click",closeEditModal);
+  $("mCancel").addEventListener("click",closeEditModal);
+  $("mSave").addEventListener("click",saveEditModal);
 });
 </script>
 </head>
@@ -913,8 +1239,19 @@ document.addEventListener("DOMContentLoaded",()=>{
       </div>
 
       <div class="card">
-        <h3>컨텐츠 기록</h3>
-        <div id="contentArea"></div>
+        <div class="row" style="justify-content:space-between;">
+          <h3 style="margin:0;">컨텐츠 기록</h3>
+          <div class="row">
+            <select id="contentFilter">
+              <option value="ALL">전체 보기</option>
+              <option value="보급">보급만 보기</option>
+              <option value="송전소">송전소만 보기</option>
+              <option value="차량수호">차량수호만 보기</option>
+            </select>
+            <span class="badge" id="contentCount">0건</span>
+          </div>
+        </div>
+        <div id="contentArea" style="margin-top:10px;"></div>
         <div id="pageArea" class="row" style="margin-top:10px;"></div>
       </div>
     </div>
@@ -929,7 +1266,7 @@ document.addEventListener("DOMContentLoaded",()=>{
       <!-- 관리자 패널 -->
       <div id="adminPanel" class="card hidden">
         <h3>관리자 패널</h3>
-        <div class="small">* 유저 등록=화이트리스트이며, 계급/부서/숨김/관리자/비밀번호/근태기록을 관리합니다.</div>
+        <div class="small">* 유저 등록=화이트리스트이며, 계급/부서/숨김/관리자/비밀번호/근태기록/컨텐츠삭제를 관리합니다.</div>
 
         <div class="hr"></div>
 
@@ -1006,9 +1343,76 @@ document.addEventListener("DOMContentLoaded",()=>{
           </table>
         </div>
 
+        <div class="hr"></div>
+
+        <!-- V4: 관리자 컨텐츠 전체삭제 -->
+        <h3 style="margin-top:0;">컨텐츠 기록 관리</h3>
+        <div class="small">* 현재 로드된 최근 7일 기록(화면 범위)을 전체 삭제합니다.</div>
+        <div class="row" style="margin-top:8px;">
+          <button id="adminContentDelAllBtn" class="danger" type="button">컨텐츠 기록 전체 삭제</button>
+        </div>
+
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- 컨텐츠 수정 모달 -->
+<div id="contentModal" class="modalBack hidden">
+  <div class="modal">
+    <div class="modalTop">
+      <div>
+        <div id="mTitle" style="font-weight:700;">컨텐츠 수정</div>
+        <div id="mMeta" class="row" style="margin-top:6px;"></div>
+      </div>
+      <button id="mClose" class="pillbtn ghost" type="button">닫기</button>
+    </div>
+
+    <div class="modalBody">
+      <div class="grid2">
+        <div class="box">
+          <div class="row" style="justify-content:space-between;">
+            <b>참여자 선택</b>
+            <span class="small">* 체크박스로 추가/삭제합니다.</span>
+          </div>
+          <input id="mSearch" class="wide" placeholder="검색(닉네임)" style="width:100%;margin-top:8px;">
+          <div id="mUserList" class="list"></div>
+        </div>
+
+        <div class="box">
+          <div class="row" style="justify-content:space-between;">
+            <b>현재 선택</b>
+            <span class="small">* 작성자는 자동 포함됩니다.</span>
+          </div>
+          <div id="mSelected" style="margin-top:10px;"></div>
+
+          <div id="mOutcomeBox" class="box" style="margin-top:12px;">
+            <div class="row" style="justify-content:space-between;">
+              <b>성공 여부</b>
+              <span class="small">보급/차량수호만 적용됩니다.</span>
+            </div>
+            <div class="row" style="margin-top:8px;">
+              <select id="mOutcome" class="wide">
+                <option value="-">- (미설정)</option>
+                <option value="O">O (성공)</option>
+                <option value="X">X (실패)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="small" style="margin-top:10px;">
+            * 작성자가 수정한 경우: (수정됨) + 추가=밑줄, 삭제=취소선으로 표시됩니다.<br>
+            * 관리자가(작성자 아닌) 수정한 경우: 작성자 아래에 수정:닉네임이 표시됩니다.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modalFoot">
+      <button id="mCancel" class="pillbtn ghost" type="button">취소</button>
+      <button id="mSave" class="pillbtn" type="button">저장</button>
+    </div>
   </div>
 </div>
 
