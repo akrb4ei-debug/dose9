@@ -212,18 +212,18 @@
       console.error(e);
       const msg = (e && e.code) ? String(e.code) : String(e);
       if(msg.includes("permission-denied")){
-        alert("로그인에 실패했습니다. (Firestore 권한 거부)
+        alert(`로그인에 실패했습니다. (Firestore 권한 거부)
 
 Firebase 콘솔 → Firestore Database → 규칙(Rules)에서
 읽기/쓰기가 허용되어 있는지 확인해 주세요.
 
-테스트 단계에서는 임시로 allow read, write: if true; 로 설정할 수 있습니다.");
+테스트 단계에서는 임시로 allow read, write: if true; 로 설정할 수 있습니다.`);
       }else if(msg.includes("unavailable")){
-        alert("로그인에 실패했습니다. (네트워크/Firestore 일시 장애)
-잠시 후 다시 시도해 주세요.");
+        alert(`로그인에 실패했습니다. (네트워크/Firestore 일시 장애)
+잠시 후 다시 시도해 주세요.`);
       }else{
-        alert("로그인에 실패했습니다.
-콘솔(F12) 에러를 확인해 주세요.");
+        alert(`로그인에 실패했습니다.
+콘솔(F12) 에러를 확인해 주세요.`);
       }
       return;
     }
@@ -1009,21 +1009,23 @@ Firebase 콘솔 → Firestore Database → 규칙(Rules)에서
     const pager = $("contentPager");
     if(!pager) return;
 
-    // ✅ 페이지는 "확실히 존재하는 페이지"만 노출합니다.
-    // - 현재 페이지는 항상 존재합니다.
-    // - 다음 페이지는 contentHasMore(=현재 페이지가 20개로 꽉 참)일 때만 존재한다고 판단합니다.
     const maxPageIndex = contentPage + (contentHasMore ? 1 : 0);
-
     const start = Math.max(0, contentPage-3);
     const end = Math.min(maxPageIndex, contentPage+3);
 
-    let html = `<button class="pagebtn" onclick="goContentPage(${Math.max(0, contentPage-1)})" ${contentPage===0?"disabled":""}>이전</button>`;
+    let html = '';
+    html += '<button class="pagebtn" onclick="goContentPage(' + Math.max(0, contentPage-1) + ')" ' + (contentPage===0?'disabled':'') + '>이전</button>';
 
     for(let i=start;i<=end;i++){
-      html += `<button class="pagebtn ${i===contentPage?"active":""}" onclick="goContentPage(${i})">${i+1}</button>`;
+      html += '<button class="pagebtn ' + (i===contentPage?'active':'') + '" onclick="goContentPage(' + i + ')">' + (i+1) + '</button>';
     }
 
-    html += `<button class="pagebtn" onclick="${contentHasMore?`goContentPage(${contentPage+1})`:"void(0)"}" ${contentHasMore?"":"disabled"}>다음</button>`;
+    if(contentHasMore){
+      html += '<button class="pagebtn" onclick="goContentPage(' + (contentPage+1) + ')">다음</button>';
+    }else{
+      html += '<button class="pagebtn" disabled>다음</button>';
+    }
+
     pager.innerHTML = html;
   }
 
@@ -1082,17 +1084,23 @@ Firebase 콘솔 → Firestore Database → 규칙(Rules)에서
     const pager = $("adminContentPager");
     if(!pager) return;
 
-    // ✅ 페이지는 "확실히 존재하는 페이지"만 노출합니다.
     const maxPageIndex = adminContentPage + (adminContentHasMore ? 1 : 0);
-
     const start = Math.max(0, adminContentPage-3);
     const end = Math.min(maxPageIndex, adminContentPage+3);
 
-    let html = `<button class="pagebtn" onclick="goAdminContentPage(${Math.max(0, adminContentPage-1)})" ${adminContentPage===0?"disabled":""}>이전</button>`;
+    let html = '';
+    html += '<button class="pagebtn" onclick="goAdminContentPage(' + Math.max(0, adminContentPage-1) + ')" ' + (adminContentPage===0?'disabled':'') + '>이전</button>';
+
     for(let i=start;i<=end;i++){
-      html += `<button class="pagebtn ${i===adminContentPage?"active":""}" onclick="goAdminContentPage(${i})">${i+1}</button>`;
+      html += '<button class="pagebtn ' + (i===adminContentPage?'active':'') + '" onclick="goAdminContentPage(' + i + ')">' + (i+1) + '</button>';
     }
-    html += `<button class="pagebtn" onclick="${adminContentHasMore?`goAdminContentPage(${adminContentPage+1})`:"void(0)"}" ${adminContentHasMore?"":"disabled"}>다음</button>`;
+
+    if(adminContentHasMore){
+      html += '<button class="pagebtn" onclick="goAdminContentPage(' + (adminContentPage+1) + ')">다음</button>';
+    }else{
+      html += '<button class="pagebtn" disabled>다음</button>';
+    }
+
     pager.innerHTML = html;
   }
 
