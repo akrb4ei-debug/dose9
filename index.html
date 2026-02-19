@@ -1,29 +1,74 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>도스온라인 국방부 근퇴시스템</title>
 
 <style>
-body{margin:0;background:#111;color:#eee;font-family:Segoe UI;}
-.top{padding:15px 30px;background:#1a1a1a;border-bottom:1px solid #333;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;}
-.container{display:flex;gap:20px;padding:20px;max-width:1400px;margin:0 auto;}
-.card{background:#1a1a1a;padding:15px;border:1px solid #333;border-radius:8px;margin-bottom:15px;}
-button{background:#222;color:#fff;border:1px solid #444;padding:7px 12px;border-radius:6px;cursor:pointer;margin:3px;}
-button:hover{background:#333;}
-input,select{background:#111;color:#fff;border:1px solid #444;padding:7px 10px;border-radius:6px;margin:3px;}
-.hidden{display:none;}
-.stat{background:#111;padding:8px 10px;margin-bottom:7px;border-radius:8px;border:1px solid #222;line-height:1.45;}
-.small{font-size:12px;color:#aaa;}
-.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  :root{
+    --bg:#111;
+    --panel:#1a1a1a;
+    --border:#333;
+    --border2:#444;
+    --txt:#eee;
+    --muted:#aaa;
+    --chip:#222;
+  }
+  body{margin:0;background:var(--bg);color:var(--txt);font-family:Segoe UI,Apple SD Gothic Neo,Malgun Gothic,system-ui}
+  .top{
+    padding:14px 22px;background:var(--panel);border-bottom:1px solid var(--border);
+    display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap
+  }
+  .container{
+    display:flex;gap:20px;padding:20px;max-width:1500px;margin:0 auto;
+  }
+  .col{flex:1;min-width:340px}
+  .card{
+    background:var(--panel);padding:15px;border:1px solid var(--border);border-radius:12px;margin-bottom:15px;
+  }
+  h2,h3{margin:0 0 10px 0}
+  .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .small{font-size:12px;color:var(--muted)}
+  .chip{
+    display:inline-flex;gap:6px;align-items:center;
+    background:var(--chip);border:1px solid var(--border2);border-radius:999px;padding:6px 10px;font-size:12px
+  }
+  button{
+    background:#222;color:#fff;border:1px solid var(--border2);
+    padding:7px 12px;border-radius:8px;cursor:pointer;margin:3px;
+  }
+  button:hover{background:#333;}
+  button.ghost{background:transparent}
+  button.danger{border-color:#8b2f2f;background:#2a1414}
+  button.danger:hover{background:#3a1717}
+  input,select{
+    background:#111;color:#fff;border:1px solid var(--border2);
+    padding:7px 10px;border-radius:8px;margin:3px;
+  }
+  input.wide{width:260px;max-width:100%}
+  select.wide{width:260px;max-width:100%}
+  .hidden{display:none}
+  .stat{
+    background:#111;border:1px solid #222;border-radius:10px;
+    padding:10px 12px;margin-bottom:8px;line-height:1.5
+  }
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .hr{height:1px;background:#2a2a2a;margin:12px 0}
+  .badge{font-size:11px;padding:2px 8px;border:1px solid #444;border-radius:999px;color:#ddd}
+  .right{margin-left:auto}
+  .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+  .table{width:100%;border-collapse:collapse}
+  .table th,.table td{border-bottom:1px solid #2a2a2a;padding:8px 6px;text-align:left;font-size:13px;vertical-align:top}
+  .table th{color:#cfcfcf;font-weight:600}
+  .table td .small{margin-top:3px}
+  .pillbtn{padding:6px 10px;border-radius:999px}
 </style>
 
 <script type="module">
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import {
-  getFirestore, collection, doc, getDoc, getDocs, addDoc, updateDoc,
+  getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc,
   query, where, orderBy, limit, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -48,9 +93,17 @@ let contentPage=0;
 const PAGE_SIZE=20;
 
 let autoTimer=null;
+let sortMode="rank_desc"; // 개인 설정(메모리). 새로고침 시 초기화됨.
+
+const RANKS=["군의관","하사","중사","상사","원사","소위","중위","대위","소령","중령","대령"]; // 대령이 최고
+const DEPTS=[
+  "참모부","국군 경비사령부","국군 특수전사령부","국군 방첩사령부","제 1경비단","군사경찰단",
+  "제1공수특수전여단","제3공수특전여단","제820방첩부대","국군의무사령부"
+];
 
 function $(id){return document.getElementById(id);}
 function show(id,f){const el=$(id); if(el) el.classList.toggle("hidden",!f);}
+function isAdmin(){return !!currentUserData?.isadmin || !!currentUserData?.isAdmin;} // 과거 필드 대응
 
 function err(e){
   if(e?.code==="permission-denied") return "Firestore 권한 문제(Rules 확인)";
@@ -67,28 +120,48 @@ function startAuto(){
   autoTimer = setInterval(()=>{ refreshAll(false); }, 60*1000); // 1분
 }
 
+function setStatus(msg){
+  const el=$("statusMsg"); if(!el) return;
+  el.textContent=msg||"";
+  if(msg){
+    setTimeout(()=>{ if(el) el.textContent=""; }, 1400);
+  }
+}
+
+function rankIndex(rank){
+  const i=RANKS.indexOf(rank||"");
+  return i>=0?i: -1;
+}
+
+function normalizeUserDoc(d){
+  // 기존 문서 필드 호환을 위해 매핑합니다.
+  const out = {...d};
+  if(out.isadmin!==undefined && out.isAdmin===undefined) out.isAdmin = out.isadmin;
+  if(out.ishidden!==undefined && out.isHidden===undefined) out.isHidden = out.ishidden;
+  if(out.dept!==undefined && out.department===undefined) out.department = out.dept;
+  if(out.rankname!==undefined && out.rank===undefined) out.rank = out.rankname;
+  return out;
+}
+
 async function login(){
   try{
     const id=$("loginId").value.trim();
     const pw=$("loginPw").value;
-
     const snap=await getDoc(doc(db,"users",id));
     if(!snap.exists()) return alert("등록된 유저 없음");
-    if(String(snap.data().password)!==String(pw)) return alert("비밀번호 오류");
+    const data=normalizeUserDoc(snap.data());
+    if(String(data.password)!==String(pw)) return alert("비밀번호 오류");
 
     currentUser=id;
-    currentUserData=snap.data();
+    currentUserData=data;
 
     await loadUsers();
 
-    $("userInfo").innerText=`${id} | ${currentUserData.rank||"-"} | 관리자:${currentUserData.isAdmin?"O":"X"}`;
+    renderTopBar();
     show("loginBox",false);
     show("mainBox",true);
 
-    // ✅ 로그인 시 1회 로드
     await refreshAll(true);
-
-    // ✅ 1분 자동 갱신
     startAuto();
 
   }catch(e){
@@ -103,16 +176,28 @@ function logout(){
   currentUserData=null;
   usersCache=new Map();
   contentPage=0;
-
+  sortMode="rank_desc";
   $("loginPw").value="";
   show("mainBox",false);
   show("loginBox",true);
 }
 
+function renderTopBar(){
+  $("userInfo").innerHTML = `
+    <span class="chip"><b>${currentUser}</b></span>
+    <span class="chip">계급 <b>${currentUserData.rank||"-"}</b></span>
+    <span class="chip">부서 <b>${currentUserData.department||"-"}</b></span>
+    <span class="chip">관리자 <b>${isAdmin()?"O":"X"}</b></span>
+  `;
+  show("adminToggleBtn", isAdmin());
+  show("adminPanel", false);
+}
+
 async function loadUsers(){
   const snap=await getDocs(colUsers);
   usersCache=new Map();
-  snap.forEach(d=>usersCache.set(d.id,d.data()));
+  snap.forEach(d=>usersCache.set(d.id, normalizeUserDoc(d.data())));
+  renderAdminUserTable(); // 관리자면 표 갱신
 }
 
 async function checkIn(){
@@ -120,10 +205,9 @@ async function checkIn(){
     const q=query(colWork,where("nickname","==",currentUser),where("checkOut","==",null),limit(1));
     if(!(await getDocs(q)).empty) return alert("이미 출근중");
     await addDoc(colWork,{nickname:currentUser,checkIn:serverTimestamp(),checkOut:null});
-    await loadStats(); // 빠르게 반영
-  }catch(e){
-    alert(err(e)); console.error(e);
-  }
+    await loadStats();
+    await loadOnline();
+  }catch(e){ alert(err(e)); console.error(e); }
 }
 
 async function checkOut(){
@@ -133,23 +217,50 @@ async function checkOut(){
     if(snap.empty) return alert("출근 기록 없음");
     await updateDoc(doc(db,"workRecords",snap.docs[0].id),{checkOut:serverTimestamp()});
     await loadStats();
+    await loadOnline();
+  }catch(e){ alert(err(e)); console.error(e); }
+}
+
+async function loadOnline(){
+  try{
+    const openQ = query(colWork, where("checkOut","==",null));
+    const openSnap = await getDocs(openQ);
+    const openList=[];
+    openSnap.forEach(d=>{
+      const r=d.data();
+      if(r?.nickname) openList.push(r.nickname);
+    });
+
+    const isAdm=isAdmin();
+    const filtered = openList.filter(n=>{
+      const ud = usersCache.get(n);
+      if(!ud) return true;
+      if(isAdm) return true;
+      // ✅ 일반 유저는 isHidden 유저를 "접속목록"에서만 숨깁니다.
+      return !ud.isHidden;
+    });
+
+    filtered.sort((a,b)=>a.localeCompare(b,"ko"));
+    $("onlineArea").innerHTML = filtered.length
+      ? filtered.map(n=>`<div class="stat"><b>${n}</b></div>`).join("")
+      : `<div class="small">현재 출근중인 유저가 없습니다.</div>`;
   }catch(e){
-    alert(err(e)); console.error(e);
+    console.error(e);
+    $("onlineArea").innerHTML = `<div class="small">접속 목록을 불러오지 못했습니다.</div>`;
   }
 }
 
 /**
- * ✅ 리드 최적화 핵심:
- * - "출근중(open)" 상태는 checkOut==null 로만 별도 조회(보통 소수)
- * - "통계(시간)"는 최근 7일(checkIn>=7일)만 읽어 계산
- * - 그래서 workRecords 전체를 매번 읽지 않습니다.
+ * ✅ 리드 최적화:
+ * - open(출근중)은 checkOut==null 로만 조회
+ * - 시간 통계는 최근 7일(checkIn>=7일)만 조회
  */
 async function loadStats(){
   try{
     const seven=new Date();
     seven.setDate(seven.getDate()-7);
 
-    // 1) 출근중(오픈) 레코드만
+    // 1) open set
     const openQ = query(colWork, where("checkOut","==",null));
     const openSnap = await getDocs(openQ);
     const openSet = new Set();
@@ -158,12 +269,11 @@ async function loadStats(){
       if(r?.nickname) openSet.add(r.nickname);
     });
 
-    // 2) 최근 7일 레코드만
+    // 2) 최근 7일
     const recentQ = query(colWork, where("checkIn",">=", seven));
     const recentSnap = await getDocs(recentQ);
 
     const map=new Map(); // nickname -> {total, open}
-    // init with whitelist users so 순서 안정
     usersCache.forEach((_,name)=>map.set(name,{total:0,open:openSet.has(name)}));
 
     recentSnap.forEach(d=>{
@@ -171,9 +281,8 @@ async function loadStats(){
       if(!r?.nickname) return;
       if(!map.has(r.nickname)) map.set(r.nickname,{total:0,open:openSet.has(r.nickname)});
       if(r.checkIn && r.checkOut){
-        // seconds 안전
-        const sec = Math.max(0, (r.checkOut.seconds||0) - (r.checkIn.seconds||0));
-        map.get(r.nickname).total += sec;
+        const sec=Math.max(0,(r.checkOut.seconds||0)-(r.checkIn.seconds||0));
+        map.get(r.nickname).total+=sec;
       }
     });
 
@@ -185,33 +294,71 @@ async function loadStats(){
   }
 }
 
-function renderStats(map){
-  let html="";
-  usersCache.forEach((data,name)=>{
-    const s=map.get(name)||{total:0,open:false};
-    html+=`<div class="stat">
-<b>${name}</b> (${data.rank||"-"})
-| 접속:${s.open?"O":"X"}
-| 최근7일 ${Math.floor(s.total/3600)}시간
-${currentUserData.isAdmin?`<button data-force="${name}">강제퇴근</button>`:""}
-</div>`;
+function sortedUserEntries(map){
+  const entries = Array.from(usersCache.entries()).map(([name,ud])=>{
+    const st = map.get(name)||{total:0,open:false};
+    return {name, ud, st};
   });
+
+  const cmpName = (a,b)=>a.name.localeCompare(b.name,"ko");
+
+  if(sortMode==="rank_desc"){
+    entries.sort((a,b)=>{
+      const ra=rankIndex(a.ud.rank), rb=rankIndex(b.ud.rank);
+      if(ra!==rb) return rb-ra; // 대령이 마지막 index라서 "높은순" = 큰 index 우선
+      return cmpName(a,b);
+    });
+  }else if(sortMode==="rank_asc"){
+    entries.sort((a,b)=>{
+      const ra=rankIndex(a.ud.rank), rb=rankIndex(b.ud.rank);
+      if(ra!==rb) return ra-rb;
+      return cmpName(a,b);
+    });
+  }else if(sortMode==="online_first"){
+    entries.sort((a,b)=>{
+      if(a.st.open!==b.st.open) return (b.st.open?1:0)-(a.st.open?1:0);
+      return cmpName(a,b);
+    });
+  }else{
+    entries.sort(cmpName);
+  }
+  return entries;
+}
+
+function renderStats(map){
+  const entries = sortedUserEntries(map);
+  let html="";
+  for(const it of entries){
+    const {name,ud,st}=it;
+    html+=`<div class="stat">
+      <div class="row">
+        <b>${name}</b>
+        <span class="badge">${ud.rank||"-"}</span>
+        <span class="badge">${ud.department||"-"}</span>
+        ${ud.isHidden?`<span class="badge">숨김</span>`:""}
+        <span class="right small">접속 ${st.open?"O":"X"} · 최근7일 ${Math.floor(st.total/3600)}시간</span>
+      </div>
+      ${isAdmin()?`<div class="row" style="margin-top:8px;">
+        <button class="pillbtn" data-force="${name}">강제퇴근</button>
+      </div>`:""}
+    </div>`;
+  }
   $("statsArea").innerHTML=html||"데이터 없음";
 
-  if(currentUserData.isAdmin){
+  if(isAdmin()){
     document.querySelectorAll("[data-force]").forEach(btn=>{
       btn.onclick=async()=>{
         try{
           const name=btn.dataset.force;
+          if(!confirm(`${name} 님을 강제 퇴근 처리하시겠습니까?`)) return;
           const q=query(colWork,where("nickname","==",name),where("checkOut","==",null));
           const snap=await getDocs(q);
           for(const d of snap.docs){
             await updateDoc(doc(db,"workRecords",d.id),{checkOut:serverTimestamp()});
           }
           await loadStats();
-        }catch(e){
-          alert(err(e)); console.error(e);
-        }
+          await loadOnline();
+        }catch(e){ alert(err(e)); console.error(e); }
       };
     });
   }
@@ -220,13 +367,12 @@ ${currentUserData.isAdmin?`<button data-force="${name}">강제퇴근</button>`:"
 async function createContent(type){
   let names=prompt("참여자(콤마구분)\n※ 본인은 자동 포함됩니다.");
   if(names===null) return;
-
   let arr=names.split(",").map(x=>x.trim()).filter(x=>x);
 
-  // ✅ 작성자 자동 포함
+  // 작성자 자동 포함
   if(!arr.includes(currentUser)) arr.unshift(currentUser);
 
-  // ✅ 0명 저장 방지(취소/공백 대응)
+  // 0명 저장 방지
   if(arr.length===0) return alert("참여자가 0명이면 저장하지 않습니다.");
 
   await addDoc(colContent,{
@@ -256,14 +402,19 @@ async function loadContent(){
     let html="";
     docs.slice(contentPage*PAGE_SIZE,(contentPage+1)*PAGE_SIZE).forEach(d=>{
       const r=d.data();
+      // ✅ 숨김 유저는 일반 유저에게 "컨텐츠 목록"에서만 숨김(작성자/참여자에 포함되면 숨김 처리)
+      if(!isAdmin()){
+        const writerHidden = usersCache.get(r.writer)?.isHidden;
+        if(writerHidden) return;
+      }
       html+=`<div class="stat">
-<b>${r.type}</b> | <b>${r.writer}</b><br>
-참여자: ${Array.isArray(r.participants)?r.participants.join(", "):""}
-</div>`;
+        <b>${r.type}</b> | <b>${r.writer}</b><br>
+        참여자: ${Array.isArray(r.participants)?r.participants.join(", "):""}
+      </div>`;
     });
+
     $("contentArea").innerHTML=html||"기록 없음";
 
-    // 페이지 버튼
     $("pageArea").innerHTML="";
     const hasNext = docs.length > (contentPage+1)*PAGE_SIZE;
     if(hasNext){
@@ -289,13 +440,204 @@ async function refreshAll(showToast){
   // ✅ 하나 실패해도 나머지 계속
   try{ await loadUsers(); }catch(e){ console.error(e); }
   try{ await loadStats(); }catch(e){ console.error(e); }
+  try{ await loadOnline(); }catch(e){ console.error(e); }
   try{ await loadContent(); }catch(e){ console.error(e); }
 
-  if(showToast){
-    $("statusMsg").innerText = "갱신되었습니다.";
-    setTimeout(()=>{ if($("statusMsg")) $("statusMsg").innerText=""; }, 1500);
+  if(showToast) setStatus("갱신되었습니다.");
+}
+
+/* =========================
+   V2: 관리자 패널
+   ========================= */
+
+function toggleAdminPanel(){
+  if(!isAdmin()) return;
+  const open = !$("adminPanel").classList.contains("hidden");
+  show("adminPanel", open?false:true);
+  if(!open){
+    renderAdminUserTable();
   }
 }
+
+function renderAdminUserTable(){
+  if(!isAdmin()) return;
+  const tbody = $("adminUserTbody");
+  if(!tbody) return;
+
+  const q = $("adminUserSearch")?.value?.trim()?.toLowerCase() || "";
+  const rows = [];
+
+  for(const [name,ud] of usersCache.entries()){
+    if(q && !name.toLowerCase().includes(q)) continue;
+    rows.push({name,ud});
+  }
+
+  rows.sort((a,b)=>a.name.localeCompare(b.name,"ko"));
+
+  tbody.innerHTML = rows.map(({name,ud})=>{
+    const rankOptions = `<option value="">-</option>` + RANKS.map(r=>`<option value="${r}" ${ud.rank===r?"selected":""}>${r}</option>`).join("");
+    const deptOptions = `<option value="">-</option>` + DEPTS.map(d=>`<option value="${d}" ${ud.department===d?"selected":""}>${d}</option>`).join("");
+    const adminChecked = (ud.isAdmin===true) ? "checked" : "";
+    const hiddenChecked = (ud.isHidden===true) ? "checked" : "";
+    const pw = (ud.password!==undefined && ud.password!==null) ? String(ud.password) : "";
+    return `
+      <tr data-user="${name}">
+        <td>
+          <div class="row">
+            <input type="checkbox" class="adminPick" />
+            <b>${name}</b>
+          </div>
+          <div class="small mono">pw: <span class="pwText" data-pw="${escapeHtml(pw)}">••••</span>
+            <button class="pillbtn ghost pwToggle">보기</button>
+          </div>
+        </td>
+        <td>
+          <select class="rankSel wide">${rankOptions}</select>
+        </td>
+        <td>
+          <select class="deptSel wide">${deptOptions}</select>
+        </td>
+        <td>
+          <label class="row"><input type="checkbox" class="adminChk" ${adminChecked}/> <span class="small">관리자</span></label>
+          <label class="row"><input type="checkbox" class="hiddenChk" ${hiddenChecked}/> <span class="small">숨김</span></label>
+        </td>
+        <td>
+          <div class="row">
+            <input class="pwInput wide" placeholder="새 비밀번호" />
+            <button class="pillbtn pwSet">설정</button>
+          </div>
+          <div class="row" style="margin-top:6px;">
+            <button class="pillbtn ghost saveRow">저장</button>
+            <button class="pillbtn danger delUser">삭제</button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join("");
+
+  // bind row buttons
+  tbody.querySelectorAll("tr").forEach(tr=>{
+    const user = tr.getAttribute("data-user");
+
+    tr.querySelector(".pwToggle")?.addEventListener("click",()=>{
+      const span=tr.querySelector(".pwText");
+      const cur=span.textContent;
+      span.textContent = (cur==="••••") ? (span.getAttribute("data-pw")||"") : "••••";
+    });
+
+    tr.querySelector(".pwSet")?.addEventListener("click", async ()=>{
+      const v = tr.querySelector(".pwInput")?.value ?? "";
+      if(!v) return alert("새 비밀번호를 입력해 주세요.");
+      try{
+        await updateDoc(doc(db,"users",user), { password: v });
+        const ud = usersCache.get(user)||{};
+        ud.password = v;
+        usersCache.set(user, ud);
+        tr.querySelector(".pwText")?.setAttribute("data-pw", escapeHtml(String(v)));
+        tr.querySelector(".pwInput").value="";
+        setStatus("비밀번호가 설정되었습니다.");
+      }catch(e){ alert(err(e)); console.error(e); }
+    });
+
+    tr.querySelector(".saveRow")?.addEventListener("click", async ()=>{
+      try{
+        const rank = tr.querySelector(".rankSel")?.value || "";
+        const dept = tr.querySelector(".deptSel")?.value || "";
+        const admin = !!tr.querySelector(".adminChk")?.checked;
+        const hidden = !!tr.querySelector(".hiddenChk")?.checked;
+
+        await updateDoc(doc(db,"users",user), {
+          rank: rank || null,
+          department: dept || null,
+          isAdmin: admin,
+          isHidden: hidden
+        });
+
+        const ud = usersCache.get(user)||{};
+        ud.rank = rank || "";
+        ud.department = dept || "";
+        ud.isAdmin = admin;
+        ud.isHidden = hidden;
+        usersCache.set(user, ud);
+
+        setStatus("저장되었습니다.");
+        await loadStats();
+        await loadOnline();
+        await loadContent();
+      }catch(e){ alert(err(e)); console.error(e); }
+    });
+
+    tr.querySelector(".delUser")?.addEventListener("click", async ()=>{
+      if(!confirm(`${user} 유저를 삭제하시겠습니까?\n(화이트리스트에서 제거됩니다.)`)) return;
+      try{
+        await deleteDoc(doc(db,"users",user));
+        usersCache.delete(user);
+        renderAdminUserTable();
+        await loadStats();
+        await loadOnline();
+        await loadContent();
+        setStatus("삭제되었습니다.");
+      }catch(e){ alert(err(e)); console.error(e); }
+    });
+  });
+}
+
+function escapeHtml(s){
+  return String(s||"").replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+async function adminAddUser(){
+  const nick = $("adminAddNick").value.trim();
+  const pw = $("adminAddPw").value.trim();
+  if(!nick) return alert("닉네임을 입력해 주세요.");
+  if(!pw) return alert("비밀번호를 입력해 주세요.");
+  try{
+    const exists = await getDoc(doc(db,"users",nick));
+    if(exists.exists()) return alert("이미 존재하는 유저입니다.");
+
+    await setDoc(doc(db,"users",nick), {
+      password: pw,
+      isAdmin: false,
+      isHidden: false,
+      rank: "",
+      department: ""
+    });
+
+    $("adminAddNick").value="";
+    $("adminAddPw").value="";
+    await loadUsers();
+    renderAdminUserTable();
+    setStatus("유저가 추가되었습니다.");
+  }catch(e){ alert(err(e)); console.error(e); }
+}
+
+async function adminBulkSetAdmin(flag){
+  // 체크된 유저들 일괄 적용
+  const picks = Array.from(document.querySelectorAll("#adminUserTbody .adminPick"))
+    .filter(x=>x.checked)
+    .map(x=>x.closest("tr")?.getAttribute("data-user"))
+    .filter(Boolean);
+
+  if(picks.length===0) return alert("선택된 유저가 없습니다.");
+  if(!confirm(`${picks.length}명에게 관리자 권한을 ${flag?"부여":"해임"}하시겠습니까?`)) return;
+
+  try{
+    for(const u of picks){
+      await updateDoc(doc(db,"users",u), { isAdmin: flag });
+      const ud = usersCache.get(u)||{};
+      ud.isAdmin = flag;
+      usersCache.set(u, ud);
+    }
+    renderAdminUserTable();
+    await loadStats();
+    await loadOnline();
+    setStatus("적용되었습니다.");
+  }catch(e){ alert(err(e)); console.error(e); }
+}
+
+/* =========================
+   이벤트 바인딩
+   ========================= */
 
 document.addEventListener("DOMContentLoaded",()=>{
   $("loginBtn").addEventListener("click",login);
@@ -308,6 +650,17 @@ document.addEventListener("DOMContentLoaded",()=>{
   $("supplyBtn").addEventListener("click",()=>createContent("보급"));
   $("plantBtn").addEventListener("click",()=>createContent("송전소"));
   $("escortBtn").addEventListener("click",()=>createContent("차량수호"));
+
+  $("sortSel").addEventListener("change",(e)=>{
+    sortMode = e.target.value;
+    loadStats();
+  });
+
+  $("adminToggleBtn").addEventListener("click",toggleAdminPanel);
+  $("adminUserSearch").addEventListener("input",renderAdminUserTable);
+  $("adminAddBtn").addEventListener("click",adminAddUser);
+  $("bulkAdminOn").addEventListener("click",()=>adminBulkSetAdmin(true));
+  $("bulkAdminOff").addEventListener("click",()=>adminBulkSetAdmin(false));
 });
 
 </script>
@@ -316,31 +669,44 @@ document.addEventListener("DOMContentLoaded",()=>{
 <body>
 
 <div id="loginBox" class="card" style="width:350px;margin:100px auto;">
-<h2>로그인</h2>
-<input id="loginId" placeholder="아이디"><br>
-<input id="loginPw" type="password" placeholder="비밀번호"><br>
-<button id="loginBtn">로그인</button>
-<div class="small" style="margin-top:8px;">* 아이디=닉네임으로 판정합니다.</div>
+  <h2>로그인</h2>
+  <input id="loginId" placeholder="아이디"><br>
+  <input id="loginPw" type="password" placeholder="비밀번호"><br>
+  <button id="loginBtn">로그인</button>
+  <div class="small" style="margin-top:8px;">* 아이디=닉네임으로 판정합니다.</div>
 </div>
 
 <div id="mainBox" class="hidden">
   <div class="top">
-    <span id="userInfo"></span>
+    <div class="row" id="userInfo"></div>
     <div class="row">
       <span id="statusMsg" class="small"></span>
+      <select id="sortSel" class="wide" title="유저 통계 정렬">
+        <option value="rank_desc">계급 높은순</option>
+        <option value="rank_asc">계급 낮은순</option>
+        <option value="online_first">접속자 우선</option>
+        <option value="name">이름순</option>
+      </select>
       <button id="refreshBtn">새로고침</button>
+      <button id="adminToggleBtn" class="ghost hidden">관리</button>
       <button id="logoutBtn">로그아웃</button>
     </div>
   </div>
 
   <div class="container">
 
-    <div style="flex:1;min-width:340px">
+    <div class="col">
       <div class="card">
         <h3>근태</h3>
         <button id="inBtn">출근</button>
         <button id="outBtn">퇴근</button>
         <div class="small" style="margin-top:8px;">* 통계는 최근 7일 기준으로 계산됩니다.</div>
+      </div>
+
+      <div class="card">
+        <h3>접속 목록(출근중)</h3>
+        <div class="small" style="margin-bottom:8px;">* 일반 유저는 ‘숨김 유저’가 보이지 않습니다.</div>
+        <div id="onlineArea"></div>
       </div>
 
       <div class="card">
@@ -358,11 +724,49 @@ document.addEventListener("DOMContentLoaded",()=>{
       </div>
     </div>
 
-    <div style="flex:1;min-width:340px">
+    <div class="col">
       <div class="card">
         <h3>유저 통계</h3>
         <div class="small" style="margin-bottom:8px;">* 접속 O/X = 출근중 여부 / 시간 = 최근 7일 누적</div>
         <div id="statsArea"></div>
+      </div>
+
+      <!-- 관리자 패널 -->
+      <div id="adminPanel" class="card hidden">
+        <h3>관리자 패널</h3>
+        <div class="small">* 유저 등록=화이트리스트이며, 계급/부서/숨김/관리자/비밀번호를 관리합니다.</div>
+
+        <div class="hr"></div>
+
+        <div class="row">
+          <input id="adminAddNick" class="wide" placeholder="추가할 닉네임" />
+          <input id="adminAddPw" class="wide" placeholder="초기 비밀번호" />
+          <button id="adminAddBtn">유저 추가</button>
+        </div>
+
+        <div class="row" style="margin-top:8px;">
+          <input id="adminUserSearch" class="wide" placeholder="유저 검색(닉네임)" />
+          <button id="bulkAdminOn">선택 관리자 부여</button>
+          <button id="bulkAdminOff" class="danger">선택 관리자 해임</button>
+        </div>
+
+        <div class="hr"></div>
+
+        <div style="overflow:auto;max-height:520px;border:1px solid #2a2a2a;border-radius:12px;">
+          <table class="table">
+            <thead>
+              <tr>
+                <th style="min-width:200px;">유저</th>
+                <th style="min-width:200px;">계급</th>
+                <th style="min-width:240px;">부서</th>
+                <th style="min-width:140px;">권한/숨김</th>
+                <th style="min-width:360px;">비밀번호/관리</th>
+              </tr>
+            </thead>
+            <tbody id="adminUserTbody"></tbody>
+          </table>
+        </div>
+
       </div>
     </div>
 
