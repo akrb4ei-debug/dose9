@@ -274,28 +274,25 @@ body::before{
     .tinyStatus{ font-size: 12px; color: var(--muted2); margin-left: 8px; }
 
   
-/* ==== PATCH: Admin overlay sheet (no grid push, no auto-down) ==== */
-body.admin-open .grid{ grid-template-columns: 1fr !important; max-width: 1180px !important; }
-#adminBackdrop{
-  position:fixed; inset:0; background:rgba(0,0,0,.55);
-  backdrop-filter: blur(4px);
-  z-index:9998; display:none;
+/* ==== PATCH: Admin wide side panel (3-column shift, no auto-down) ==== */
+.layout{ display:flex; } /* keep */
+body.admin-open .grid{
+  grid-template-columns: 1fr 1.3fr 720px !important;
+  max-width: 1680px !important;
 }
-body.admin-open #adminBackdrop{ display:block; }
-#adminCol{
-  position:fixed !important;
-  top:0 !important; right:0 !important;
-  width:min(720px, 92vw) !important;
-  height:100vh !important;
-  max-height:none !important;
-  overflow:auto !important;
-  overscroll-behavior: contain;
-  z-index:9999 !important;
-  border-left:1px solid var(--stroke) !important;
-  box-shadow:-16px 0 60px rgba(0,0,0,.55);
+body.admin-open .grid > .card{ grid-column: 2; }
+body.admin-open #adminCol{
+  grid-column: 3 !important;
+  position: relative !important;
+  width: auto !important;
+  height: auto !important;
+  max-height: none !important;
+  overflow: auto !important;
+  box-shadow: none !important;
 }
+#adminBackdrop{ display:none !important; }
 #adminCol::-webkit-scrollbar{ width:10px; }
-#adminCol::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.18); border-radius:999px; }
+#adminCol::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.14); border-radius:12px; }
 #adminCol::-webkit-scrollbar-track{ background:transparent; }
 /* ==== PATCH: Toast system ==== */
 #toastHost{ position:fixed; top:18px; right:18px; z-index:10050; display:flex; flex-direction:column; gap:10px; pointer-events:none; }
@@ -1579,8 +1576,6 @@ async function ensureUserDocDefaultsOnce(userId, userData){
     function closeAdminPanel(){
       document.body.classList.remove("admin-open");
       const admin=$("adminCol");
-      const back=$("adminBackdrop");
-      if(back){ back.hidden=true; back.style.display="none"; }
       if(admin){
         const active=document.activeElement;
         if(active && admin.contains(active)) active.blur?.();
@@ -1589,15 +1584,11 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       }
     }
     }
-    function openAdminPanel(){
+
+function openAdminPanel(){
       if(!isAdmin()) return;
       document.body.classList.add("admin-open");
       const admin=$("adminCol");
-      const back=$("adminBackdrop");
-      if(back){
-        back.hidden=false; back.style.display="block";
-        back.onclick=()=>closeAdminPanel();
-      }
       if(admin){
         admin.hidden=false;
         admin.inert = false;
@@ -1608,7 +1599,8 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       }
     }
     }
-    function toggleAdminPanel(){
+
+function toggleAdminPanel(){
       if(!isAdmin()) return;
       const open = document.body.classList.contains("admin-open");
       if(open) closeAdminPanel();
