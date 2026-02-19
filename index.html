@@ -15,10 +15,13 @@
     --txt:#f2f2f4;
     --muted:#b6b6c2;
     --chip:#1e1e24;
-    --accent:#e6e6ea;
     --danger:#c54a4a;
   }
   *{box-sizing:border-box}
+
+  /* ✅ hidden 속성은 무조건 display:none이 되도록 강제 */
+  [hidden]{ display:none !important; }
+
   body{margin:0;background:var(--bg);color:var(--txt);font-family:Segoe UI,Apple SD Gothic Neo,Malgun Gothic,system-ui}
   .top{
     position:sticky; top:0; z-index:5;
@@ -49,8 +52,6 @@
   }
   button:hover{background:#24242c;}
   button.ghost{background:transparent}
-  button.danger{border-color:#5b2b2b;background:#241314}
-  button.danger:hover{background:#2c1618}
   button.pillbtn{padding:7px 11px;border-radius:999px}
   button:disabled{opacity:.5;cursor:not-allowed}
   input,select{
@@ -119,7 +120,7 @@
   .u{ text-decoration: underline; text-decoration-thickness: 2px; }
   .s{ text-decoration: line-through; text-decoration-thickness: 2px; opacity:.85; }
 
-  /* ===== 관리자 패널: 전면 드로어(스크롤 박스 없앰) ===== */
+  /* ===== 관리자 패널: 전면 드로어 ===== */
   .drawerBack{
     position:fixed; inset:0; background:rgba(0,0,0,.6);
     z-index:9000; display:flex; justify-content:flex-end;
@@ -131,7 +132,7 @@
     border-left:1px solid var(--border);
     box-shadow:-20px 0 60px rgba(0,0,0,.45);
     padding:16px;
-    overflow: visible; /* ✅ 내부 스크롤 박스 제거 */
+    overflow: visible; /* 내부 스크롤 박스 제거 */
   }
   .drawerTop{
     background:rgba(20,20,22,.92); backdrop-filter: blur(10px);
@@ -153,8 +154,6 @@
   details.adminSec > summary::-webkit-details-marker{display:none}
   .sumHint{font-weight:500;color:var(--muted);font-size:12px;margin-left:auto}
   .secBody{padding-top:10px}
-
-  /* 관리자 페이징 */
   .adminPager{
     margin-top:10px;
     display:flex;gap:8px;align-items:center;flex-wrap:wrap;
@@ -201,7 +200,6 @@ let editBaseParticipants=[];
 let editSelected=new Set();
 let editSearchQ="";
 
-/* 관리자 유저 목록 페이징(스크롤 박스 대신) */
 let adminUserPage=0;
 const ADMIN_PAGE_SIZE=10;
 
@@ -251,30 +249,25 @@ function fmtKST(ts){
 }
 
 /* =========================
-   ✅ 컨텐츠 수정 모달: 절대 자동 오픈 금지(강제 숨김)
+   ✅ 강제 닫기/열기: hidden + inert + display none
    ========================= */
 function hardCloseModal(){
   const m=$("contentModal");
   if(!m) return;
-
   const active=document.activeElement;
-  if(active && m.contains(active)){
-    active.blur?.();
-    document.body.focus?.();
-  }
-
+  if(active && m.contains(active)) active.blur?.();
   m.setAttribute("inert","");
-  m.classList.add("hidden");
   m.hidden = true;
+  m.classList.add("hidden");
+  m.style.display = "none";
 }
 function hardOpenModal(){
   const m=$("contentModal");
   if(!m) return;
-
+  m.style.display = "";
   m.hidden = false;
   m.classList.remove("hidden");
   m.removeAttribute("inert");
-
   setTimeout(()=>$("mClose")?.focus?.(),0);
 }
 function closeEditModal(){
@@ -283,28 +276,23 @@ function closeEditModal(){
   editBaseParticipants=[]; editSelected=new Set(); editSearchQ="";
 }
 
-/* =========================
-   ✅ 관리자 패널: 안 지워짐 방지(강제 숨김)
-   ========================= */
 function hardCloseDrawer(){
   const back=$("adminDrawerBack");
   if(!back) return;
-
   const active=document.activeElement;
   if(active && back.contains(active)) active.blur?.();
-
   back.setAttribute("inert","");
+  back.hidden = true;
   back.classList.add("hidden");
-  back.hidden = true; // ✅ 강제 숨김
+  back.style.display = "none";
 }
 function hardOpenDrawer(){
   const back=$("adminDrawerBack");
   if(!back) return;
-
+  back.style.display = "";
   back.hidden = false;
   back.classList.remove("hidden");
   back.removeAttribute("inert");
-
   setTimeout(()=>$("adminDrawerClose")?.focus?.(),0);
 }
 function toggleAdminDrawer(){
@@ -411,7 +399,7 @@ async function loadOnline(){
   }
 }
 
-/* ===== 유저 통계: 유저 목록 + 접속(O/X)만 ===== */
+/* ===== 유저 통계: 닉네임 + 접속(O/X)만 ===== */
 async function loadStats(){
   try{
     const openQ=query(colWork,where("checkOut","==",null));
@@ -427,7 +415,7 @@ function renderStatsSimple(openSet){
   const tbody=$("statsTbody");
   tbody.innerHTML = names.map(n=>{
     const ud=usersCache.get(n);
-    const canShow = isAdmin() ? true : !ud?.isHidden; // 일반 유저는 숨김 유저 통계에도 안 보이게 할지 여부
+    const canShow = isAdmin() ? true : !ud?.isHidden;
     if(!canShow) return "";
     return `
       <tr>
@@ -589,7 +577,7 @@ function renderContentList(){
       ${editInfo}
       <div class="small" style="margin-top:6px;">참여자: ${partHtml}</div>
       <div class="row" style="margin-top:8px;">
-        ${canEditContent(r)?`<button class="pillbtn" data-edit="${escapeHtml(it.id)}">수정</button>`:""}
+        ${canEditContent(r)?`<button class="pillbtn" data-edit="${escapeHtml(it.id)}" type="button">수정</button>`:""}
       </div>
     </div>`;
   }
@@ -624,10 +612,12 @@ function openEditModal(docId){
   `;
 
   if(contentNeedsOutcome(data.type)){
-    show("mOutcomeBox",true);
+    $("mOutcomeBox").hidden=false;
+    $("mOutcomeBox").style.display="";
     $("mOutcome").value=(data.outcome===true?"O":(data.outcome===false?"X":"-"));
   }else{
-    show("mOutcomeBox",false);
+    $("mOutcomeBox").hidden=true;
+    $("mOutcomeBox").style.display="none";
   }
 
   $("mSearch").value="";
@@ -723,7 +713,7 @@ async function saveEditModal(){
   }catch(e){ alert(err(e)); console.error(e); }
 }
 
-/* ===== 관리자: 유저 관리(스크롤 박스 대신 10명씩 페이징) ===== */
+/* ===== 관리자: 유저 관리(10명 페이지네이션) ===== */
 function renderAdminUserTable(){
   if(!isAdmin()) return;
   const tbody=$("adminUserTbody");
@@ -877,17 +867,15 @@ async function refreshAll(toast){
 
 /* ===== 이벤트 ===== */
 document.addEventListener("DOMContentLoaded", ()=>{
-  // ✅ 처음 로드 시: 모달/드로어 무조건 닫기(2중 안전)
-  hardCloseModal(); closeEditModal();
+  // ✅ 페이지 첫 로드에서 모달/드로어 무조건 닫기(즉시 + 다음 tick)
+  hardCloseModal();
   hardCloseDrawer();
   setTimeout(()=>{ hardCloseModal(); hardCloseDrawer(); },0);
 
-  // 모달 배경 클릭 닫기
+  // 모달/드로어 배경 클릭 닫기
   $("contentModal")?.addEventListener("click",(e)=>{
     if(e.target?.id==="contentModal") closeEditModal();
   });
-
-  // 드로어 배경 클릭 닫기
   $("adminDrawerBack")?.addEventListener("click",(e)=>{
     if(e.target?.id==="adminDrawerBack") hardCloseDrawer();
   });
@@ -912,11 +900,9 @@ document.addEventListener("DOMContentLoaded", ()=>{
   $("plantBtn").addEventListener("click",()=>createContent("송전소"));
   $("escortBtn").addEventListener("click",()=>createContent("차량수호"));
 
-  // 관리 버튼: 앞에 딱(드로어)
   $("adminToggleBtn").addEventListener("click",toggleAdminDrawer);
   $("adminDrawerClose")?.addEventListener("click",hardCloseDrawer);
 
-  // 관리자 유저 검색/추가
   $("adminUserSearch")?.addEventListener("input",()=>{ adminUserPage=0; renderAdminUserTable(); });
   $("adminAddBtn")?.addEventListener("click",adminAddUser);
 
@@ -1033,14 +1019,14 @@ document.addEventListener("DOMContentLoaded", ()=>{
   </div>
 </div>
 
-<!-- ✅ 관리자 드로어(전면) : hidden + inert + hidden 속성까지 -->
-<div id="adminDrawerBack" class="drawerBack hidden" inert hidden>
+<!-- ✅ 관리자 드로어 (기본: inert + hidden + hidden 속성 + style display none은 JS에서 강제) -->
+<div id="adminDrawerBack" class="drawerBack hidden" inert hidden style="display:none;">
   <div class="drawer" role="dialog" aria-modal="true">
     <div class="drawerTop">
       <div>
         <b style="font-size:15px;">관리자 패널</b>
         <div class="small">* “관리” 버튼을 한 번 더 누르거나 배경 클릭/ESC로 닫힙니다.</div>
-        <div class="small">* 내부 스크롤 박스를 제거하고, 유저 목록은 10명씩 넘깁니다.</div>
+        <div class="small">* 유저 목록은 10명씩 넘깁니다.</div>
       </div>
       <div class="row">
         <button id="adminDrawerClose" class="pillbtn ghost" type="button">닫기</button>
@@ -1081,8 +1067,8 @@ document.addEventListener("DOMContentLoaded", ()=>{
   </div>
 </div>
 
-<!-- ✅ 컨텐츠 수정 모달 (기본: inert + hidden + hidden 속성) -->
-<div id="contentModal" class="modalBack hidden" inert hidden>
+<!-- ✅ 컨텐츠 수정 모달 (기본: inert + hidden + hidden 속성 + style display none은 JS에서 강제) -->
+<div id="contentModal" class="modalBack hidden" inert hidden style="display:none;">
   <div class="modal">
     <div class="modalTop">
       <div>
