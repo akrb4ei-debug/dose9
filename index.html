@@ -1595,7 +1595,6 @@ async function ensureUserDocDefaultsOnce(userId, userData){
         admin.inert = true;
       }
     }
-    }
     function openAdminPanel(){
       if(!isAdmin()) return;
       document.body.classList.add("admin-open");
@@ -1613,7 +1612,6 @@ async function ensureUserDocDefaultsOnce(userId, userData){
         loadWorkPage(0);
         admin.scrollTop=0;
       }
-    }
     }
     function toggleAdminPanel(){
       if(!isAdmin()) return;
