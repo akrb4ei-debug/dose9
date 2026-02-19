@@ -1,3 +1,16 @@
+
+    // ==== PATCH: in-page toast (no browser alert) ====
+    function toast(msg,type="info"){
+      const host=$("toastHost") || document.body;
+      const el=document.createElement("div");
+      el.className="toastMsg "+type;
+      el.textContent=String(msg||"");
+      host.appendChild(el);
+      requestAnimationFrame(()=>el.classList.add("show"));
+      setTimeout(()=>{ el.classList.remove("show"); setTimeout(()=>el.remove(),220); }, 2200);
+    }
+    // 브라우저 alert을 사이트 내 토스트로 대체합니다.
+    window.alert = (m)=>toast(m,"info");
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -260,7 +273,61 @@ body::before{
     .tiny{ font-size: 12px; color: var(--muted2); }
     .tinyStatus{ font-size: 12px; color: var(--muted2); margin-left: 8px; }
 
-  </style>
+  
+/* ==== PATCH: Admin overlay sheet (no grid push, no auto-down) ==== */
+body.admin-open .grid{ grid-template-columns: 1fr !important; max-width: 1180px !important; }
+#adminBackdrop{
+  position:fixed; inset:0; background:rgba(0,0,0,.55);
+  backdrop-filter: blur(4px);
+  z-index:9998; display:none;
+}
+body.admin-open #adminBackdrop{ display:block; }
+#adminCol{
+  position:fixed !important;
+  top:0 !important; right:0 !important;
+  width:min(720px, 92vw) !important;
+  height:100vh !important;
+  max-height:none !important;
+  overflow:auto !important;
+  overscroll-behavior: contain;
+  z-index:9999 !important;
+  border-left:1px solid var(--stroke) !important;
+  box-shadow:-16px 0 60px rgba(0,0,0,.55);
+}
+#adminCol::-webkit-scrollbar{ width:10px; }
+#adminCol::-webkit-scrollbar-thumb{ background:rgba(255,255,255,.18); border-radius:999px; }
+#adminCol::-webkit-scrollbar-track{ background:transparent; }
+/* ==== PATCH: Toast system ==== */
+#toastHost{ position:fixed; top:18px; right:18px; z-index:10050; display:flex; flex-direction:column; gap:10px; pointer-events:none; }
+.toastMsg{
+  pointer-events:none;
+  background:rgba(20,22,28,.92);
+  border:1px solid rgba(255,255,255,.14);
+  border-left:4px solid rgba(199,211,226,.7);
+  padding:12px 14px;
+  border-radius:14px;
+  min-width: 220px;
+  max-width: 360px;
+  box-shadow:0 18px 50px rgba(0,0,0,.45);
+  opacity:0;
+  transform: translateY(-8px);
+  transition:.22s ease;
+  font-weight:700;
+}
+.toastMsg.show{ opacity:1; transform: translateY(0); }
+.toastMsg.success{ border-left-color: rgba(124,255,168,.9); }
+.toastMsg.error{ border-left-color: rgba(255,124,154,.9); }
+.toastMsg.info{ border-left-color: rgba(199,211,226,.9); }
+/* ==== PATCH: slightly brighter gray tone ==== */
+:root{
+  --bg:#101218;
+  --panel:#151823;
+  --panel2:#1b1f2b;
+  --panel3:#23293a;
+  --stroke: rgba(255,255,255,0.12);
+}
+
+</style>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -879,7 +946,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
     }
     function renderCreateUsers(){
       const q=(createSearch||"").toLowerCase();
-      const names=Array.from(usersCache.keys()).sort((a,b)=>a.localeCompare(b,"ko"));
+      const names=Array.from(usersCache.keys()).filter(n=>{ const u=usersCache.get(n)||{}; return isAdmin() || !u.isHidden; }).sort((a,b)=>a.localeCompare(b,"ko"));
       const filtered=q?names.filter(n=>n.toLowerCase().includes(q)):names;
       $("cUserList").innerHTML = filtered.map(n=>{
         const checked=createSelected.has(n)?"checked":"";
@@ -1032,7 +1099,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
     }
     function renderEditUsers(){
       const q=(editSearch||"").toLowerCase();
-      const names=Array.from(usersCache.keys()).sort((a,b)=>a.localeCompare(b,"ko"));
+      const names=Array.from(usersCache.keys()).filter(n=>{ const u=usersCache.get(n)||{}; return isAdmin() || !u.isHidden; }).sort((a,b)=>a.localeCompare(b,"ko"));
       const filtered=q?names.filter(n=>n.toLowerCase().includes(q)):names;
       $("eUserList").innerHTML = filtered.map(n=>{
         const checked=editSelected.has(n)?"checked":"";
@@ -1512,26 +1579,34 @@ async function ensureUserDocDefaultsOnce(userId, userData){
     function closeAdminPanel(){
       document.body.classList.remove("admin-open");
       const admin=$("adminCol");
+      const back=$("adminBackdrop");
+      if(back){ back.hidden=true; back.style.display="none"; }
       if(admin){
-        // 포커스가 패널 안에 있으면 먼저 해제합니다.
         const active=document.activeElement;
         if(active && admin.contains(active)) active.blur?.();
         admin.hidden=true;
-        admin.setAttribute("aria-hidden","true");
+        admin.inert = true;
       }
+    }
     }
     function openAdminPanel(){
       if(!isAdmin()) return;
       document.body.classList.add("admin-open");
       const admin=$("adminCol");
+      const back=$("adminBackdrop");
+      if(back){
+        back.hidden=false; back.style.display="block";
+        back.onclick=()=>closeAdminPanel();
+      }
       if(admin){
         admin.hidden=false;
-        admin.setAttribute("aria-hidden","false");
+        admin.inert = false;
         // 관리자 카드 렌더는 열릴 때만 수행하여 렉을 줄입니다.
         renderAdminUserCards();
         loadWorkPage(0);
         admin.scrollTop=0;
       }
+    }
     }
     function toggleAdminPanel(){
       if(!isAdmin()) return;
@@ -1643,6 +1718,9 @@ async function ensureUserDocDefaultsOnce(userId, userData){
 </head>
 
 <body>
+  <div id="adminBackdrop" hidden></div>
+  <div id="toastHost" aria-live="polite" aria-atomic="true"></div>
+
   <div class="wrap">
     <div id="loginView" class="card" style="max-width: 520px; margin: 80px auto 0;">
       <div class="row" style="align-items:flex-start;">
