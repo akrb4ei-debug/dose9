@@ -174,12 +174,18 @@
     const id = $("loginId").value.trim();
     const pw = $("loginPw").value;
 
-    const snap = await getDoc(doc(db,"users",id));
-    if(!snap.exists()) return alert("등록되지 않은 유저입니다.");
-    const data = snap.data();
-    if(data.password !== pw) return alert("비밀번호가 올바르지 않습니다.");
+    if(!id) return alert("아이디(닉네임)를 입력해 주세요.");
+    if(!pw) return alert("비밀번호를 입력해 주세요.");
 
-    currentUser = id;
+    try{
+      const snap = await getDoc(doc(db,"users",id));
+      if(!snap.exists()) return alert("등록되지 않은 유저입니다.");
+      const data = snap.data();
+
+      // ✅ 비밀번호는 Firestore에 문자열/숫자로 저장될 수 있으므로 문자열로 통일해 비교합니다.
+      if(String(data.password ?? "") !== String(pw)) return alert("비밀번호가 올바르지 않습니다.");
+
+      currentUser = id;
     currentUserData = data;
 
     await loadUsers();
@@ -194,6 +200,25 @@
     await refreshAll(); // ✅ 로그인 1회 풀로드
     openChatSmart();    // ✅ 내 부서 채팅 자동 오픈
     await checkNoticeOnLoginOnce();
+    }catch(e){
+      console.error(e);
+      const msg = (e && e.code) ? String(e.code) : String(e);
+      if(msg.includes("permission-denied")){
+        alert("로그인에 실패했습니다. (Firestore 권한 거부)
+
+Firebase 콘솔 → Firestore Database → 규칙(Rules)에서
+읽기/쓰기가 허용되어 있는지 확인해 주세요.
+
+테스트 단계에서는 임시로 allow read, write: if true; 로 설정할 수 있습니다.");
+      }else if(msg.includes("unavailable")){
+        alert("로그인에 실패했습니다. (네트워크/Firestore 일시 장애)
+잠시 후 다시 시도해 주세요.");
+      }else{
+        alert("로그인에 실패했습니다.
+콘솔(F12) 에러를 확인해 주세요.");
+      }
+      return;
+    }
   }
   window.login = login;
 
@@ -1463,6 +1488,20 @@
   window.setTab = setTab;
 
   // ===== Boot globals =====
+
+  // ✅ 로그인 입력창에서 Enter를 누르면 로그인합니다.
+  document.addEventListener("keydown",(e)=>{
+    if(document.getElementById("loginBox") && !document.getElementById("loginBox").classList.contains("hidden")){
+      if(e.key==="Enter"){
+        const ae = document.activeElement;
+        if(ae && (ae.id==="loginId" || ae.id==="loginPw")){
+          e.preventDefault();
+          window.login && window.login();
+        }
+      }
+    }
+  });
+
   window.setContentFilter = setContentFilter;
 </script>
 </head>
