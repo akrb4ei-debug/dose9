@@ -19,57 +19,77 @@
   }
   body{margin:0;background:var(--bg);color:var(--txt);font-family:Segoe UI,Apple SD Gothic Neo,Malgun Gothic,system-ui}
   .top{
-    padding:14px 22px;background:var(--panel);border-bottom:1px solid var(--border);
+    position:sticky; top:0; z-index:5;
+    padding:14px 22px;background:rgba(20,20,22,.92);backdrop-filter: blur(10px);
+    border-bottom:1px solid var(--border);
     display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap
   }
-  .container{display:flex;gap:20px;padding:20px;max-width:1500px;margin:0 auto;}
-  .col{flex:1;min-width:340px}
+  .container{
+    display:flex;gap:20px;padding:22px;
+    max-width:1720px;margin:0 auto;
+  }
+  .col{flex:1;min-width:360px}
   .card{
     background:linear-gradient(180deg,var(--panel),var(--panel2));
-    padding:15px;border:1px solid var(--border);border-radius:14px;margin-bottom:15px;
+    padding:16px;border:1px solid var(--border);border-radius:16px;margin-bottom:16px;
+    box-shadow:0 18px 40px rgba(0,0,0,.18);
   }
   h2,h3{margin:0 0 10px 0}
   .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-  .small{font-size:12px;color:var(--muted)}
+  .small{font-size:12px;color:var(--muted);line-height:1.45}
   .chip{
     display:inline-flex;gap:6px;align-items:center;
     background:var(--chip);border:1px solid var(--border2);border-radius:999px;padding:6px 10px;font-size:12px
   }
   button{
     background:#1c1c22;color:#fff;border:1px solid var(--border2);
-    padding:7px 12px;border-radius:10px;cursor:pointer;margin:3px;
+    padding:8px 12px;border-radius:12px;cursor:pointer;margin:3px;
   }
   button:hover{background:#24242c;}
   button.ghost{background:transparent}
   button.danger{border-color:#5b2b2b;background:#241314}
   button.danger:hover{background:#2c1618}
-  button.pillbtn{padding:6px 10px;border-radius:999px}
+  button.pillbtn{padding:7px 11px;border-radius:999px}
   input,select{
     background:#0f0f12;color:#fff;border:1px solid var(--border2);
-    padding:7px 10px;border-radius:10px;margin:3px;
+    padding:8px 10px;border-radius:12px;margin:3px;
   }
-  input.wide{width:260px;max-width:100%}
-  select.wide{width:260px;max-width:100%}
+  input.wide{width:280px;max-width:100%}
+  select.wide{width:280px;max-width:100%}
   .hidden{display:none}
   .stat{
-    background:#0f0f12;border:1px solid #23232a;border-radius:12px;
-    padding:10px 12px;margin-bottom:8px;line-height:1.55
+    background:#0f0f12;border:1px solid #23232a;border-radius:14px;
+    padding:11px 12px;margin-bottom:9px;line-height:1.55
   }
   .hr{height:1px;background:#23232a;margin:12px 0}
   .badge{font-size:11px;padding:2px 8px;border:1px solid var(--border2);border-radius:999px;color:#e6e6ea}
   .right{margin-left:auto}
   .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
   .table{width:100%;border-collapse:collapse}
-  .table th,.table td{border-bottom:1px solid #23232a;padding:8px 6px;text-align:left;font-size:13px;vertical-align:top}
-  .table th{color:#e8e8ee;font-weight:600}
+  .table th,.table td{border-bottom:1px solid #23232a;padding:9px 7px;text-align:left;font-size:13px;vertical-align:top}
+  .table th{color:#e8e8ee;font-weight:650}
   .anim{transition:max-height .25s ease, opacity .25s ease, transform .25s ease}
   .collapse{max-height:0; opacity:0; transform:translateY(-6px); overflow:hidden}
   .expand{max-height:1200px; opacity:1; transform:translateY(0); overflow:hidden}
 
   .barWrap{margin-top:10px;display:flex;flex-direction:column;gap:8px}
-  .barRow{display:grid;grid-template-columns:180px 1fr 90px;gap:10px;align-items:center}
+  .barRow{display:grid;grid-template-columns:200px 1fr 90px;gap:10px;align-items:center}
   .barBg{height:10px;border:1px solid #2f2f36;border-radius:999px;overflow:hidden;background:#0a0a0c}
   .barFill{height:100%;background:var(--accent)}
+
+  /* ✅ 관리자 패널 정돈(아코디언) */
+  details.adminSec{
+    border:1px solid #23232a;border-radius:14px;background:#0f0f12;
+    padding:10px 12px;margin-top:10px;
+  }
+  details.adminSec > summary{
+    list-style:none; cursor:pointer; user-select:none;
+    display:flex; align-items:center; gap:10px;
+    font-weight:800; padding:6px 2px;
+  }
+  details.adminSec > summary::-webkit-details-marker{display:none}
+  .sumHint{font-weight:500;color:var(--muted);font-size:12px;margin-left:auto}
+  .secBody{padding-top:10px}
 
   .modalBack{
     position:fixed;inset:0;background:rgba(0,0,0,.65);
@@ -77,7 +97,7 @@
   }
   .modal{
     width:min(980px, 96vw);
-    background:#111114;border:1px solid #2a2a30;border-radius:16px;
+    background:#111114;border:1px solid #2a2a30;border-radius:18px;
     box-shadow:0 20px 60px rgba(0,0,0,.45);
     overflow:hidden;
   }
@@ -122,7 +142,6 @@ import {
   query, where, orderBy, limit, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
-/* ✅ Firebase 설정 */
 const firebaseConfig={
   apiKey:"AIzaSyAJ6MhR1JsGbvieb8akAi4Zpas_W3uaNJ4",
   authDomain:"dosep-b6ee3.firebaseapp.com",
@@ -136,7 +155,6 @@ const colUsers=collection(db,"users");
 const colWork=collection(db,"workRecords");
 const colContent=collection(db,"contentRecords");
 
-/* ===== 전역 상태 ===== */
 let currentUser=null;
 let currentUserData=null;
 let usersCache=new Map();
@@ -151,7 +169,6 @@ let contentPage=0;
 const PAGE_SIZE=20;
 let filterOpen=false;
 
-/* 모달 */
 let editDocId=null;
 let editDocData=null;
 let editBaseParticipants=[];
@@ -164,7 +181,6 @@ const DEPTS=[
   "제1공수특수전여단","제3공수특전여단","제820방첩부대","국군의무사령부"
 ];
 
-/* ===== 유틸 ===== */
 function $(id){return document.getElementById(id);}
 function show(id,f){const el=$(id); if(el) el.classList.toggle("hidden",!f);}
 function isAdmin(){return !!currentUserData?.isAdmin || !!currentUserData?.isadmin;}
@@ -213,7 +229,7 @@ function fmtKST(ts){
   return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-/* ✅✅✅ 모달 자동오픈 “절대 방지” 하드락(핵심) ✅✅✅ */
+/* ✅ 모달 자동오픈 절대 방지(하드락) */
 function hardCloseModal(){
   const m=document.getElementById("contentModal");
   if(!m) return;
@@ -450,7 +466,6 @@ function applyContentFilter(list){
   return list.filter(x=>x.data?.type===contentFilter);
 }
 
-/* 필터 드롭다운 */
 function toggleFilterMenu(force){
   filterOpen = (force!==undefined) ? !!force : !filterOpen;
   show("filterMenu", filterOpen);
@@ -664,10 +679,10 @@ function openEditModal(docId){
   renderModalUserList();
   renderModalSelected();
 
-  hardOpenModal(); /* ✅ 하드 오픈 */
+  hardOpenModal();
 }
 function closeEditModal(){
-  hardCloseModal(); /* ✅ 하드 클로즈 */
+  hardCloseModal();
   editDocId=null; editDocData=null;
   editBaseParticipants=[]; editSelected=new Set(); editSearchQ="";
 }
@@ -755,8 +770,6 @@ async function saveEditModal(){
 }
 
 /* ===== 관리자 패널 / 그래프 / 유저관리 / 근태관리 ===== */
-/* 아래는 기존 V6와 동일(기능 유지) */
-
 function toggleAdminPanel(){
   if(!isAdmin()) return;
   const open=!$("adminPanel").classList.contains("hidden");
@@ -767,15 +780,6 @@ function toggleAdminPanel(){
   }
 }
 
-function toggleGraph(){
-  if(!isAdmin()) return;
-  const panel=$("graphPanel");
-  const isOpen=panel.classList.contains("expand");
-  panel.classList.toggle("expand", !isOpen);
-  panel.classList.toggle("collapse", isOpen);
-  $("graphBtn").textContent = isOpen ? "그래프 펼치기" : "그래프 접기";
-  if(!isOpen && lastStatsMap) renderGraphFromStats(lastStatsMap);
-}
 function renderGraphFromStats(map){
   const entries=sortedUserEntries(map);
   const maxSec=Math.max(1, ...entries.map(e=>e.st.total||0));
@@ -796,6 +800,7 @@ function renderGraphFromStats(map){
   `;
 }
 
+/* 유저 표 렌더 */
 function renderAdminUserTable(){
   if(!isAdmin()) return;
   const tbody=$("adminUserTbody");
@@ -1059,7 +1064,6 @@ async function adminDeleteAllWork(){
   }catch(e){ alert(err(e)); console.error(e); }
 }
 
-/* ===== 전체 새로고침 ===== */
 async function refreshAll(showToast){
   try{ await loadUsers(); }catch(e){ console.error(e); }
   try{ await loadStats(); }catch(e){ console.error(e); }
@@ -1068,13 +1072,11 @@ async function refreshAll(showToast){
   if(showToast) setStatus("갱신되었습니다.");
 }
 
-/* ===== 이벤트 바인딩 ===== */
+/* ===== 이벤트 ===== */
 document.addEventListener("DOMContentLoaded", ()=>{
-  /* ✅✅✅ 시작 즉시 모달은 무조건 닫습니다(자동오픈 봉인) */
   hardCloseModal();
   closeEditModal();
 
-  /* ✅ 모달 배경 클릭 시 닫기 */
   $("contentModal")?.addEventListener("click",(e)=>{
     if(e.target?.id==="contentModal") closeEditModal();
   });
@@ -1098,7 +1100,6 @@ document.addEventListener("DOMContentLoaded", ()=>{
   $("bulkAdminOn").addEventListener("click",()=>adminBulkSetAdmin(true));
   $("bulkAdminOff").addEventListener("click",()=>adminBulkSetAdmin(false));
 
-  $("graphBtn").addEventListener("click",toggleGraph);
   $("adminWorkLoadBtn").addEventListener("click",adminLoadWorkRecords);
   $("adminWorkDelUserBtn").addEventListener("click",adminDeleteAllWorkOfUser);
   $("adminWorkDelAllBtn").addEventListener("click",adminDeleteAllWork);
@@ -1126,7 +1127,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
 <body>
 
-<div id="loginBox" class="card" style="width:350px;margin:100px auto;">
+<div id="loginBox" class="card" style="width:360px;margin:100px auto;">
   <h2>로그인</h2>
   <input id="loginId" placeholder="아이디"><br>
   <input id="loginPw" type="password" placeholder="비밀번호"><br>
@@ -1211,93 +1212,97 @@ document.addEventListener("DOMContentLoaded", ()=>{
 
       <div id="adminPanel" class="card hidden">
         <h3>관리자 패널</h3>
-        <div class="small">* 유저 등록=화이트리스트이며, 계급/부서/숨김/관리자/비밀번호/근태/컨텐츠를 관리합니다.</div>
+        <div class="small">* 혼잡도를 낮추기 위해 영역별로 접기/펼치기 구조로 정리됩니다.</div>
 
-        <div class="hr"></div>
+        <details class="adminSec" open>
+          <summary>그래프 <span class="sumHint">최근 7일 누적 근무시간</span></summary>
+          <div class="secBody">
+            <button class="pillbtn" type="button" onclick="(function(){})()">※ 아래 그래프는 통계 갱신 시 자동 반영됩니다.</button>
+            <div id="graphArea" style="margin-top:10px;"></div>
+          </div>
+        </details>
 
-        <div class="row">
-          <button id="graphBtn" class="pillbtn" type="button">그래프 펼치기</button>
-          <span class="small">* 그래프는 최근 7일 누적시간 기준입니다.</span>
-        </div>
-        <div id="graphPanel" class="anim collapse" style="margin-top:10px;">
-          <div id="graphArea"></div>
-        </div>
+        <details class="adminSec" open>
+          <summary>유저 관리 <span class="sumHint">화이트리스트 / 계급 / 부서 / 숨김 / 비밀번호</span></summary>
+          <div class="secBody">
+            <div class="row">
+              <input id="adminAddNick" class="wide" placeholder="추가할 닉네임" />
+              <input id="adminAddPw" class="wide" placeholder="초기 비밀번호" />
+              <button id="adminAddBtn" type="button">유저 추가</button>
+            </div>
 
-        <div class="hr"></div>
+            <div class="row" style="margin-top:8px;">
+              <input id="adminUserSearch" class="wide" placeholder="유저 검색(닉네임)" />
+              <button id="bulkAdminOn" type="button">선택 관리자 부여</button>
+              <button id="bulkAdminOff" class="danger" type="button">선택 관리자 해임</button>
+            </div>
 
-        <div class="row">
-          <input id="adminAddNick" class="wide" placeholder="추가할 닉네임" />
-          <input id="adminAddPw" class="wide" placeholder="초기 비밀번호" />
-          <button id="adminAddBtn" type="button">유저 추가</button>
-        </div>
+            <div style="overflow:auto;max-height:440px;border:1px solid #23232a;border-radius:12px;margin-top:10px;">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="min-width:200px;">유저</th>
+                    <th style="min-width:200px;">계급</th>
+                    <th style="min-width:240px;">부서</th>
+                    <th style="min-width:140px;">권한/숨김</th>
+                    <th style="min-width:360px;">비밀번호/관리</th>
+                  </tr>
+                </thead>
+                <tbody id="adminUserTbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </details>
 
-        <div class="row" style="margin-top:8px;">
-          <input id="adminUserSearch" class="wide" placeholder="유저 검색(닉네임)" />
-          <button id="bulkAdminOn" type="button">선택 관리자 부여</button>
-          <button id="bulkAdminOff" class="danger" type="button">선택 관리자 해임</button>
-        </div>
+        <details class="adminSec">
+          <summary>근태 관리 <span class="sumHint">기록 수정/삭제/전체삭제</span></summary>
+          <div class="secBody">
+            <div class="small" style="margin-bottom:10px;">
+              * 유저 선택 후 ‘최근 기록 불러오기’를 누르면 최대 50건을 표시합니다.
+            </div>
 
-        <div class="hr"></div>
+            <div class="row">
+              <select id="adminWorkUser" class="wide"></select>
+              <button id="adminWorkLoadBtn" type="button">최근 기록 불러오기</button>
+              <button id="adminWorkDelUserBtn" class="danger" type="button">해당 유저 근태 전체 삭제</button>
+              <button id="adminWorkDelAllBtn" class="danger" type="button">전체 근태 삭제</button>
+            </div>
 
-        <div style="overflow:auto;max-height:420px;border:1px solid #23232a;border-radius:12px;">
-          <table class="table">
-            <thead>
-              <tr>
-                <th style="min-width:200px;">유저</th>
-                <th style="min-width:200px;">계급</th>
-                <th style="min-width:240px;">부서</th>
-                <th style="min-width:140px;">권한/숨김</th>
-                <th style="min-width:360px;">비밀번호/관리</th>
-              </tr>
-            </thead>
-            <tbody id="adminUserTbody"></tbody>
-          </table>
-        </div>
+            <div id="adminWorkHint" class="small" style="margin-top:8px;"></div>
 
-        <div class="hr"></div>
+            <div style="overflow:auto;max-height:420px;border:1px solid #23232a;border-radius:12px;margin-top:10px;">
+              <table class="table">
+                <thead>
+                  <tr>
+                    <th style="min-width:100px;">ID</th>
+                    <th style="min-width:210px;">출근(수정)</th>
+                    <th style="min-width:210px;">퇴근(수정)</th>
+                    <th style="min-width:160px;">작업</th>
+                  </tr>
+                </thead>
+                <tbody id="adminWorkTbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </details>
 
-        <h3 style="margin-top:0;">근태 기록 관리</h3>
-        <div class="small" style="margin-bottom:10px;">
-          * 유저 선택 후 ‘최근 기록 불러오기’를 누르면 최대 50건을 표시합니다.
-        </div>
+        <details class="adminSec">
+          <summary>컨텐츠 관리 <span class="sumHint">최근 7일 범위 전체삭제</span></summary>
+          <div class="secBody">
+            <div class="small">* 최근 7일 범위(현재 로드된 기록)를 전체 삭제합니다.</div>
+            <div class="row" style="margin-top:8px;">
+              <button id="adminContentDelAllBtn" class="danger" type="button">컨텐츠 기록 전체 삭제</button>
+            </div>
+          </div>
+        </details>
 
-        <div class="row">
-          <select id="adminWorkUser" class="wide"></select>
-          <button id="adminWorkLoadBtn" type="button">최근 기록 불러오기</button>
-          <button id="adminWorkDelUserBtn" class="danger" type="button">해당 유저 근태 전체 삭제</button>
-          <button id="adminWorkDelAllBtn" class="danger" type="button">전체 근태 삭제</button>
-        </div>
-
-        <div id="adminWorkHint" class="small" style="margin-top:8px;"></div>
-
-        <div style="overflow:auto;max-height:420px;border:1px solid #23232a;border-radius:12px;margin-top:10px;">
-          <table class="table">
-            <thead>
-              <tr>
-                <th style="min-width:100px;">ID</th>
-                <th style="min-width:210px;">출근(수정)</th>
-                <th style="min-width:210px;">퇴근(수정)</th>
-                <th style="min-width:160px;">작업</th>
-              </tr>
-            </thead>
-            <tbody id="adminWorkTbody"></tbody>
-          </table>
-        </div>
-
-        <div class="hr"></div>
-
-        <h3 style="margin-top:0;">컨텐츠 기록 관리</h3>
-        <div class="small">* 최근 7일 범위(현재 로드된 기록)를 전체 삭제합니다.</div>
-        <div class="row" style="margin-top:8px;">
-          <button id="adminContentDelAllBtn" class="danger" type="button">컨텐츠 기록 전체 삭제</button>
-        </div>
       </div>
     </div>
 
   </div>
 </div>
 
-<!-- ✅✅✅ 모달: hidden + aria-hidden 기본(자동오픈 봉인) -->
+<!-- 모달 -->
 <div id="contentModal" class="modalBack hidden" aria-hidden="true">
   <div class="modal">
     <div class="modalTop">
