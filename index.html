@@ -162,11 +162,19 @@
 
   function renderTop(){
     $("me").innerHTML = `<b>${escapeHtml(currentUser)}</b> · ${escapeHtml(currentUserData?.rank||"-")} · 관리자 ${isAdmin()?"O":"X"} · 부서 ${escapeHtml(currentUserData?.department||"-")} · 부서장 ${isDeptLeader()?"O":"X"}`;
-    $("adminBlock").classList.toggle("hidden", !isAdmin());
-    $("adminQuick").classList.toggle("hidden", !isAdmin());
-    $("adminWorkBlock").classList.toggle("hidden", !isAdmin());
-    $("adminContentBlock").classList.toggle("hidden", !isAdmin());
-    $("adminPwdBlock").classList.toggle("hidden", !isAdmin());
+
+    // ✅ 일부 섹션은 버전에 따라 존재하지 않을 수 있으므로 null 체크 후 처리합니다.
+    const toggle = (id, show) => {
+      const el = $(id);
+      if(!el) return;
+      el.classList.toggle("hidden", !show);
+    };
+
+    toggle("adminBlock", isAdmin());
+    toggle("adminQuick", isAdmin());
+    toggle("adminWorkBlock", isAdmin());
+    toggle("adminContentBlock", isAdmin()); // (없어도 무시됩니다)
+    toggle("adminPwdBlock", isAdmin());
   }
 
   // ===== Login =====
