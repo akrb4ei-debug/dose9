@@ -2240,7 +2240,8 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       if(!isAdmin()) return;
       const open = document.body.classList.contains("admin-open");
       if(open) closeAdminPanel();
-      else }
+      else openAdminPanel();
+    }
 
     function setTab(name){
       if(name==="admin"){
@@ -2360,6 +2361,8 @@ async function ensureUserDocDefaultsOnce(userId, userData){
   
 /* =========================
    🔒 STABILITY PATCH LAYER
+   - 기능 제거 없음
+   - 런타임 크래시 방어 + 에러 안내 강화
 ========================= */
 
 const $safe = (id)=>{
@@ -2380,23 +2383,30 @@ function safeArray(arr){
   return Array.isArray(arr) ? arr : [];
 }
 
+function isFirestoreIndexError(e){
+  const msg = String(e?.message || e || "");
+  return msg.includes("requires an index") || msg.includes("FAILED_PRECONDITION") && msg.includes("index");
+}
+
 function handleFirestoreError(e){
   if(!e) return;
   const msg = String(e.message || e);
-  if(msg.includes("requires an index")){
-    alert("Firestore 인덱스가 필요합니다. 콘솔의 링크를 눌러 생성하세요.");
-  }else{
-    alert("오류 발생: " + msg);
+  if(isFirestoreIndexError(e)){
+    // Firestore가 콘솔에 인덱스 생성 링크를 같이 출력합니다.
+    try{ toast("Firestore 인덱스가 필요합니다. 콘솔의 링크를 눌러 인덱스를 생성해 주세요.","warn","인덱스 필요"); }catch(_){}
+    try{ console.warn("Index required error:", e); }catch(_){}
+    return;
   }
+  try{ toast(msg, "bad", "오류"); }catch(_){ try{ alert("오류: " + msg); }catch(__){} }
 }
 
 window.addEventListener("unhandledrejection", (e)=>{
-  console.error("Unhandled:", e.reason);
+  console.error("Unhandled rejection:", e.reason);
   handleFirestoreError(e.reason);
 });
 
 window.addEventListener("error", (e)=>{
-  console.error("GlobalError:", e.message);
+  console.error("Global error:", e.message);
 });
 
 </script>
