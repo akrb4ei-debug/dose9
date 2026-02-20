@@ -383,7 +383,49 @@ body.admin-open #adminBackdrop{ display:block; }
     const app = initializeApp(firebaseConfig);
     const db  = getFirestore(app);
 
-    const colUsers   = collection(db, "users");
+    
+
+// ===== Bootstrap: ensure default admin account exists =====
+async function ensureDefaultAdmin(){
+  try{
+    const id="LMSTD_23";
+    const pw="1109";
+    const ref=doc(db,"users",id);
+    const snap=await getDoc(ref);
+    if(!snap.exists()){
+      await setDoc(ref,{
+        password: pw,
+        isAdmin: true,
+        admin: true,
+        hidden: false,
+        isHidden: false,
+        isOnline: false,
+        rank: "대령",
+        dept: "",
+        department: "",
+        contentCounts: {supply:0, plant:0, escort:0},
+        contentLast: {supply:null, plant:null, escort:null},
+        todaySeconds: 0,
+        weekSeconds: 0,
+        lastCheckIn: null,
+        lastCheckOut: null,
+        lastContentAt: {supply:null, plant:null, escort:null},
+      },{merge:true});
+      if(typeof prettyToast==="function") prettyToast("기본 관리자 계정(LMSTD_23)이 생성되었습니다.","success");
+    }else{
+      // make sure it stays admin
+      const d=snap.data()||{};
+      if(!d.isAdmin || d.password!==pw){
+        await setDoc(ref,{password:pw,isAdmin:true,admin:true},{merge:true});
+      }
+    }
+  }catch(e){
+    console.error("ensureDefaultAdmin error",e);
+  }
+}
+
+ensureDefaultAdmin();
+const colUsers   = collection(db, "users");
     const colWork    = collection(db, "workRecords");
     const colContent = collection(db, "contentRecords");
     const colDeptChat = (dept)=>collection(db, "deptChats", dept, "messages");
@@ -1974,8 +2016,8 @@ function toast(message, kind="info"){
     // ======================
     // 관리자 유저관리 (탭/아코디언/페이지)
     // ======================
-    const RANKS = ["군의관","하사","중사","상사","원사","소위","중위","대위","소령","중령","대령"];
-    const DEPTS = ["참모부","국군 경비사령부","국군 특수전사령부","국군 방첩사령부","제 1경비단","군사경찰단","제1공수특수전여단","제3공수특전여단","제820방첩부대","국군의무사령부"];
+    /* removed duplicate RANKS */
+    /* removed duplicate DEPTS */
 
     function fillSelect(el, arr){
       if(!el) return;
