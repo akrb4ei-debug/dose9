@@ -427,6 +427,7 @@ const colUsers   = collection(db, "users");
     let currentUserData=null;
     let usersCache=new Map();
     let lastUsersLoadAt=0;
+    let lastSummaryAt=0;
     const USERS_COOLDOWN_MS = 5*60*1000;
     const SUMMARY_COOLDOWN_MS = 3*60*1000; // 요약 갱신 쿨타임(3분) // 5분
 const USER_PAGE_SIZE = 10;
@@ -848,7 +849,7 @@ async function openUserModal(uid){
 
     const lockBody=(on)=>document.body.classList.toggle("noscroll", !!on);
 
-    async function normalizeUser(d){
+    function normalizeUser(d){
 
       const u={...d};
       if(u.isadmin!==undefined && u.isAdmin===undefined) u.isAdmin=u.isadmin;
