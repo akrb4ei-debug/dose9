@@ -336,10 +336,15 @@
   .toast.warn .tDot{background:var(--warn)}
   .toast .tMsg{font-weight:900}
   .toast .tSub{font-size:12px; color:var(--muted); margin-top:2px}
+
+/* Pre-login safety: hide app chrome until login 완료 */
+body.prelogin #appArea{display:none !important;}
+body.prelogin #topBar, body.prelogin #sideBar, body.prelogin #adminPanel, body.prelogin #adminDock, body.prelogin #adminFloat{display:none !important;}
+
 </style>
 </head>
 
-<body>
+<body class="prelogin">
 <div id="toastStack"></div>
 <div id="ctxMenu" class="ctx"></div>
 <div id="backdrop" class="backdrop"></div>
@@ -380,7 +385,7 @@
     </div>
   </div>
 
-  <div id="appArea" class="grid hidden">
+  <div id="appArea" class="grid hidden" class="hidden">
     <div>
       <div class="card">
         <div class="cardHead">
@@ -1005,7 +1010,10 @@ async function login(){
     const d = snap.data()||{};
     if(String(d.password) !== String(pw)) return toast("비밀번호가 틀렸습니다.","bad");
     App.state.uid = id;
-    App.state.udata = d;
+    
+document.body.classList.remove("prelogin");
+show("appArea", true);
+App.state.udata = d;
     await normalizeResets(id, d);
 
     $("loginCard").classList.add("hidden");
@@ -1016,6 +1024,7 @@ async function login(){
     renderTop();
     fillDeptSelect();
     await refreshAll(true);
+    setMainTab('dashboard');
     renderMyInfo();
     await refreshNoticeInfo(true);
     scheduleAutoRefresh();
