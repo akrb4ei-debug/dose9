@@ -346,6 +346,59 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     // ✅ 사용자 제공 Firebase 설정 반영
+
+  /* =========================
+     ✅ HARDENED IMPROVEMENT LAYER (v13)
+     - 중복 선언/이벤트 중복 바인딩 방지
+     - 런타임 크래시 방어
+     - 기존 기능 유지
+  ========================= */
+  if(window.__DOSE_V13_INIT__){
+    console.warn("[dose] duplicate init blocked");
+  }else{
+    window.__DOSE_V13_INIT__ = true;
+  }
+
+  function safeDefine(name, fn){
+    try{
+      if(typeof window[name] !== "function"){
+        window[name] = fn;
+      }
+      return window[name];
+    }catch(e){
+      console.warn("[safeDefine] failed", name, e);
+      return fn;
+    }
+  }
+
+  function safeOn(el, evt, handler, key){
+    if(!el) return;
+    const k = "__bound_" + evt + "_" + (key||handler.name||"anon");
+    if(el[k]) return;
+    el.addEventListener(evt, handler);
+    el[k] = true;
+  }
+
+  function safeSetHTML(el, htmlStr){
+    if(!el) return;
+    el.innerHTML = htmlStr;
+  }
+
+  function safeText(el, t){
+    if(!el) return;
+    el.textContent = t;
+  }
+
+  async function safeAsync(label, fn){
+    try{ return await fn(); }
+    catch(e){
+      console.error("[dose]", label, e);
+      try{ toast(`${label} 중 오류가 발생했습니다.`, "bad", label); }catch(_){}
+      throw e;
+    }
+  }
+
+
     const firebaseConfig = {
       apiKey: "AIzaSyAJ6MhR1JsGbvieb8akAi4Zpas_W3uaNJ4",
       authDomain: "dosep-b6ee3.firebaseapp.com",
@@ -1066,14 +1119,19 @@ currentUser=id;
 
 
     async function refreshAll({silent}={}){
-      try{
-        // 단계별 실패해도 가능한 만큼 진행
-        try{ await loadUsersOnce({force:true, reason:"admin"}); }catch(e){ console.warn("[refreshAll] users failed", e); }
-        try{ await loadDashKpis(); }catch(e){ console.warn("[refreshAll] kpi failed", e); }
-        try{ await loadUserTable(); }catch(e){ console.warn("[refreshAll] userTable failed", e); }
-        try{ await loadContentPage(0); }catch(e){ console.warn("[refreshAll] content failed", e); }
-        if(!silent) setStatus("갱신되었습니다.");
-      }catch(e){
+      // v13: 단계별 실패 분리 + 크래시 방지
+      const steps = [
+        ["users", ()=>loadUsersOnce({force:true, reason:"admin"})],
+        ["kpi", ()=>loadDashKpis()],
+        ["userTable", ()=>loadUserTable()],
+        ["content", ()=>loadContentPage(0)],
+      ];
+      for(const [label, fn] of steps){
+        try{ await fn(); }
+        catch(e){ console.warn(`[refreshAll] ${label} failed`, e); }
+      }
+      if(!silent) setStatus("갱신되었습니다.");
+    }catch(e){
         console.error(e);
         try{ toast("새로고침 중 오류가 발생했습니다. 콘솔을 확인해 주세요.","bad","새로고침"); }catch(_){}
       }
@@ -1434,7 +1492,7 @@ currentUser=id;
 
     
     // 참여자 렌더 (컨텐츠 타임라인/관리자 컨텐츠 공용)
-    function renderParticipants(parts, added, removed){
+      safeDefine("renderParticipants", function(parts, added, removed){
       const arr = Array.isArray(parts) ? parts : [];
       const addSet = new Set(Array.isArray(added)?added:[]);
       const remSet = new Set(Array.isArray(removed)?removed:[]);
@@ -1444,7 +1502,7 @@ currentUser=id;
         const cls = remSet.has(n) ? "chip danger" : (addSet.has(n) ? "chip good" : "chip");
         return `<span class="${cls}">${safe}</span>`;
       }).join(" ");
-    }
+    });
 
 function renderContentTimeline(){
       const list = $("contentList");
@@ -1721,6 +1779,12 @@ function renderContentTimeline(){
       renderCreateSelected(); renderCreateUsers();
     }
     async function saveCreate(){
+
+      // v13: 방어 - 참여자 0명 저장 방지(이미 경고 있음)
+      if(!createSelected || createSelected.size===0){
+        toast("참여자를 1명 이상 선택하세요.","warn","컨텐츠");
+        return;
+      }
       if(!createType) return;
       const parts=Array.from(createSelected).map(s=>s.trim()).filter(Boolean);
       if(parts.length===0) return alert("0명은 저장하지 않습니다.");
@@ -1895,9 +1959,9 @@ function renderContentTimeline(){
       const snap=await getDocs(qy);
       workDocs=snap.docs;
       if(snap.docs.length>0) workCursors[pageIndex]=snap.docs[snap.docs.length-1];
-      renderWorkTable();
+      renderWorkTableFiltered();
     }
-    function renderWorkTable(){
+    function renderWorkTableFiltered(){
       $("workPageInfo").textContent=`${workPage+1} 페이지`;
       $("btnPrevWork").disabled = workPage===0;
       $("btnNextWork").disabled = workDocs.length < PAGE_SIZE;
@@ -2387,7 +2451,7 @@ function renderContentTimeline(){
         b.classList.toggle("active", b.getAttribute("data-admintab")===tab);
       });
       if(tab==="users"){ renderAdminUserCards(); }
-      if(tab==="work"){ renderWorkTable(); }
+      if(tab==="work"){ renderWorkTableFiltered(); }
       if(tab==="content"){ loadAdminContentPage(adminContentPage); }
     }
 
@@ -2527,12 +2591,12 @@ function renderContentTimeline(){
 
       // admin tabs
       document.querySelectorAll("[data-admintab]").forEach(btn=>{
-        btn.addEventListener("click", ()=>setAdminTab(btn.getAttribute("data-admintab")));
+        safeOn(btn,"click", ()=>setAdminTab(btn.getAttribute("data-admintab")), "admintab");
       });
-      $("workStatusFilter")?.addEventListener("change", renderWorkTable);
-      $("adminContentType")?.addEventListener("change", ()=>{ adminContentCursors=[]; loadAdminContentPage(0); });
-      $("adminContentPrev")?.addEventListener("click", ()=>loadAdminContentPage(Math.max(0, adminContentPage-1)));
-      $("adminContentNext")?.addEventListener("click", ()=>loadAdminContentPage(adminContentPage+1));
+      safeOn($("workStatusFilter"),"change", renderWorkTableFiltered, "workFilter");
+      safeOn($("adminContentType"),"change", ()=>{ adminContentCursors=[]; loadAdminContentPage(0); }, "contentType");
+      safeOn($("adminContentPrev"),"click", ()=>loadAdminContentPage(Math.max(0, adminContentPage-1)), "contentPrev");
+      safeOn($("adminContentNext"),"click", ()=>loadAdminContentPage(adminContentPage+1), "contentNext");
       $("adminBackdrop")?.addEventListener("click", closeAdminPanel);
       $("btnProfileClose")?.addEventListener("click", ()=>showModal("profileModal", false));
       document.addEventListener("keydown", (e)=>{
