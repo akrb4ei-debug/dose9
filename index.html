@@ -309,7 +309,7 @@ body::before{
 /* 관리자 패널 오버레이 */
 .adminBackdrop{position:fixed; inset:0; z-index:7777; background:rgba(0,0,0,.45); backdrop-filter: blur(3px); opacity:0; transition: opacity .18s ease;}
 .adminBackdrop.show{opacity:1;}
-.adminCol{position:fixed; top:18px; right:18px; bottom:18px; width:min(920px, calc(100% - 36px)); z-index:7778; overflow:auto; border-radius:18px; box-shadow: var(--shadow);}
+.adminCol{position:fixed; top:18px; right:18px; bottom:18px; width: min(50vw, 980px); z-index:7778; overflow:auto; border-radius:18px; box-shadow: var(--shadow);}
 .adminCol .box{background: rgba(255,255,255,0.03); border:1px solid var(--stroke); border-radius:16px;}
 body.admin-open{overflow:hidden;}
 
@@ -330,6 +330,12 @@ body.admin-open{overflow:hidden;}
   inset: auto !important;
   display: block !important;
   z-index: 1 !important;
+}
+
+
+/* === ADMIN_HALF_PATCH: 관리자 패널 반화면(50vw) === */
+@media (max-width: 980px){
+  .adminCol{ width: calc(100% - 36px) !important; }
 }
 
 </style>
@@ -442,7 +448,9 @@ const RANKS = ["군의관","하사","중사","상사","원사","소위","중위"
     const USERS_COOLDOWN_MS = 5*60*1000;
     const SUMMARY_COOLDOWN_MS = 3*60*1000; // 요약 갱신 쿨타임(3분) // 5분
 const USER_PAGE_SIZE = 10;
-    let usersPage = 0; // 유저 목록 페이지(10명 단위)
+    
+    const ADMIN_PAGE_SIZE = 12; // 관리자 카드/목록 페이지 크기(화면 절반 패널 기준)
+let usersPage = 0; // 유저 목록 페이지(10명 단위)
 
     // content paging
     let contentPage=0;
@@ -1065,11 +1073,7 @@ currentUser=id;
           <span class="chip">부서 <b>${esc(u.department||"-")}</b></span>
           <span class="chip">관리자 <b>${u.isAdmin?"O":"X"}</b></span>
         `;
-        $1        // 관리자 탭(상단)도 권한에 따라 숨김 처리
-        try{
-          const adminTabBtn = document.querySelector('.tab[data-tab="admin"]');
-          if(adminTabBtn) adminTabBtn.hidden = !u.isAdmin;
-        }catch(_){}
+        qs("btnAdmin").hidden = !u.isAdmin;
 
         qs("loginView").hidden=true;
         qs("appView").hidden=false;
@@ -1081,11 +1085,8 @@ currentUser=id;
         alert("로그인 중 오류가 발생했습니다. (콘솔 확인)");
       }
     }
-    $1      try{ closeAdminPanel(); }catch(_){}
-      try{
-        const adminTabBtn = document.querySelector('.tab[data-tab="admin"]');
-        if(adminTabBtn) adminTabBtn.hidden = true;
-      }catch(_){}
+    function logout(){
+      currentUser=null; currentUserData=null;
       usersCache=new Map();
       qs("loginPw").value="";
       qs("appView").hidden=true;
@@ -2429,14 +2430,7 @@ async function maybeShowNoticeOnce(){
       }
     }
     function toggleAdminPanel(){
-      if(!isAdmin()){
-        try{ toast("관리자 권한이 없습니다.","warn","관리자"); }catch(_){}
-        // 탭 상태를 마지막 일반 탭으로 되돌립니다(무반응/헷갈림 방지)
-        try{
-          document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active", t.dataset.tab===lastNonAdminTab));
-        }catch(_){}
-        return;
-      }
+      if(!isAdmin()) return;
       const open = document.body.classList.contains("admin-open");
       if(open) closeAdminPanel();
       else openAdminPanel();
@@ -2585,11 +2579,7 @@ async function maybeShowNoticeOnce(){
     window.addEventListener("DOMContentLoaded", async ()=>{
       await seedDefaultAdmin();
       // 초기 로드시 관리자 패널이 자동으로 열리지 않도록 항상 닫힘 상태로 시작합니다.
-      $1      // 로그인 전에는 관리자 탭 숨김
-      try{
-        const adminTabBtn = document.querySelector('.tab[data-tab="admin"]');
-        if(adminTabBtn) adminTabBtn.hidden = true;
-      }catch(_){}
+      try{ closeAdminPanel(); }catch(e){}
 
       qs("btnLogin").addEventListener("click", login);
       qs("btnLogout").addEventListener("click", logout);
