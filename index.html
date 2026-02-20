@@ -1500,7 +1500,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
 
     // edit content modal (participants 수정 + outcome 수정, 권한: 작성자 또는 관리자)
     let editId=null, editData=null, editSelected=new Set(), editSearch="";
-    async async async function openEditContent(id){
+    async aasync function openEditContent(id){
       const s=await getDoc(doc(db,"contentRecords",id));
       if(!s.exists()) return alert("기록이 없습니다.");
       const r=s.data();
