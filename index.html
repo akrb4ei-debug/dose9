@@ -260,7 +260,41 @@ body::before{
     .tiny{ font-size: 12px; color: var(--muted2); }
     .tinyStatus{ font-size: 12px; color: var(--muted2); margin-left: 8px; }
 
-  </style>
+  
+/* Toast / Modal / Context Menu */
+.toastWrap{position:fixed; right:16px; bottom:16px; z-index:9999; display:flex; flex-direction:column; gap:10px; width:min(420px, calc(100% - 32px)); pointer-events:none;}
+.toast{pointer-events:auto; background:rgba(20,24,32,0.92); border:1px solid var(--stroke2); border-radius:14px; padding:12px 12px 10px; box-shadow: var(--shadow); animation: toastIn .16s ease;}
+.toast .tTop{display:flex; align-items:flex-start; justify-content:space-between; gap:10px}
+.toast .tTitle{font-weight:800; font-size:13px}
+.toast .tMsg{margin-top:6px; color:var(--muted); font-size:12px; line-height:1.35; white-space:pre-wrap}
+.toast.good{border-color: rgba(124,255,168,0.45)}
+.toast.bad{border-color: rgba(255,124,154,0.45)}
+.toast.warn{border-color: rgba(255,211,106,0.45)}
+.toast.out{animation: toastOut .16s ease forwards}
+@keyframes toastIn{from{transform:translateY(8px);opacity:0}to{transform:translateY(0);opacity:1}}
+@keyframes toastOut{to{transform:translateY(6px);opacity:0}}
+
+.backdrop{position:fixed; inset:0; z-index:8888; background:rgba(0,0,0,0.55); backdrop-filter: blur(6px); opacity:0; pointer-events:none; transition: opacity .14s ease;}
+.backdrop.show{opacity:1; pointer-events:auto}
+.modal{position:fixed; inset:0; z-index:8889; display:none; align-items:center; justify-content:center; padding:18px;}
+.modal.show{display:flex}
+.modalBox{width:min(900px, 100%); background: var(--panel2); border:1px solid var(--stroke2); border-radius: 18px; box-shadow: var(--shadow); overflow:hidden;}
+.modalHead{padding:12px 14px; border-bottom:1px solid var(--stroke); display:flex; align-items:center; justify-content:space-between; gap:12px; background: rgba(0,0,0,0.15);}
+.modalBody{padding:14px; max-height:70vh; overflow:auto}
+
+.ctxMenu{position:fixed; z-index:99999; width:280px; background: var(--panel2); border:1px solid var(--stroke2); border-radius:14px; box-shadow: var(--shadow); overflow:hidden;}
+.ctxMenu button{width:100%; text-align:left; background:transparent; border:none; border-bottom:1px solid var(--stroke); padding:10px 12px; color:var(--ink); cursor:pointer; font-weight:700;}
+.ctxMenu button:hover{background: rgba(255,255,255,0.06)}
+.ctxMenu button.danger{color: var(--bad)}
+.ctxMenu button:last-child{border-bottom:none}
+
+/* Admin user accordion */
+.admItem{border:1px solid var(--stroke); border-radius:14px; background: var(--panel2); margin-top:10px; overflow:hidden;}
+.admItem summary{list-style:none; cursor:pointer; padding:12px 12px; display:flex; align-items:center; gap:10px;}
+.admItem summary::-webkit-details-marker{display:none}
+.admItem .admBody{padding:12px 12px 14px; border-top:1px solid var(--stroke); background: rgba(255,255,255,0.02);}
+
+</style>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -315,6 +349,256 @@ const USER_PAGE_SIZE = 10;
     const $ = (id)=>document.getElementById(id);
     const esc = (s)=>String(s??"").replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
     const setStatus=(msg)=>{ const el=$("status"); if(!el) return; el.textContent=msg||""; if(msg) setTimeout(()=>{el.textContent="";},1200); };
+    // =============================
+    // UI 토스트 (브라우저 alert 대체)
+    // =============================
+    function toast(msg,type="good",title="알림",ms=2200){
+      const wrap=document.getElementById("toastWrap");
+      if(!wrap) return;
+      const el=document.createElement("div");
+      el.className="toast "+(type||"");
+      const t=new Date();
+      el.innerHTML=`<div class="tTop"><div class="tTitle">${esc(title)}</div><div class="tiny">${t.toLocaleTimeString()}</div></div><div class="tMsg">${esc(String(msg||""))}</div>`;
+      wrap.appendChild(el);
+      const kill=()=>{ el.classList.add("out"); setTimeout(()=>el.remove(), 180); };
+      setTimeout(kill, ms);
+    }
+    // 기존 alert는 토스트로 바꿉니다.
+    (function(){
+      const _a = window.alert;
+      window.__nativeAlert=_a;
+      window.alert = (m)=>toast(m,"warn","안내");
+    })();
+
+    // =============================
+    // 테마 토글 (개인 설정, 로컬 저장)
+    // =============================
+    function applyTheme(theme){
+      const t = theme || localStorage.getItem("dose_theme") || "dark";
+      document.documentElement.setAttribute("data-theme", t);
+      localStorage.setItem("dose_theme", t);
+    }
+    function toggleTheme(){
+      const cur = document.documentElement.getAttribute("data-theme") || "dark";
+      applyTheme(cur==="dark" ? "light" : "dark");
+      toast("테마가 변경되었습니다.","good","테마");
+    }
+
+    // =============================
+    // 유저 상세 모달 (최근 7일)
+    // =============================
+    let work7dCache=null;
+    let content7dCache=null;
+    let content7dLoadedAt=0;
+    let work7dLoadedAt=0;
+    const CACHE_7D_MS = 60*1000; // 1분 캐시
+
+    async function loadWork7dOnce(){
+      const now=Date.now();
+      if(work7dCache && (now-work7dLoadedAt)<CACHE_7D_MS) return work7dCache;
+      const since = sevenDaysAgo();
+      const qy = query(collection(db,"workRecords"), where("checkIn", ">=", since), orderBy("checkIn","desc"));
+      const snap = await getDocs(qy);
+      work7dCache = snap.docs.map(d=>({id:d.id, ...d.data()}));
+      work7dLoadedAt = now;
+      return work7dCache;
+    }
+    async function loadContent7dOnce(){
+      const now=Date.now();
+      if(content7dCache && (now-content7dLoadedAt)<CACHE_7D_MS) return content7dCache;
+      const since = sevenDaysAgo();
+      const qy = query(collection(db,"contentRecords"), where("time", ">=", since), orderBy("time","desc"));
+      const snap = await getDocs(qy);
+      content7dCache = snap.docs.map(d=>({id:d.id, ...d.data()}));
+      content7dLoadedAt = now;
+      return content7dCache;
+    }
+
+    function openModal(){
+      const bd=document.getElementById("backdrop");
+      const md=document.getElementById("userModal");
+      if(!bd||!md) return;
+      bd.classList.add("show");
+      md.classList.add("show");
+      md.setAttribute("aria-hidden","false");
+      lockBody(true);
+    }
+    function closeModal(){
+      const bd=document.getElementById("backdrop");
+      const md=document.getElementById("userModal");
+      if(!bd||!md) return;
+      bd.classList.remove("show");
+      md.classList.remove("show");
+      md.setAttribute("aria-hidden","true");
+      lockBody(false);
+    }
+
+    async function openUserModal(uid){
+      try{
+        if(!uid) return;
+        document.getElementById("userModalTitle").textContent = `유저 상세 · ${uid}`;
+        document.getElementById("userModalBody").innerHTML = `<div class="tiny muted">불러오는 중...</div>`;
+        openModal();
+
+        const [w, c] = await Promise.all([loadWork7dOnce(), loadContent7dOnce()]);
+        const ws = w.filter(x=>String(x.nickname||"")===uid);
+        const cs = c.filter(x=>{
+          const ps = x.participants||[];
+          return Array.isArray(ps) && ps.includes(uid);
+        });
+
+        const workItems = ws.slice(0,30).map(r=>{
+          const cin = fmt(r.checkIn);
+          const cout = r.checkOut ? fmt(r.checkOut) : "—";
+          const dur = (r.checkIn && r.checkOut && r.checkIn.seconds && r.checkOut.seconds)
+            ? secsToHMS(r.checkOut.seconds-r.checkIn.seconds)
+            : (r.checkOut? "":"(출근중)");
+          return `<div class="item"><div class="itemTop"><div class="itemTitle"><b>출근</b> <span class="tiny muted">${esc(cin)}</span></div><span class="tag ${r.checkOut?'on':'off'}">${r.checkOut?'퇴근':'출근중'}</span></div><div class="itemMeta">퇴근: ${esc(cout)} · ${esc(dur)}</div></div>`;
+        }).join("") || `<div class="item"><div class="itemMeta">최근 7일 출퇴근 기록이 없습니다.</div></div>`;
+
+        const contentItems = cs.slice(0,30).map(r=>{
+          const t = fmt(r.time);
+          const type = r.type || "-";
+          const wri = r.writer || "-";
+          return `<div class="item"><div class="itemTop"><div class="itemTitle"><b>${esc(type)}</b> <span class="tiny muted">${esc(t)}</span></div><span class="tag">${esc(wri)}</span></div><div class="itemMeta">참여자: ${(r.participants||[]).map(esc).join(", ")}</div></div>`;
+        }).join("") || `<div class="item"><div class="itemMeta">최근 7일 컨텐츠 참여 기록이 없습니다.</div></div>`;
+
+        document.getElementById("userModalBody").innerHTML = `
+          <div class="cardSoft">
+            <div class="rowBetween"><b>최근 7일 출퇴근</b><span class="tiny muted">최신 30건 표시</span></div>
+            <div class="sep"></div>
+            <div class="list">${workItems}</div>
+          </div>
+          <div style="height:12px"></div>
+          <div class="cardSoft">
+            <div class="rowBetween"><b>최근 7일 컨텐츠 참여</b><span class="tiny muted">최신 30건 표시</span></div>
+            <div class="sep"></div>
+            <div class="list">${contentItems}</div>
+          </div>
+        `;
+      }catch(e){
+        console.error(e);
+        document.getElementById("userModalBody").innerHTML = `<div class="item"><div class="itemMeta">불러오지 못했습니다. 콘솔을 확인해 주세요.</div></div>`;
+      }
+    }
+
+    // =============================
+    // 컨텍스트 메뉴 (관리자 전용)
+    // =============================
+    function hideCtxMenu(){
+      const m=document.getElementById("ctxMenu");
+      if(!m) return;
+      m.classList.add("hidden");
+      m.innerHTML="";
+    }
+    function showCtxMenu(x,y,uid){
+      if(!isAdmin()) return;
+      const m=document.getElementById("ctxMenu");
+      if(!m) return;
+      m.innerHTML = `
+        <button data-act="view7d">최근 7일 기록</button>
+        <button data-act="forceout">강제 퇴근</button>
+        <button data-act="toggleadmin">관리자 토글</button>
+        <button data-act="togglehidden">숨김 토글</button>
+        <button data-act="pw">비밀번호 변경</button>
+        <button class="danger" data-act="delete">유저 삭제</button>
+      `;
+      m.style.left = Math.max(10, Math.min(window.innerWidth-290, x))+"px";
+      m.style.top  = Math.max(10, Math.min(window.innerHeight-220, y))+"px";
+      m.classList.remove("hidden");
+      m.querySelectorAll("button").forEach(b=>{
+        b.onclick=async()=>{
+          const act=b.getAttribute("data-act");
+          hideCtxMenu();
+          if(act==="view7d") return openUserModal(uid);
+          if(act==="forceout") return adminForceOut(uid);
+          if(act==="toggleadmin"){
+            const u=usersCache.get(uid); if(!u) return;
+            await updateDoc(doc(db,"users",uid),{isAdmin:!u.isAdmin});
+            toast("관리자 권한이 변경되었습니다.","good","관리");
+            await loadUsersOnce(true);
+            await loadUserTable();
+            await renderAdminUserCards();
+            return;
+          }
+          if(act==="togglehidden"){
+            const u=usersCache.get(uid); if(!u) return;
+            await updateDoc(doc(db,"users",uid),{isHidden:!u.isHidden});
+            toast("숨김 상태가 변경되었습니다.","good","관리");
+            await loadUsersOnce(true);
+            await loadUserTable();
+            await renderAdminUserCards();
+            return;
+          }
+          if(act==="pw"){
+            const np=prompt("새 비밀번호를 입력해 주세요.");
+            if(!np) return;
+            await updateDoc(doc(db,"users",uid),{password:String(np)});
+            toast("비밀번호가 변경되었습니다.","good","관리");
+            await loadUsersOnce(true);
+            await renderAdminUserCards();
+            return;
+          }
+          if(act==="delete"){
+            if(!confirm(`${uid} 유저를 삭제할까요? (되돌릴 수 없습니다)`)) return;
+            await adminDeleteUser(uid);
+            return;
+          }
+        }
+      });
+    }
+
+    async function adminDeleteUser(uid){
+      if(!isAdmin()) return;
+      if(uid===currentUser) return toast("본인 계정은 여기서 삭제할 수 없습니다.","warn","관리");
+      await deleteDoc(doc(db,"users",uid));
+      toast("유저가 삭제되었습니다.","good","관리");
+      await loadUsersOnce(true);
+      await loadDashKpis();
+      await loadUserTable();
+      await renderAdminUserCards();
+    }
+
+    // =============================
+    // 관리자 패널 드래그 이동 (개인 설정)
+    // =============================
+    function initAdminDrag(){
+      const dock=document.getElementById("adminDock");
+      if(!dock) return;
+      const head=dock.querySelector(".adminDockHeader") || dock;
+      let dragging=false, sx=0, sy=0, ox=0, oy=0;
+      const saved = localStorage.getItem("dose_admin_pos");
+      if(saved){
+        try{
+          const p=JSON.parse(saved);
+          if(typeof p.left==="number") dock.style.left=p.left+"px";
+          if(typeof p.top==="number") dock.style.top=p.top+"px";
+          dock.style.right="auto";
+        }catch(e){}
+      }
+      head.addEventListener("pointerdown",(ev)=>{
+        if(ev.button!==0) return;
+        dragging=true;
+        sx=ev.clientX; sy=ev.clientY;
+        const r=dock.getBoundingClientRect();
+        ox=r.left; oy=r.top;
+        head.setPointerCapture(ev.pointerId);
+      });
+      head.addEventListener("pointermove",(ev)=>{
+        if(!dragging) return;
+        const dx=ev.clientX-sx, dy=ev.clientY-sy;
+        dock.style.left=Math.max(8, ox+dx)+"px";
+        dock.style.top=Math.max(8, oy+dy)+"px";
+        dock.style.right="auto";
+      });
+      head.addEventListener("pointerup",()=>{
+        if(!dragging) return;
+        dragging=false;
+        const r=dock.getBoundingClientRect();
+        localStorage.setItem("dose_admin_pos", JSON.stringify({left:r.left, top:r.top}));
+      });
+    }
+
     const lockBody=(on)=>document.body.classList.toggle("noscroll", !!on);
 
     function normalizeUser(d){
@@ -575,7 +859,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
         const sup=u.contentCounts?.supply||0;
         const pl=u.contentCounts?.plant||0;
         const es=u.contentCounts?.escort||0;
-        return `<tr>
+        return `<tr class="uRow" data-user="${esc(id)}">
           <td><b>${esc(id)}</b></td>
           <td>${rank}</td>
           <td>${dept}</td>
@@ -1297,28 +1581,39 @@ async function ensureUserDocDefaultsOnce(userId, userData){
           const deptOpts = `<option value="">-</option>` + DEPTS.map(d=>`<option value="${esc(d)}" ${u.department===d?"selected":""}>${esc(d)}</option>`).join("");
 
           const lead = (u.deptLeaderOf||[]).join(", ");
-          return `<div class="box" style="margin-top:10px;">
-            <div class="row">
+          return `<details class="admItem" data-adm="${esc(id)}">
+            <summary>
               <span class="badge">${esc(id)}</span>
               <span class="badge role">${esc(u.rank||"-")}</span>
               <span class="badge dim">${esc(u.department||"-")}</span>
               <span class="spacer"></span>
-              <label class="tiny"><input type="checkbox" data-admin="${esc(id)}" ${admin}/> 관리자</label>
-              <label class="tiny"><input type="checkbox" data-hidden="${esc(id)}" ${hidden}/> 숨김</label>
+              <span class="tiny">${u.isAdmin?"관리자":"일반"}</span>
+            </summary>
+            <div class="admBody">
+              <div class="row">
+                <label class="tiny"><input type="checkbox" data-admin="${esc(id)}" ${admin}/> 관리자</label>
+                <label class="tiny"><input type="checkbox" data-hidden="${esc(id)}" ${hidden}/> 숨김</label>
+                <span class="spacer"></span>
+                <button class="pill" data-forcein="${esc(id)}">강제 출근</button>
+                <button class="pill" data-forceout="${esc(id)}">강제 퇴근</button>
+                <button class="pill danger" data-deluser="${esc(id)}">유저 삭제</button>
+              </div>
+
+              <div class="row" style="margin-top:10px; flex-wrap:wrap;">
+                <select class="w220" data-rank="${esc(id)}">${rankOpts}</select>
+                <select class="w320" data-dept="${esc(id)}">${deptOpts}</select>
+                <input class="w220" placeholder="비밀번호 변경" data-pw="${esc(id)}"/>
+                <button class="pill" data-save="${esc(id)}">저장</button>
+              </div>
+
+              <div class="row" style="margin-top:10px; flex-wrap:wrap;">
+                <input class="w320" placeholder="부서장 권한 (쉼표로 부서명)" data-lead="${esc(id)}" value="${esc(lead)}"/>
+                <button class="pill" data-savelead="${esc(id)}">부서장 저장</button>
+                <span class="spacer"></span>
+                <button class="pill" data-view7d="${esc(id)}">최근 7일 기록</button>
+              </div>
             </div>
-            <div class="row" style="margin-top:10px;">
-              <select class="w220" data-rank="${esc(id)}">${rankOpts}</select>
-              <select class="w320" data-dept="${esc(id)}">${deptOpts}</select>
-              <input class="w220" placeholder="비밀번호 변경" data-pw="${esc(id)}"/>
-              <button class="pill" data-save="${esc(id)}">저장</button>
-            </div>
-            <div class="row" style="margin-top:8px;">
-              <input class="w320" placeholder="부서장 권한(쉼표로 부서 입력)" data-lead="${esc(id)}" value="${esc(lead)}"/>
-              <button class="pill" data-savelead="${esc(id)}">부서장 저장</button>
-              <button class="pill danger" data-forcein="${esc(id)}">강제출근</button>
-              <button class="pill danger" data-forceout="${esc(id)}">강제퇴근</button>
-            </div>
-          </div>`;
+          </details>`;
         }).join("");
 
       $("adminUserCards").innerHTML = cards || `<div class="tiny">유저가 없습니다.</div>`;
@@ -1332,6 +1627,12 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       });
       $("adminUserCards").querySelectorAll("[data-forcein]").forEach(b=>{
         b.onclick=()=>adminForceIn(b.getAttribute("data-forcein"));
+      });
+      $("adminUserCards").querySelectorAll("[data-deluser]").forEach(b=>{
+        b.onclick=()=>adminDeleteUser(b.getAttribute("data-deluser"));
+      });
+      $("adminUserCards").querySelectorAll("[data-view7d]").forEach(b=>{
+        b.onclick=()=>openUserModal(b.getAttribute("data-view7d"));
       });
       $("adminUserCards").querySelectorAll("[data-forceout]").forEach(b=>{
         b.onclick=()=>adminForceOut(b.getAttribute("data-forceout"));
@@ -2079,5 +2380,23 @@ async function ensureUserDocDefaultsOnce(userId, userData){
     </div>
   </div>
 
+  <div id="toastWrap" class="toastWrap"></div>
+
+  <!-- 사용자 상세 모달 -->
+  <div id="backdrop" class="backdrop"></div>
+  <div id="userModal" class="modal" aria-hidden="true">
+    <div class="modalBox">
+      <div class="modalHead">
+        <h3 id="userModalTitle">유저 상세</h3>
+        <button class="btn small" id="userModalClose">닫기</button>
+      </div>
+      <div class="modalBody">
+        <div id="userModalBody" class="list"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 우클릭 컨텍스트 메뉴(관리자 전용) -->
+  <div id="ctxMenu" class="ctxMenu hidden"></div>
 </body>
 </html>
