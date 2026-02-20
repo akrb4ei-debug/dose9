@@ -7,7 +7,71 @@
   <link rel="icon" href="data:,">
 
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;800&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js">
+/* =========================
+   🔒 STABILITY PATCH LAYER
+   (No feature removed)
+========================= */
+
+// Safe DOM getter
+const $safe = (id)=>{
+  try{
+    const el=document.getElementById(id);
+    return el||null;
+  }catch(e){return null;}
+};
+
+// Safe timestamp to Date
+function safeToDate(ts){
+  try{
+    if(!ts) return null;
+    if(typeof ts.toDate==="function") return ts.toDate();
+    if(ts instanceof Date) return ts;
+    return null;
+  }catch(e){return null;}
+}
+
+// Safe duration calc
+function safeDuration(startTs){
+  const d=safeToDate(startTs);
+  if(!d) return 0;
+  const now=new Date();
+  return Math.max(0, Math.floor((now.getTime()-d.getTime())/1000));
+}
+
+// Safe array
+function safeArray(arr){
+  return Array.isArray(arr)?arr:[];
+}
+
+// Prevent duplicate event binding
+(function(){
+  if(window.__DOSE_BOUND__) return;
+  window.__DOSE_BOUND__=true;
+})();
+
+// Firestore index error friendly message
+function handleFirestoreError(e){
+  if(!e) return;
+  const msg=String(e.message||e);
+  if(msg.includes("requires an index")){
+    alert("Firestore 인덱스가 필요합니다. 콘솔의 링크를 눌러 생성하세요.");
+  }else{
+    alert("오류 발생: "+msg);
+  }
+}
+
+// Global async guard
+window.addEventListener("unhandledrejection", (e)=>{
+  console.error("Unhandled:",e.reason);
+  handleFirestoreError(e.reason);
+});
+window.addEventListener("error", (e)=>{
+  console.error("GlobalError:",e.message);
+});
+
+
+</script>
 
   <style>
     
@@ -2357,7 +2421,71 @@ async function ensureUserDocDefaultsOnce(userId, userData){
         }
       });
     });
-  </script>
+  
+/* =========================
+   🔒 STABILITY PATCH LAYER
+   (No feature removed)
+========================= */
+
+// Safe DOM getter
+const $safe = (id)=>{
+  try{
+    const el=document.getElementById(id);
+    return el||null;
+  }catch(e){return null;}
+};
+
+// Safe timestamp to Date
+function safeToDate(ts){
+  try{
+    if(!ts) return null;
+    if(typeof ts.toDate==="function") return ts.toDate();
+    if(ts instanceof Date) return ts;
+    return null;
+  }catch(e){return null;}
+}
+
+// Safe duration calc
+function safeDuration(startTs){
+  const d=safeToDate(startTs);
+  if(!d) return 0;
+  const now=new Date();
+  return Math.max(0, Math.floor((now.getTime()-d.getTime())/1000));
+}
+
+// Safe array
+function safeArray(arr){
+  return Array.isArray(arr)?arr:[];
+}
+
+// Prevent duplicate event binding
+(function(){
+  if(window.__DOSE_BOUND__) return;
+  window.__DOSE_BOUND__=true;
+})();
+
+// Firestore index error friendly message
+function handleFirestoreError(e){
+  if(!e) return;
+  const msg=String(e.message||e);
+  if(msg.includes("requires an index")){
+    alert("Firestore 인덱스가 필요합니다. 콘솔의 링크를 눌러 생성하세요.");
+  }else{
+    alert("오류 발생: "+msg);
+  }
+}
+
+// Global async guard
+window.addEventListener("unhandledrejection", (e)=>{
+  console.error("Unhandled:",e.reason);
+  handleFirestoreError(e.reason);
+});
+window.addEventListener("error", (e)=>{
+  console.error("GlobalError:",e.message);
+});
+
+
+</script>
   <!-- BUILD_STAMP 2026-02-20 04:12:27 -->
 </head>
 
