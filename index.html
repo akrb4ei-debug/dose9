@@ -323,6 +323,15 @@ body.admin-open{overflow:hidden;}
 
   .link{cursor:pointer;text-decoration:underline;text-decoration-color:rgba(255,255,255,.35);text-underline-offset:3px;}
   .link:hover{text-decoration-color:rgba(255,255,255,.7);}
+
+/* === PATCH: overlay 모달이 .modal 재정의에 의해 숨겨지는 문제 해결 === */
+.overlay > .modal{
+  position: relative !important;
+  inset: auto !important;
+  display: block !important;
+  z-index: 1 !important;
+}
+
 </style>
 
   <script type="module">
@@ -843,6 +852,8 @@ async function openUserModal(uid){
 
       const u={...d};
       if(u.isadmin!==undefined && u.isAdmin===undefined) u.isAdmin=u.isadmin;
+      if(u.admin!==undefined && u.isAdmin===undefined) u.isAdmin=u.admin;
+      if(u.ishidden!==undefined && u.isHidden===undefined) u.isHidden=u.ishidden;
       if(u.ishidden!==undefined && u.isHidden===undefined) u.isHidden=u.ishidden;
       if(u.hidden!==undefined && u.isHidden===undefined) u.isHidden=u.hidden;
       if(u.dept!==undefined && u.department===undefined) u.department=u.dept;
@@ -860,12 +871,26 @@ async function ensureUserDocDefaultsOnce(userId, userData){
 
     const patch = {};
 
+    const __legacyAdmin = (userData.admin ?? userData.isadmin);
+    const __legacyHidden = (userData.hidden ?? userData.ishidden);
+
     // 필수 필드 기본값
-    if(userData.isAdmin === undefined) patch.isAdmin = false;
-    if(userData.isHidden === undefined) patch.isHidden = false;
+    if(userData.isAdmin === undefined){
+      const legacyAdmin = (userData.admin ?? userData.isadmin);
+      patch.isAdmin = !!legacyAdmin;
+    }
+    if(userData.isHidden === undefined){
+      const legacyHidden = (userData.hidden ?? userData.ishidden);
+      patch.isHidden = !!legacyHidden;
+    }
     if(userData.rank === undefined) patch.rank = "";
     if(userData.department === undefined) patch.department = "";
     if(!Array.isArray(userData.deptLeaderOf)) patch.deptLeaderOf = [];
+
+    // legacy 필드가 true인데 신규 필드가 false/누락인 경우, 권한/숨김 상태를 승격(데이터 손실 방지)
+    if(__legacyAdmin===true && userData.isAdmin!==true) patch.isAdmin = true;
+    if(__legacyHidden===true && userData.isHidden!==true) patch.isHidden = true;
+
 
     if(userData.seenNotices === undefined || typeof userData.seenNotices !== "object") patch.seenNotices = {};
     if(userData.contentCounts === undefined || typeof userData.contentCounts !== "object") patch.contentCounts = {supply:0, plant:0, escort:0};
@@ -1009,16 +1034,26 @@ currentUser=id;
     // ✅ 로그인 시 1회 로드, 이후 "새로고침" 버튼으로만 갱신.
 
     async function refreshSummary({silent}={}){
-      if(!currentUser) return;
-      const key = `dose_sum_last_${currentUser}`;
-      const last = Number(localStorage.getItem(key)||0);
-      const now = Date.now();
-      if(last && (now-last) < SUMMARY_COOLDOWN_MS){
-        const remain = Math.ceil((SUMMARY_COOLDOWN_MS-(now-last))/1000);
-        toast(`요약 갱신 쿨타임: ${remain}초 남았습니다.`,"warn","요약 갱신");
-        if(!silent) setStatus(`요약 갱신 쿨타임: ${remain}초`);
-        return;
+      try{
+        const now=Date.now();
+        if(!isAdmin() && lastSummaryAt && (now-lastSummaryAt)<SUMMARY_COOLDOWN_MS){
+          const remain=Math.ceil((SUMMARY_COOLDOWN_MS-(now-lastSummaryAt))/1000);
+          toast(`요약 갱신 쿨타임: ${remain}초 남았습니다.`,"warn","요약 갱신");
+          if(!silent) setStatus(`요약 갱신 쿨타임: ${remain}초`);
+          return;
+        }
+        // 요약만 갱신: 유저 + KPI + 유저표 (컨텐츠는 갱신하지 않습니다)
+        await loadUsersOnce({force:true, reason:"admin"});
+        await loadDashKpis();
+        await loadUserTable();
+        toast("요약이 갱신되었습니다.","good","요약");
+        if(!silent) setStatus("요약이 갱신되었습니다.");
+        lastSummaryAt = Date.now();
+      }catch(e){
+        console.error(e);
+        try{ toast("요약 갱신 중 오류가 발생했습니다. 콘솔을 확인해 주세요.","bad","요약"); }catch(_){}
       }
+    }
       localStorage.setItem(key, String(now));
       // 요약만 갱신: 유저 + KPI + 유저표 (컨텐츠는 갱신하지 않습니다)
       await loadUsersOnce({force:true, reason:"admin"});
@@ -1029,11 +1064,17 @@ currentUser=id;
     }
 
     async function refreshAll({silent}={}){
-      await loadUsersOnce({force:true, reason:"admin"});
-      await loadDashKpis();
-      await loadUserTable();
-      await loadContentPage(0);
-      if(!silent) setStatus("갱신되었습니다.");
+      try{
+        // 단계별 실패해도 가능한 만큼 진행
+        try{ await loadUsersOnce({force:true, reason:"admin"}); }catch(e){ console.warn("[refreshAll] users failed", e); }
+        try{ await loadDashKpis(); }catch(e){ console.warn("[refreshAll] kpi failed", e); }
+        try{ await loadUserTable(); }catch(e){ console.warn("[refreshAll] userTable failed", e); }
+        try{ await loadContentPage(0); }catch(e){ console.warn("[refreshAll] content failed", e); }
+        if(!silent) setStatus("갱신되었습니다.");
+      }catch(e){
+        console.error(e);
+        try{ toast("새로고침 중 오류가 발생했습니다. 콘솔을 확인해 주세요.","bad","새로고침"); }catch(_){}
+      }
     }
 
     async function loadUsersOnce({force=false, reason=""}={}){
@@ -1217,7 +1258,7 @@ currentUser=id;
 
         await updateDoc(doc(db,"users",currentUser), updates);
 
-        toast("출근 처리되었습니다.","good","출근",1800,"checkin");
+        toast("출근 처리되었습니다.","good","출근","checkin",3200);
         await refreshAll({silent:true});
       }catch(e){
         console.error(e);
@@ -1280,7 +1321,7 @@ currentUser=id;
 
         await updateDoc(doc(db,"users",currentUser), updates);
 
-        toast("퇴근 처리되었습니다.","good","퇴근",1800,"checkout");
+        toast("퇴근 처리되었습니다.","good","퇴근","checkout",3200);
         await refreshAll({silent:true});
       }catch(e){
         console.error(e);
@@ -1433,19 +1474,37 @@ currentUser=id;
     // create content modal
     let createType=null, createSelected=new Set(), createSearch="";
     async function openCreate(type){
-      if(!currentUser){ toast("로그인 후 이용 가능합니다.","warn","안내"); return; }
-      await loadUsersOnce({force:false, reason: isAdmin()? "admin": ""});
-      createType=type;
-      createSelected=new Set([currentUser]); // 작성자 자동 포함
-      createSearch="";
-      $("cTitle").textContent = `컨텐츠 작성 · ${type}`;
-      $("cSearch").value="";
-      $("cOutcomeBox").hidden = !needsOutcome(type);
-      $("cOutcome").value="-";
-      renderCreateUsers();
-      renderCreateSelected();
-      showModal("createModal", true);
+      try{
+        if(!currentUser){ toast("로그인 후 이용 가능합니다.","warn","안내"); return; }
+
+        // 모달을 먼저 띄워 "아무 것도 안 뜨는" 체감을 줄입니다.
+        createType=type;
+        createSelected=new Set([currentUser]); // 작성자 자동 포함
+        createSearch="";
+        $("cTitle").textContent = `컨텐츠 작성 · ${type}`;
+        $("cSearch").value="";
+        $("cOutcomeBox").hidden = !needsOutcome(type);
+        $("cOutcome").value="-";
+        showModal("createModal", true);
+
+        // ✅ 컨텐츠 작성 진입 시 유저 목록은 "항상 최신"으로 갱신합니다.
+        // - 쿨타임 적용 X (force:true)
+        // - 사용자에게 쿨타임/갱신 메시지 출력 X (toast/setStatus 미사용)
+        try{
+          await loadUsersOnce({force:true, reason:""});
+        }catch(e){
+          console.warn("[openCreate] loadUsersOnce failed:", e);
+          // 메시지는 띄우지 않음
+        }
+
+        renderCreateUsers();
+        renderCreateSelected();
+      }catch(e){
+        console.error(e);
+        toast("컨텐츠 작성창을 열지 못했습니다. 콘솔을 확인해 주세요.","bad","컨텐츠 작성");
+      }
     }
+
     function renderCreateUsers(){
       const q=(createSearch||"").toLowerCase();
       const names=Array.from(usersCache.keys()).sort((a,b)=>a.localeCompare(b,"ko"));
@@ -2492,8 +2551,6 @@ window.addEventListener("error", (e)=>{
         </div>
         <div class="right">
           <div id="who" class="row"></div>
-          <button id="btnSummary" class="pill">요약 갱신</button>
-          <button id="btnRefresh" class="pill">새로고침</button>
           <button id="btnAdmin" class="pill primary" hidden>관리</button>
           <button id="btnLogout" class="pill danger">로그아웃</button>
         </div>
@@ -2514,7 +2571,12 @@ window.addEventListener("error", (e)=>{
       <div class="grid">
         <!-- LEFT -->
         <div class="card" data-view="dashboard">
-          <h3>요약</h3>
+          <div class="row" style="align-items:center; margin-bottom:10px;">
+            <h3 style="margin:2px 0 0 0;">요약</h3>
+            <span class="spacer"></span>
+            <button id="btnSummary" class="pill">요약 갱신</button>
+            <button id="btnRefresh" class="pill">새로고침</button>
+          </div>
           <div class="kpis">
             <div id="kpiOnline" class="kpi"></div>
             <div id="kpiTodayIn" class="kpi"></div>
