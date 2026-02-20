@@ -313,6 +313,8 @@ body.admin-open{overflow:hidden;}
 
   <script type="module">
     
+
+console.log("BUILD_20260220_042806");
 console.log("BUILD_64b5f0ff 2026-02-20 03:53:44");
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import {
@@ -403,7 +405,7 @@ const USER_PAGE_SIZE = 10;
       const icon = (type==="good")?"✅":(type==="warn")?"⚠️":(type==="bad")?"❌":"ℹ️";
       const k = key || `${type}:${title}:${msg}`.slice(0,160);
       // 기존 동일 키 토스트가 있으면 갱신(중복 쌓임 방지)합니다.
-      const safeKey = (window.CSS && CSS.escape) ? CSS.escape(k) : String(k).replace(/"/g,"");
+      const safeKey = (window.CSS && CSS.escape) ? cssEsc(k) : String(k).replace(/"/g,"");
       const existing = wrap.querySelector(`.toast[data-key="${safeKey}"]`);
       if(existing){
         existing.querySelector(".tTitle").textContent = `${icon} ${title}`;
@@ -651,6 +653,8 @@ const USER_PAGE_SIZE = 10;
       await loadDashKpis();
       await loadUserTable();
       await renderAdminUserCards();
+      try{ await loadDashKpis(); await loadUserTable(); }catch(e){}
+      try{ if(typeof loadWorkPage==="function") await loadWorkPage(0); }catch(e){}
     }
 
     // =============================
@@ -1143,7 +1147,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       updates.todayCheckIns=increment(1);
       if(u.weekStart!==wsKey){ updates.weekStart=wsKey; updates.weekSeconds=0; }
       await updateDoc(doc(db,"users",nick), updates);
-      setStatus("강제 출근 완료");
+      toast("강제 출근 처리되었습니다.","good","관리"); setStatus("강제 출근 완료");
     }
     async function adminForceOut(nick){
       if(!isAdmin()) return;
@@ -1167,7 +1171,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       updates.todaySeconds=increment(durSec);
       updates.weekSeconds=increment(durSec);
       await updateDoc(doc(db,"users",nick), updates);
-      setStatus("강제 퇴근 완료");
+      toast("강제 퇴근 처리되었습니다.","good","관리"); setStatus("강제 퇴근 완료");
     }
 
     // ---------- CONTENT (7일 제한 + 페이지네이션 + 작성 모달) ----------
@@ -1265,7 +1269,9 @@ async function ensureUserDocDefaultsOnce(userId, userData){
 
     // create content modal
     let createType=null, createSelected=new Set(), createSearch="";
-    function openCreate(type){
+    async function openCreate(type){
+      if(!currentUser){ toast("로그인 후 이용 가능합니다.","warn","안내"); return; }
+      await loadUsersOnce({force:false, reason: isAdmin()? "admin": ""});
       createType=type;
       createSelected=new Set([currentUser]); // 작성자 자동 포함
       createSearch="";
@@ -1793,85 +1799,129 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       await loadDashKpis();
       await loadUserTable();
       await renderAdminUserCards();
+      try{ await loadDashKpis(); await loadUserTable(); }catch(e){}
+      try{ if(typeof loadWorkPage==="function") await loadWorkPage(0); }catch(e){}
     }
 
     function renderAdminUserCards(){
-      const q=($("adminSearch").value||"").trim().toLowerCase();
-      const cards=Array.from(usersCache.entries())
-        .filter(([id,u])=>!q || id.toLowerCase().includes(q))
-        .sort(([a],[b])=>a.localeCompare(b,"ko"))
-        .map(([id,u])=>{
-          const admin=u.isAdmin? "checked":"";
-          const hidden=u.isHidden? "checked":"";
-          const rankOpts = `<option value="">-</option>` + RANKS.map(r=>`<option value="${esc(r)}" ${u.rank===r?"selected":""}>${esc(r)}</option>`).join("");
-          const deptOpts = `<option value="">-</option>` + DEPTS.map(d=>`<option value="${esc(d)}" ${u.department===d?"selected":""}>${esc(d)}</option>`).join("");
+      if(!isAdmin()) return;
+      const wrap = $("adminUserCards");
+      if(!wrap) return;
 
-          const lead = (u.deptLeaderOf||[]).join(", ");
-          return `<details class="admItem" data-adm="${esc(id)}">
-            <summary>
-              <span class="badge">${esc(id)}</span>
-              <span class="badge role">${esc(u.rank||"-")}</span>
-              <span class="badge dim">${esc(u.department||"-")}</span>
+      const sortSel=$("adminSort");
+      if(sortSel && !sortSel._init){
+        sortSel._init=true;
+        sortSel.innerHTML = `
+          <option value="rankDesc">계급 높은순</option>
+          <option value="rankAsc">계급 낮은순</option>
+          <option value="onlineFirst">접속자 우선</option>
+          <option value="onlineOnly">온라인만</option>
+          <option value="nameAsc">이름 A→Z</option>
+          <option value="nameDesc">이름 Z→A</option>
+        `;
+        sortSel.value = localStorage.getItem("dose_admin_sort") || "rankDesc";
+        sortSel.onchange=()=>{ localStorage.setItem("dose_admin_sort", sortSel.value); adminPage=0; renderAdminUserCards(); };
+      }
+
+      const q = ($("adminSearch")?.value||"").trim().toLowerCase();
+      const mode = sortSel?.value || "rankDesc";
+
+      let arr = Array.from(usersCache.entries()).map(([id,u])=>[id, u||{}]);
+      if(q){
+        arr = arr.filter(([id,u])=>{
+          const hay = `${id} ${u.rank||""} ${u.department||""}`.toLowerCase();
+          return hay.includes(q);
+        });
+      }
+
+      const rankOrder = {"군의관":100,"하사":10,"중사":20,"상사":30,"원사":40,"소위":50,"중위":60,"대위":70,"소령":80,"중령":90,"대령":110};
+      const getRank=(u)=>rankOrder[String(u.rank||"")]||0;
+
+      if(mode==="rankDesc") arr.sort((a,b)=>getRank(b[1])-getRank(a[1]));
+      if(mode==="rankAsc") arr.sort((a,b)=>getRank(a[1])-getRank(b[1]));
+      if(mode==="onlineFirst") arr.sort((a,b)=>Number(!!b[1].isOnline)-Number(!!a[1].isOnline) || getRank(b[1])-getRank(a[1]));
+      if(mode==="onlineOnly") arr = arr.filter(([id,u])=>!!u.isOnline);
+      if(mode==="nameAsc") arr.sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
+      if(mode==="nameDesc") arr.sort((a,b)=>String(b[0]).localeCompare(String(a[0])));
+
+      const total = arr.length;
+      const maxPage = Math.max(1, Math.ceil(total/ADMIN_PAGE_SIZE));
+      adminPage = Math.max(0, Math.min(adminPage, maxPage-1));
+      const slice = arr.slice(adminPage*ADMIN_PAGE_SIZE, (adminPage+1)*ADMIN_PAGE_SIZE);
+
+      const rankOptsTpl=(val)=>RANKS.map(r=>`<option value="${esc(r)}" ${String(val)===String(r)?"selected":""}>${esc(r)}</option>`).join("");
+      const deptOptsTpl=(val)=>DEPTS.map(d=>`<option value="${esc(d)}" ${String(val)===String(d)?"selected":""}>${esc(d)}</option>`).join("");
+
+      wrap.innerHTML = slice.map(([id,u])=>{
+        const admin = u.isAdmin ? "checked" : "";
+        const hidden = u.isHidden ? "checked" : "";
+        const leadArr = Array.isArray(u.deptLeaderOf)?u.deptLeaderOf:[];
+        const lead = leadArr.join(", ");
+        const leaderBadge = leadArr.length ? `<span class="badge">부서장</span>` : ``;
+
+        const rankOpts = `<option value="">(계급)</option>` + rankOptsTpl(u.rank||"");
+        const deptOpts = `<option value="">(부서)</option>` + deptOptsTpl(u.department||"");
+
+        return `<details class="admItem" data-adm="${esc(id)}">
+          <summary>
+            <span class="badge">${esc(id)}</span>
+            ${leaderBadge}
+            <span class="badge role">${esc(u.rank||"-")}</span>
+            <span class="badge dim">${esc(u.department||"-")}</span>
+            <span class="spacer"></span>
+            <span class="tiny">${u.isAdmin?"관리자":"일반"}</span>
+          </summary>
+          <div class="admBody">
+            <div class="row">
+              <label class="tiny"><input type="checkbox" data-admin="${esc(id)}" ${admin}/> 관리자</label>
+              <label class="tiny"><input type="checkbox" data-hidden="${esc(id)}" ${hidden}/> 숨김</label>
               <span class="spacer"></span>
-              <span class="tiny">${u.isAdmin?"관리자":"일반"}</span>
-            </summary>
-            <div class="admBody">
-              <div class="row">
-                <label class="tiny"><input type="checkbox" data-admin="${esc(id)}" ${admin}/> 관리자</label>
-                <label class="tiny"><input type="checkbox" data-hidden="${esc(id)}" ${hidden}/> 숨김</label>
-                <span class="spacer"></span>
-                <button class="pill" data-forcein="${esc(id)}">강제 출근</button>
-                <button class="pill" data-forceout="${esc(id)}">강제 퇴근</button>
-                <button class="pill danger" data-deluser="${esc(id)}">유저 삭제</button>
-              </div>
-
-              <div class="row" style="margin-top:10px; flex-wrap:wrap;">
-                <select class="w220" data-rank="${esc(id)}">${rankOpts}</select>
-                <select class="w320" data-dept="${esc(id)}">${deptOpts}</select>
-                <input class="w220" placeholder="비밀번호 변경" data-pw="${esc(id)}"/>
-                <button class="pill" data-save="${esc(id)}">저장</button>
-              </div>
-
-              <div class="row" style="margin-top:10px; flex-wrap:wrap;">
-                <input class="w320" placeholder="부서장 권한 (쉼표로 부서명)" data-lead="${esc(id)}" value="${esc(lead)}"/>
-                <button class="pill" data-savelead="${esc(id)}">부서장 저장</button>
-                <span class="spacer"></span>
-                <button class="pill" data-view7d="${esc(id)}">최근 7일 기록</button>
-              </div>
+              <button class="pill" data-forcein="${esc(id)}">강제 출근</button>
+              <button class="pill" data-forceout="${esc(id)}">강제 퇴근</button>
+              <button class="pill danger" data-deluser="${esc(id)}">유저 삭제</button>
             </div>
-          </details>`;
-        }).join("");
 
-      $("adminUserCards").innerHTML = cards || `<div class="tiny">유저가 없습니다.</div>`;
+            <div class="row" style="margin-top:10px; flex-wrap:wrap;">
+              <select class="w220" data-rank="${esc(id)}">${rankOpts}</select>
+              <select class="w320" data-dept="${esc(id)}">${deptOpts}</select>
+              <input class="w220" placeholder="비밀번호 변경" data-pw="${esc(id)}"/>
+              <button class="pill" data-save="${esc(id)}">저장</button>
+            </div>
 
-      // bind
-      $("adminUserCards").querySelectorAll("[data-save]").forEach(b=>{
-        b.onclick=()=>adminSaveUser(b.getAttribute("data-save"));
-      });
-      $("adminUserCards").querySelectorAll("[data-savelead]").forEach(b=>{
-        b.onclick=()=>adminSaveLeader(b.getAttribute("data-savelead"));
-      });
-      $("adminUserCards").querySelectorAll("[data-forcein]").forEach(b=>{
-        b.onclick=()=>adminForceIn(b.getAttribute("data-forcein"));
-      });
-      $("adminUserCards").querySelectorAll("[data-deluser]").forEach(b=>{
-        b.onclick=()=>adminDeleteUser(b.getAttribute("data-deluser"));
-      });
-      $("adminUserCards").querySelectorAll("[data-view7d]").forEach(b=>{
-        b.onclick=()=>openUserModal(b.getAttribute("data-view7d"));
-      });
-      $("adminUserCards").querySelectorAll("[data-forceout]").forEach(b=>{
-        b.onclick=()=>adminForceOut(b.getAttribute("data-forceout"));
-      });
+            <div class="row" style="margin-top:10px; flex-wrap:wrap;">
+              <input class="w320" placeholder="부서장 권한 (쉼표로 부서명)" data-lead="${esc(id)}" value="${esc(lead)}"/>
+              <button class="pill" data-savelead="${esc(id)}">부서장 저장</button>
+              <span class="spacer"></span>
+              <button class="pill" data-view7d="${esc(id)}">최근 7일 기록</button>
+            </div>
+          </div>
+        </details>`;
+      }).join("") || `<div class="tiny muted">표시할 유저가 없습니다.</div>`;
+
+      const pi=$("adminPageInfo");
+      if(pi) pi.textContent = `${adminPage+1} / ${maxPage} · ${total}명`;
+
+      $("adminPrev")?.toggleAttribute("disabled", adminPage<=0);
+      $("adminNext")?.toggleAttribute("disabled", adminPage>=maxPage-1);
+
+      if($("adminPrev")) $("adminPrev").onclick=()=>{ adminPage=Math.max(0, adminPage-1); renderAdminUserCards(); };
+      if($("adminNext")) $("adminNext").onclick=()=>{ adminPage=Math.min(maxPage-1, adminPage+1); renderAdminUserCards(); };
+
+      wrap.querySelectorAll("[data-save]").forEach(b=>{ b.onclick=()=>adminSaveUser(b.getAttribute("data-save")); });
+      wrap.querySelectorAll("[data-savelead]").forEach(b=>{ b.onclick=()=>adminSaveLeader(b.getAttribute("data-savelead")); });
+      wrap.querySelectorAll("[data-forcein]").forEach(b=>{ b.onclick=()=>adminForceIn(b.getAttribute("data-forcein")); });
+      wrap.querySelectorAll("[data-forceout]").forEach(b=>{ b.onclick=()=>adminForceOut(b.getAttribute("data-forceout")); });
+      wrap.querySelectorAll("[data-deluser]").forEach(b=>{ b.onclick=()=>adminDeleteUser(b.getAttribute("data-deluser")); });
+      wrap.querySelectorAll("[data-view7d]").forEach(b=>{ b.onclick=()=>openUserModal(b.getAttribute("data-view7d")); });
     }
 
     async function adminSaveUser(id){
       if(!isAdmin()) return;
-      const isA = $("adminUserCards").querySelector(`input[data-admin="${CSS.escape(id)}"]`)?.checked || false;
-      const isH = $("adminUserCards").querySelector(`input[data-hidden="${CSS.escape(id)}"]`)?.checked || false;
-      const rank = $("adminUserCards").querySelector(`select[data-rank="${CSS.escape(id)}"]`)?.value || "";
-      const dept = $("adminUserCards").querySelector(`select[data-dept="${CSS.escape(id)}"]`)?.value || "";
-      const pwEl = $("adminUserCards").querySelector(`input[data-pw="${CSS.escape(id)}"]`);
+      const isA = $("adminUserCards").querySelector(`input[data-admin="${cssEsc(id)}"]`)?.checked || false;
+      const isH = $("adminUserCards").querySelector(`input[data-hidden="${cssEsc(id)}"]`)?.checked || false;
+      const rank = $("adminUserCards").querySelector(`select[data-rank="${cssEsc(id)}"]`)?.value || "";
+      const dept = $("adminUserCards").querySelector(`select[data-dept="${cssEsc(id)}"]`)?.value || "";
+      const pwEl = $("adminUserCards").querySelector(`input[data-pw="${cssEsc(id)}"]`);
       const pw = (pwEl?.value||"").trim();
 
       const updates={ isAdmin:isA, isHidden:isH, rank, department:dept };
@@ -1879,23 +1929,27 @@ async function ensureUserDocDefaultsOnce(userId, userData){
 
       await updateDoc(doc(db,"users",id), updates);
       if(pwEl) pwEl.value="";
-      toast("저장 완료","good","관리",1800,"admin_saved"); setStatus("저장 완료");
+      toast("저장 완료","good","관리",1800,"admin_saved"); toast("유저 설정이 저장되었습니다.","good","관리"); setStatus("저장 완료");
       await loadUsersOnce({force:true, reason:"admin"});
       await loadDashKpis();
       await loadUserTable();
       await renderAdminUserCards();
+      try{ await loadDashKpis(); await loadUserTable(); }catch(e){}
+      try{ if(typeof loadWorkPage==="function") await loadWorkPage(0); }catch(e){}
     }
 
     async function adminSaveLeader(id){
       if(!isAdmin()) return;
-      const el = $("adminUserCards").querySelector(`input[data-lead="${CSS.escape(id)}"]`);
+      const el = $("adminUserCards").querySelector(`input[data-lead="${cssEsc(id)}"]`);
       const raw=(el?.value||"").trim();
       const arr=raw?raw.split(",").map(s=>s.trim()).filter(Boolean):[];
       // 없는 부서 입력도 허용(자유), 대신 표준 부서만 쓰길 권장
       await updateDoc(doc(db,"users",id), { deptLeaderOf: arr });
-      setStatus("부서장 권한 저장");
+      toast("부서장 권한이 저장되었습니다.","good","관리"); setStatus("부서장 권한 저장");
       await loadUsersOnce({force:true, reason:"admin"});
       await renderAdminUserCards();
+      try{ await loadDashKpis(); await loadUserTable(); }catch(e){}
+      try{ if(typeof loadWorkPage==="function") await loadWorkPage(0); }catch(e){}
     }
 
     // ---------- CHAT/NOTICE (3-D) ----------
@@ -2068,8 +2122,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       if(!isAdmin()) return;
       const open = document.body.classList.contains("admin-open");
       if(open) closeAdminPanel();
-      else openAdminPanel();
-    }
+      else }
 
     function setTab(name){
       if(name==="admin"){
@@ -2095,7 +2148,14 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       $("btnLogin").addEventListener("click", login);
       $("btnLogout").addEventListener("click", logout);
 
-      $("btnSummary").addEventListener("click", ()=>refreshSummary({silent:false}));
+      $("btnAdminClose")?.addEventListener("click", closeAdminPanel);
+      $("adminBackdrop")?.addEventListener("click", closeAdminPanel);
+      document.addEventListener("keydown", (e)=>{
+        if(e.key==="Escape"){
+          try{ closeAdminPanel(); }catch(_){ }
+          try{ showModal("createModal", false); }catch(_){ }
+        }
+      });
 
       $("btnSummary").addEventListener("click", ()=>refreshSummary({silent:false}));
 
