@@ -346,59 +346,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     // ✅ 사용자 제공 Firebase 설정 반영
-
-  /* =========================
-     ✅ HARDENED IMPROVEMENT LAYER (v13)
-     - 중복 선언/이벤트 중복 바인딩 방지
-     - 런타임 크래시 방어
-     - 기존 기능 유지
-  ========================= */
-  if(window.__DOSE_V13_INIT__){
-    console.warn("[dose] duplicate init blocked");
-  }else{
-    window.__DOSE_V13_INIT__ = true;
-  }
-
-  function safeDefine(name, fn){
-    try{
-      if(typeof window[name] !== "function"){
-        window[name] = fn;
-      }
-      return window[name];
-    }catch(e){
-      console.warn("[safeDefine] failed", name, e);
-      return fn;
-    }
-  }
-
-  function safeOn(el, evt, handler, key){
-    if(!el) return;
-    const k = "__bound_" + evt + "_" + (key||handler.name||"anon");
-    if(el[k]) return;
-    el.addEventListener(evt, handler);
-    el[k] = true;
-  }
-
-  function safeSetHTML(el, htmlStr){
-    if(!el) return;
-    el.innerHTML = htmlStr;
-  }
-
-  function safeText(el, t){
-    if(!el) return;
-    el.textContent = t;
-  }
-
-  async function safeAsync(label, fn){
-    try{ return await fn(); }
-    catch(e){
-      console.error("[dose]", label, e);
-      try{ toast(`${label} 중 오류가 발생했습니다.`, "bad", label); }catch(_){}
-      throw e;
-    }
-  }
-
-
     const firebaseConfig = {
       apiKey: "AIzaSyAJ6MhR1JsGbvieb8akAi4Zpas_W3uaNJ4",
       authDomain: "dosep-b6ee3.firebaseapp.com",
@@ -469,10 +416,14 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
 const colUsers   = collection(db, "users");
     const colWork    = collection(db, "workRecords");
     const colContent = collection(db, "contentRecords");
-    const colDeptChat = (dept)=>collection(db, "deptChats", dept, "messages");
-    const docDeptNotice = (dept)=>doc(db, "deptNotices", dept);
-
-    const RANKS = ["군의관","하사","중사","상사","원사","소위","중위","대위","소령","중령","대령"];
+    // NOTE: 부서 채팅/공지는 Firestore 경로를 추가로 만들지 않기 위해(정상버전 DB 경로 규칙 준수)
+    // 로컬스토리지 기반으로 동작합니다.
+    const lsGet = (k, fallback) => { try{ const v=localStorage.getItem(k); return v?JSON.parse(v):fallback; }catch{ return fallback; } };
+    const lsSet = (k, v) => { try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} };
+    const chatKey = (dept)=>`deptChat:${dept}`;
+    const noticeKey = (dept)=>`deptNotice:${dept}`;
+    const seenKey = (user, dept)=>`deptNoticeSeen:${user}:${dept}`;
+const RANKS = ["군의관","하사","중사","상사","원사","소위","중위","대위","소령","중령","대령"];
     const DEPTS = ["참모부","국군 경비사령부","국군 특수전사령부","국군 방첩사령부","제 1경비단","군사경찰단","제1공수특수전여단","제3공수특전여단","제820방첩부대","국군의무사령부"];
 
     const PAGE_SIZE = 20;
@@ -623,9 +574,15 @@ const USER_PAGE_SIZE = 10;
 
     // ✅ 브라우저 alert() 대신, 사이트 토스트로 표시합니다.
     async function alert(msg){
-
-      try{ toast(String(msg), 'warn', '알림', 2600, 'alert'); }
-      catch(e){ try{ window.alert(String(msg)); }catch(_){ console.log(msg); } }
+      try{ return toast(String(msg), "warn", "알림", "alert", 2600); }
+      catch(e){
+        try{
+          const native = window.__nativeAlert || window.alert;
+          return native.call(window, String(msg));
+        }catch(_){
+          console.log(msg);
+        }
+      }
     }
 
 
@@ -1119,19 +1076,14 @@ currentUser=id;
 
 
     async function refreshAll({silent}={}){
-      // v13: 단계별 실패 분리 + 크래시 방지
-      const steps = [
-        ["users", ()=>loadUsersOnce({force:true, reason:"admin"})],
-        ["kpi", ()=>loadDashKpis()],
-        ["userTable", ()=>loadUserTable()],
-        ["content", ()=>loadContentPage(0)],
-      ];
-      for(const [label, fn] of steps){
-        try{ await fn(); }
-        catch(e){ console.warn(`[refreshAll] ${label} failed`, e); }
-      }
-      if(!silent) setStatus("갱신되었습니다.");
-    }catch(e){
+      try{
+        // 단계별 실패해도 가능한 만큼 진행
+        try{ await loadUsersOnce({force:true, reason:"admin"}); }catch(e){ console.warn("[refreshAll] users failed", e); }
+        try{ await loadDashKpis(); }catch(e){ console.warn("[refreshAll] kpi failed", e); }
+        try{ await loadUserTable(); }catch(e){ console.warn("[refreshAll] userTable failed", e); }
+        try{ await loadContentPage(0); }catch(e){ console.warn("[refreshAll] content failed", e); }
+        if(!silent) setStatus("갱신되었습니다.");
+      }catch(e){
         console.error(e);
         try{ toast("새로고침 중 오류가 발생했습니다. 콘솔을 확인해 주세요.","bad","새로고침"); }catch(_){}
       }
@@ -1153,19 +1105,6 @@ currentUser=id;
       const mine=usersCache.get(currentUser);
       if(mine) currentUserData=mine;
       lastUsersLoadAt = Date.now();
-
-    // ✅ 컨텐츠 작성 버튼 전용: 온라인 유저만 즉시 갱신 (요약/새로고침 쿨타임과 분리)
-    async function loadOnlineUsersForCreate(){
-      const qy = query(colUsers, where("isOnline","==",true));
-      const s = await getDocs(qy);
-      const map = new Map();
-      s.forEach(d=>map.set(d.id, normalizeUser(d.data())));
-      // 작성자는 항상 포함
-      const mine = usersCache.get(currentUser) || currentUserData;
-      if(mine) map.set(currentUser, mine);
-      createUsersCache = map;
-      createUsersMode = "online";
-    }
 
     }
 
@@ -1492,7 +1431,7 @@ currentUser=id;
 
     
     // 참여자 렌더 (컨텐츠 타임라인/관리자 컨텐츠 공용)
-      safeDefine("renderParticipants", function(parts, added, removed){
+    function renderParticipants(parts, added, removed){
       const arr = Array.isArray(parts) ? parts : [];
       const addSet = new Set(Array.isArray(added)?added:[]);
       const remSet = new Set(Array.isArray(removed)?removed:[]);
@@ -1502,7 +1441,7 @@ currentUser=id;
         const cls = remSet.has(n) ? "chip danger" : (addSet.has(n) ? "chip good" : "chip");
         return `<span class="${cls}">${safe}</span>`;
       }).join(" ");
-    });
+    }
 
 function renderContentTimeline(){
       const list = $("contentList");
@@ -1563,6 +1502,21 @@ function renderContentTimeline(){
     let createType=null, createSelected=new Set(), createSearch="";
     let createUsersMode="all";
     let createUsersCache=null; // Map for online-only list
+    // ✅ 컨텐츠 작성 버튼 전용: 온라인 유저만 즉시 갱신 (요약/새로고침 쿨타임과 분리)
+    // - openCreate()에서 호출됩니다.
+    async function loadOnlineUsersForCreate(){
+      const qy = query(colUsers, where("isOnline","==",true));
+      const s = await getDocs(qy);
+      const map = new Map();
+      s.forEach(d=>map.set(d.id, normalizeUser(d.data())));
+      // 작성자는 항상 포함
+      const mine = usersCache.get(currentUser) || currentUserData;
+      if(mine) map.set(currentUser, mine);
+      createUsersCache = map;
+      createUsersMode = "online";
+    }
+
+
     async function openCreate(type){
       if(!currentUser){ toast("로그인 후 이용 가능합니다.","warn","안내"); return; }
 
@@ -1779,12 +1733,6 @@ function renderContentTimeline(){
       renderCreateSelected(); renderCreateUsers();
     }
     async function saveCreate(){
-
-      // v13: 방어 - 참여자 0명 저장 방지(이미 경고 있음)
-      if(!createSelected || createSelected.size===0){
-        toast("참여자를 1명 이상 선택하세요.","warn","컨텐츠");
-        return;
-      }
       if(!createType) return;
       const parts=Array.from(createSelected).map(s=>s.trim()).filter(Boolean);
       if(parts.length===0) return alert("0명은 저장하지 않습니다.");
@@ -1959,9 +1907,9 @@ function renderContentTimeline(){
       const snap=await getDocs(qy);
       workDocs=snap.docs;
       if(snap.docs.length>0) workCursors[pageIndex]=snap.docs[snap.docs.length-1];
-      renderWorkTableFiltered();
+      renderWorkTable();
     }
-    function renderWorkTableFiltered(){
+    function renderWorkTable(){
       $("workPageInfo").textContent=`${workPage+1} 페이지`;
       $("btnPrevWork").disabled = workPage===0;
       $("btnNextWork").disabled = workDocs.length < PAGE_SIZE;
@@ -2266,88 +2214,89 @@ function renderContentTimeline(){
     }
 
     // ---------- CHAT/NOTICE (3-D) ----------
-    async function loadChat(){
-      const dept=currentUserData?.department;
-      if(!dept) { $("chatInfo").textContent="부서가 설정되어야 채팅을 사용할 수 있습니다."; return; }
-      $("chatDept").textContent = dept;
-      // 최근 50개만
-      const qy=query(colDeptChat(dept), orderBy("time","desc"), limit(50));
-      const snap=await getDocs(qy);
-      const msgs=snap.docs.map(d=>d.data()).reverse();
-      $("chatList").innerHTML = msgs.map(m=>{
-        const mine=(m.by===currentUser);
-        return `<div class="event" style="background:${mine?'rgba(185,198,255,0.10)':'rgba(17,21,32,0.50)'}">
-          <div class="head"><span class="badge">${esc(m.by||"-")}</span><span class="spacer"></span><span class="tiny">${esc(fmt(m.time))}</span></div>
-          <div class="p">${esc(m.text||"")}</div>
-        </div>`;
-      }).join("") || `<div class="tiny">메시지가 없습니다.</div>`;
+// ※ Firestore에 deptChats/deptNotices 컬렉션을 만들지 않고 로컬스토리지로 처리합니다.
+async function loadChat(){
+  const dept=currentUserData?.department;
+  if(!dept) { $("chatInfo").textContent="부서가 설정되어야 채팅을 사용할 수 있습니다."; return; }
+  $("chatDept").textContent = dept;
 
-      // 공지
-      const ns=await getDoc(docDeptNotice(dept));
-      if(ns.exists()){
-        const n=ns.data();
-        $("noticeBox").innerHTML = `
-          <div class="event">
-            <div class="head"><span class="badge role">공지</span><span class="badge">${esc(n.by||"-")}</span><span class="spacer"></span><span class="tiny">${esc(fmt(n.at))}</span></div>
-            <div class="p">${esc(n.text||"")}</div>
-          </div>`;
-      }else{
-        $("noticeBox").innerHTML = `<div class="tiny">등록된 공지가 없습니다.</div>`;
-      }
+  const all = lsGet(chatKey(dept), []);
+  const msgs = Array.isArray(all) ? all.slice(-50) : [];
 
-      $("noticeCompose").hidden = !isDeptLeaderOf(dept);
-    }
+  $("chatList").innerHTML = msgs.map(m=>{
+    const mine=(m.by===currentUser);
+    return `<div class="event" style="background:${mine?'rgba(185,198,255,0.10)':'rgba(17,21,32,0.50)'}">
+      <div class="head"><span class="badge">${esc(m.by||"-")}</span><span class="spacer"></span><span class="tiny">${esc(fmt(m.time))}</span></div>
+      <div class="p">${esc(m.text||"")}</div>
+    </div>`;
+  }).join("") || `<div class="tiny">메시지가 없습니다.</div>`;
 
-    async function sendChat(){
-      const dept=currentUserData?.department;
-      if(!dept) return alert("부서가 없습니다.");
-      const text=$("chatText").value.trim();
-      if(!text) return;
-      await addDoc(colDeptChat(dept), { by: currentUser, text, time: serverTimestamp() });
-      $("chatText").value="";
-      setStatus("전송됨");
-      await loadChat();
-    }
+  // 공지(로컬)
+  const n = lsGet(noticeKey(dept), null);
+  if(n && n.text){
+    $("noticeBox").innerHTML = `
+      <div class="event">
+        <div class="head"><span class="badge role">공지</span><span class="badge">${esc(n.by||"-")}</span><span class="spacer"></span><span class="tiny">${esc(fmt(n.at))}</span></div>
+        <div class="p">${esc(n.text||"")}</div>
+      </div>`;
+  }else{
+    $("noticeBox").innerHTML = `<div class="tiny">등록된 공지가 없습니다.</div>`;
+  }
 
-    async function postNotice(){
-      const dept=currentUserData?.department;
-      if(!dept) return;
-      if(!isDeptLeaderOf(dept)) return toast("부서장 권한이 없습니다.","bad","공지");
-      const text=$("noticeText").value.trim();
-      if(!text) return toast("공지 내용을 입력해 주세요.","warn","공지");
-      await setDoc(docDeptNotice(dept), { text, by: currentUser, at: serverTimestamp(), id: `${Date.now()}_${Math.random().toString(16).slice(2)}` }, {merge:true});
-      $("noticeText").value="";
-      toast("공지가 등록되었습니다.","good","공지"); setStatus("공지 등록됨");
-      await loadChat();
-    }
+  $("noticeCompose").hidden = !isDeptLeaderOf(dept);
+}
 
-    async function maybeShowNoticeOnce(){
-      const dept=currentUserData?.department;
-      if(!dept) return;
-      const ns=await getDoc(docDeptNotice(dept));
-      if(!ns.exists()) return;
-      const n=ns.data();
-      if(!n?.id) return;
+async function sendChat(){
+  const dept=currentUserData?.department;
+  if(!dept) return alert("부서가 없습니다.");
+  const text=$("chatText").value.trim();
+  if(!text) return;
 
-      // users 문서의 seenNotice.{dept}에 id 저장해서 1회만 표시
-      const seen = currentUserData?.seenNotices || {};
-      if(seen[dept] === n.id) return;
+  const arr = lsGet(chatKey(dept), []);
+  const next = Array.isArray(arr) ? arr : [];
+  next.push({ by: currentUser, text, time: Date.now() });
+  lsSet(chatKey(dept), next);
 
-      // 모달로 띄움
-      $("nDept").textContent = dept;
-      $("nBy").textContent = n.by||"-";
-      $("nAt").textContent = fmt(n.at);
-      $("nText").textContent = n.text||"";
-      showModal("noticeModal", true);
+  $("chatText").value="";
+  setStatus("전송됨");
+  await loadChat();
+}
 
-      // 확인 누르면 저장
-      $("btnNoticeOk").onclick = async function(){
-        const patch = { seenNotices: { ...(currentUserData?.seenNotices||{}), [dept]: n.id } };
-        await updateDoc(doc(db,"users",currentUser), patch).catch(()=>{});
-        currentUserData.seenNotices = patch.seenNotices;
-        showModal("noticeModal", false);
-      };
-    }
+async function postNotice(){
+  const dept=currentUserData?.department;
+  if(!dept) return;
+  if(!isDeptLeaderOf(dept)) return toast("부서장 권한이 없습니다.","bad","공지");
+  const text=$("noticeText").value.trim();
+  if(!text) return toast("공지 내용을 입력해 주세요.","warn","공지");
+
+  const n = { text, by: currentUser, at: Date.now(), id: `${Date.now()}_${Math.random().toString(16).slice(2)}` };
+  lsSet(noticeKey(dept), n);
+
+  $("noticeText").value="";
+  toast("공지가 등록되었습니다.","good","공지"); setStatus("공지 등록됨");
+  await loadChat();
+}
+
+async function maybeShowNoticeOnce(){
+  const dept=currentUserData?.department;
+  if(!dept) return;
+  const n = lsGet(noticeKey(dept), null);
+  if(!n?.id) return;
+
+  const k = seenKey(currentUser, dept);
+  if(localStorage.getItem(k) === n.id) return;
+
+  $("nDept").textContent = dept;
+  $("nBy").textContent = n.by||"-";
+  $("nAt").textContent = fmt(n.at);
+  $("nText").textContent = n.text||"";
+  showModal("noticeModal", true);
+
+  $("btnNoticeOk").onclick = function(){
+    try{ localStorage.setItem(k, n.id); }catch{}
+    showModal("noticeModal", false);
+  };
+}
 
     // ---------- MODAL CONTROL ----------
     function showModal(id, on){
@@ -2451,7 +2400,7 @@ function renderContentTimeline(){
         b.classList.toggle("active", b.getAttribute("data-admintab")===tab);
       });
       if(tab==="users"){ renderAdminUserCards(); }
-      if(tab==="work"){ renderWorkTableFiltered(); }
+      if(tab==="work"){ renderWorkTable(); }
       if(tab==="content"){ loadAdminContentPage(adminContentPage); }
     }
 
@@ -2591,12 +2540,12 @@ function renderContentTimeline(){
 
       // admin tabs
       document.querySelectorAll("[data-admintab]").forEach(btn=>{
-        safeOn(btn,"click", ()=>setAdminTab(btn.getAttribute("data-admintab")), "admintab");
+        btn.addEventListener("click", ()=>setAdminTab(btn.getAttribute("data-admintab")));
       });
-      safeOn($("workStatusFilter"),"change", renderWorkTableFiltered, "workFilter");
-      safeOn($("adminContentType"),"change", ()=>{ adminContentCursors=[]; loadAdminContentPage(0); }, "contentType");
-      safeOn($("adminContentPrev"),"click", ()=>loadAdminContentPage(Math.max(0, adminContentPage-1)), "contentPrev");
-      safeOn($("adminContentNext"),"click", ()=>loadAdminContentPage(adminContentPage+1), "contentNext");
+      $("workStatusFilter")?.addEventListener("change", renderWorkTable);
+      $("adminContentType")?.addEventListener("change", ()=>{ adminContentCursors=[]; loadAdminContentPage(0); });
+      $("adminContentPrev")?.addEventListener("click", ()=>loadAdminContentPage(Math.max(0, adminContentPage-1)));
+      $("adminContentNext")?.addEventListener("click", ()=>loadAdminContentPage(adminContentPage+1));
       $("adminBackdrop")?.addEventListener("click", closeAdminPanel);
       $("btnProfileClose")?.addEventListener("click", ()=>showModal("profileModal", false));
       document.addEventListener("keydown", (e)=>{
