@@ -919,15 +919,23 @@ async function ensureUserDocDefaultsOnce(userId, userData){
     async function login(){
       try{
         const id=$("loginId").value.trim();
-        const pw=$("loginPw").value;
-        if(!id||!pw) { toast("아이디/비밀번호를 입력해 주세요.","warn"); return; }
+        const pwRaw = ($("loginPw")?.value ?? "");
+        const pw = String(pwRaw).trim().normalize("NFC");
+        if(String(pwRaw) !== pw){
+          console.info("[login] trimmed password input");
+        }
+if(!id||!pw) { toast("아이디/비밀번호를 입력해 주세요.","warn"); return; }
 
         const s=await getDoc(doc(db,"users",id));
         if(!s.exists()) { toast("등록된 유저가 아닙니다. 관리자에게 등록을 요청해 주세요.","bad"); return; }
         const u=normalizeUser(s.data());
-        if(String(u.password??"")!==String(pw)) { toast("비밀번호가 올바르지 않습니다.","bad"); return; }
-
-        currentUser=id;
+        const savedPw = String(u.password ?? "").trim().normalize("NFC");
+        if(savedPw !== pw){
+          console.warn("[login] pw mismatch", { typed: pw, saved: savedPw });
+          toast("비밀번호가 올바르지 않습니다.","bad");
+          return;
+        }
+currentUser=id;
         currentUserData=u;
 
         await ensureUserDocDefaultsOnce(id, currentUserData);
