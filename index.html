@@ -409,6 +409,31 @@ const USER_PAGE_SIZE = 10;
     const $ = (id)=>document.getElementById(id);
     const esc = (s)=>String(s??"").replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
     const setStatus=(msg)=>{ const el=$("status"); if(!el) return; el.textContent=msg||""; if(msg) setTimeout(()=>{el.textContent="";},1200); };
+
+    const hardHide = (id)=>{
+      const el = $(id);
+      if(!el) return;
+      el.classList.add("hidden");
+      el.hidden = true;
+      el.setAttribute("aria-hidden","true");
+      try{ el.inert = true; }catch(_){}
+    };
+    const hardShow = (id)=>{
+      const el = $(id);
+      if(!el) return;
+      el.classList.remove("hidden");
+      el.hidden = false;
+      el.removeAttribute("aria-hidden");
+      try{ el.inert = false; }catch(_){}
+    };
+
+    // 전역 오류를 토스트로 표시하여 "무반응" 상태를 방지합니다.
+    window.addEventListener("error",(ev)=>{
+      try{ toast("스크립트 오류: "+(ev?.message||"")); }catch(_){}
+    });
+    window.addEventListener("unhandledrejection",(ev)=>{
+      try{ toast("처리되지 않은 오류: "+(ev?.reason?.message||String(ev?.reason||""))); }catch(_){}
+    });
     // =============================
     // UI 토스트 (브라우저 alert 대체)
     // =============================
@@ -576,7 +601,6 @@ const USER_PAGE_SIZE = 10;
       lockBody(false);
     }
 
-    async 
     async function openProfile(userId){
 
       const u = usersCache.get(userId) || {};
