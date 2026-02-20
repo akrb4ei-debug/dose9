@@ -365,27 +365,70 @@ const USER_PAGE_SIZE = 10;
     // =============================
     // UI 토스트 (브라우저 alert 대체)
     // =============================
-    function toast(msg,type="good",title="알림",ms=2200){
+    function toast(msg,type="good",title="알림",ms=2200,key=null){
       const wrap=document.getElementById("toastWrap");
       if(!wrap) return;
-      const el=document.createElement("div");
-      el.className="toast "+(type||"");
-      const t=new Date();
-      el.innerHTML=`<div class="tTop"><div class="tTitle">${esc(title)}</div><div class="tiny">${t.toLocaleTimeString()}</div></div><div class="tMsg">${esc(String(msg||""))}</div>`;
-      wrap.appendChild(el);
-      const kill=()=>{ el.classList.add("out"); setTimeout(()=>el.remove(), 180); };
-      setTimeout(kill, ms);
-    }
-    // 기존 alert는 토스트로 바꿉니다.
-    (function(){
-      const _a = window.alert;
-      window.__nativeAlert=_a;
-      window.alert = (m)=>toast(m,"warn","안내");
-    })();
 
-    // =============================
-    // 테마 토글 (개인 설정, 로컬 저장)
-    // =============================
+      const icon = (type==="good")?"✅":(type==="warn")?"⚠️":(type==="bad")?"❌":"ℹ️";
+      const k = key || `${type}:${title}:${msg}`.slice(0,160);
+
+      // 기존 동일 키 토스트가 있으면 갱신(중복 쌓임 방지)합니다.
+      const existing = wrap.querySelector(`.toast[data-key="${CSS.escape(k)}"]`);
+      if(existing){
+        existing.querySelector(".tTitle").textContent = `${icon} ${title}`;
+        existing.querySelector(".tMsg").textContent = msg;
+        existing.classList.remove("out");
+        existing.dataset.type = type;
+        existing.style.setProperty("--ms", `${ms}ms`);
+        // 프로그레스 리셋
+        const bar = existing.querySelector(".tBar");
+        if(bar){
+          bar.style.animation="none";
+          // reflow
+          void bar.offsetWidth;
+          bar.style.animation="";
+        }
+        clearTimeout(existing._t1);
+        clearTimeout(existing._t2);
+        existing._t1=setTimeout(()=>existing.classList.add("out"), Math.max(600, ms-350));
+        existing._t2=setTimeout(()=>existing.remove(), ms+120);
+        return;
+      }
+
+      // 너무 많이 쌓이면 오래된 것부터 정리합니다(최대 3개).
+      while(wrap.children.length>=3){
+        wrap.firstElementChild?.remove();
+      }
+
+      const el=document.createElement("div");
+      el.className=`toast ${type}`;
+      el.dataset.key = k;
+      el.dataset.type = type;
+      el.style.setProperty("--ms", `${ms}ms`);
+      el.innerHTML = `
+        <div class="tHead">
+          <div class="tTitle">${icon} ${title}</div>
+          <button class="tX" aria-label="닫기">×</button>
+        </div>
+        <div class="tMsg"></div>
+        <div class="tBar"></div>
+      `;
+      el.querySelector(".tMsg").textContent = msg;
+      el.querySelector(".tX").onclick=()=>{ el.classList.add("out"); setTimeout(()=>el.remove(),180); };
+
+      wrap.appendChild(el);
+
+      // 자동 종료
+      el._t1=setTimeout(()=>el.classList.add("out"), Math.max(600, ms-350));
+      el._t2=setTimeout(()=>el.remove(), ms+120);
+    }
+
+    // 브라우저 alert 대신 사이트 토스트로 대체합니다.
+    (function(){
+      const _a=window.alert;
+      window.__nativeAlert=_a;
+      window.alert = (m)=>toast(String(m??""),"warn","안내",2400,"alert");
+    })();
     function applyTheme(theme){
       const t = theme || localStorage.getItem("dose_theme") || "dark";
       document.documentElement.setAttribute("data-theme", t);
@@ -520,7 +563,7 @@ const USER_PAGE_SIZE = 10;
       m.style.top  = Math.max(10, Math.min(window.innerHeight-220, y))+"px";
       m.classList.remove("hidden");
       m.querySelectorAll("button").forEach(b=>{
-        b.onclick=async()=>{
+        b.onclick = async function(){
           const act=b.getAttribute("data-act");
           hideCtxMenu();
           if(act==="view7d") return openUserModal(uid);
@@ -975,7 +1018,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
 
         await updateDoc(doc(db,"users",currentUser), updates);
 
-        toast("출근 처리되었습니다.","good","출근");
+        toast("출근 처리되었습니다.","good","출근",1800,"checkin");
         await refreshAll({silent:true});
       }catch(e){
         console.error(e);
@@ -1038,7 +1081,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
 
         await updateDoc(doc(db,"users",currentUser), updates);
 
-        toast("퇴근 처리되었습니다.","good","퇴근");
+        toast("퇴근 처리되었습니다.","good","퇴근",1800,"checkout");
         await refreshAll({silent:true});
       }catch(e){
         console.error(e);
@@ -1706,7 +1749,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
 
       await updateDoc(doc(db,"users",id), updates);
       if(pwEl) pwEl.value="";
-      toast("저장 완료","good","관리"); setStatus("저장 완료");
+      toast("저장 완료","good","관리",1800,"admin_saved"); setStatus("저장 완료");
       await loadUsersOnce({force:true, reason:"admin"});
       await loadDashKpis();
       await loadUserTable();
@@ -1801,7 +1844,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       showModal("noticeModal", true);
 
       // 확인 누르면 저장
-      $("btnNoticeOk").onclick = async ()=>{
+      $("btnNoticeOk").onclick = async function(){
         const patch = { seenNotices: { ...(currentUserData?.seenNotices||{}), [dept]: n.id } };
         await updateDoc(doc(db,"users",currentUser), patch).catch(()=>{});
         currentUserData.seenNotices = patch.seenNotices;
@@ -1935,7 +1978,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       $("btnCreatePlant").addEventListener("click", ()=>openCreate("송전소"));
       $("btnCreateEscort").addEventListener("click", ()=>openCreate("차량수호"));
 
-      $("contentFilter").addEventListener("change", async ()=>{
+      $("contentFilter").addEventListener("change", async function(){
         contentFilter=$("contentFilter").value;
         contentPage=0;
         contentPageCursors=[];
