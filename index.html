@@ -402,9 +402,8 @@ const USER_PAGE_SIZE = 10;
 
       const icon = (type==="good")?"✅":(type==="warn")?"⚠️":(type==="bad")?"❌":"ℹ️";
       const k = key || `${type}:${title}:${msg}`.slice(0,160);
-
       // 기존 동일 키 토스트가 있으면 갱신(중복 쌓임 방지)합니다.
-      const existing = const safeKey = (window.CSS && CSS.escape) ? CSS.escape(k) : String(k).replace(/"/g,"");
+      const safeKey = (window.CSS && CSS.escape) ? CSS.escape(k) : String(k).replace(/"/g,"");
       const existing = wrap.querySelector(`.toast[data-key="${safeKey}"]`);
       if(existing){
         existing.querySelector(".tTitle").textContent = `${icon} ${title}`;
@@ -658,9 +657,9 @@ const USER_PAGE_SIZE = 10;
     // 관리자 패널 드래그 이동 (개인 설정)
     // =============================
     function initAdminDrag(){
-      const dock=document.getElementById("adminDock");
+      const dock=document.getElementById("adminCol");
       if(!dock) return;
-      const head=dock.querySelector(".adminDockHeader") || dock;
+      const head=dock.querySelector(".row") || dock;
       let dragging=false, sx=0, sy=0, ox=0, oy=0;
       const saved = localStorage.getItem("dose_admin_pos");
       if(saved){
@@ -1511,7 +1510,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
 
     // edit content modal (participants 수정 + outcome 수정, 권한: 작성자 또는 관리자)
     let editId=null, editData=null, editSelected=new Set(), editSearch="";
-    async aasync function openEditContent(id){
+    async function openEditContent(id){
       const s=await getDoc(doc(db,"contentRecords",id));
       if(!s.exists()) return alert("기록이 없습니다.");
       const r=s.data();
@@ -1570,15 +1569,6 @@ async function ensureUserDocDefaultsOnce(userId, userData){
         const v=$("eOutcome").value;
         if(v==="O") outcome=true; else if(v==="X") outcome=false; else outcome=null;
       }
-
-      // 변경 사항(추가/삭제)을 계산합니다.
-      const oldPartsArr = Array.isArray(editData.participants)?editData.participants:[];
-      const oldSet = new Set(oldPartsArr.map(x=>String(x||"").trim()).filter(Boolean));
-      if(editData.writer) oldSet.add(String(editData.writer));
-      const newSet = new Set(parts.map(x=>String(x||"").trim()).filter(Boolean));
-
-      const added = Array.from(newSet).filter(x=>!oldSet.has(x));
-      const removed = Array.from(oldSet).filter(x=>!newSet.has(x));
 
       // 변경 사항(추가/삭제)을 계산합니다.
       const oldPartsArr = Array.isArray(editData.participants)?editData.participants:[];
