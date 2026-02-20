@@ -294,6 +294,18 @@ body::before{
 .admItem summary::-webkit-details-marker{display:none}
 .admItem .admBody{padding:12px 12px 14px; border-top:1px solid var(--stroke); background: rgba(255,255,255,0.02);}
 
+
+/* 컨텐츠 수정 효과 */
+.pAdd{font-weight:900;}
+.pDel{text-decoration:line-through; opacity:.75;}
+
+/* 관리자 패널 오버레이 */
+.adminBackdrop{position:fixed; inset:0; z-index:7777; background:rgba(0,0,0,.45); backdrop-filter: blur(3px); opacity:0; transition: opacity .18s ease;}
+.adminBackdrop.show{opacity:1;}
+.adminCol{position:fixed; top:18px; right:18px; bottom:18px; width:min(920px, calc(100% - 36px)); z-index:7778; overflow:auto; border-radius:18px; box-shadow: var(--shadow);}
+.adminCol .box{background: rgba(255,255,255,0.03); border:1px solid var(--stroke); border-radius:16px;}
+body.admin-open{overflow:hidden;}
+
 </style>
 
   <script type="module">
@@ -330,7 +342,8 @@ body::before{
     let currentUserData=null;
     let usersCache=new Map();
     let lastUsersLoadAt=0;
-    const USERS_COOLDOWN_MS = 5*60*1000; // 5분
+    const USERS_COOLDOWN_MS = 5*60*1000;
+    const SUMMARY_COOLDOWN_MS = 3*60*1000; // 요약 갱신 쿨타임(3분) // 5분
 const USER_PAGE_SIZE = 10;
     let usersPage = 0; // 유저 목록 페이지(10명 단위)
 
@@ -516,7 +529,7 @@ const USER_PAGE_SIZE = 10;
             const u=usersCache.get(uid); if(!u) return;
             await updateDoc(doc(db,"users",uid),{isAdmin:!u.isAdmin});
             toast("관리자 권한이 변경되었습니다.","good","관리");
-            await loadUsersOnce(true);
+            await loadUsersOnce({force:true, reason:"admin"});
             await loadUserTable();
             await renderAdminUserCards();
             return;
@@ -525,7 +538,7 @@ const USER_PAGE_SIZE = 10;
             const u=usersCache.get(uid); if(!u) return;
             await updateDoc(doc(db,"users",uid),{isHidden:!u.isHidden});
             toast("숨김 상태가 변경되었습니다.","good","관리");
-            await loadUsersOnce(true);
+            await loadUsersOnce({force:true, reason:"admin"});
             await loadUserTable();
             await renderAdminUserCards();
             return;
@@ -535,7 +548,7 @@ const USER_PAGE_SIZE = 10;
             if(!np) return;
             await updateDoc(doc(db,"users",uid),{password:String(np)});
             toast("비밀번호가 변경되었습니다.","good","관리");
-            await loadUsersOnce(true);
+            await loadUsersOnce({force:true, reason:"admin"});
             await renderAdminUserCards();
             return;
           }
@@ -553,7 +566,7 @@ const USER_PAGE_SIZE = 10;
       if(uid===currentUser) return toast("본인 계정은 여기서 삭제할 수 없습니다.","warn","관리");
       await deleteDoc(doc(db,"users",uid));
       toast("유저가 삭제되었습니다.","good","관리");
-      await loadUsersOnce(true);
+      await loadUsersOnce({force:true, reason:"admin"});
       await loadDashKpis();
       await loadUserTable();
       await renderAdminUserCards();
@@ -753,19 +766,41 @@ async function ensureUserDocDefaultsOnce(userId, userData){
     // ✅ 원칙: onSnapshot 사용하지 않음. (자동 리드 없음)
     // ✅ 로그인 시 1회 로드, 이후 "새로고침" 버튼으로만 갱신.
 
+    async function refreshSummary({silent}={}){
+      if(!currentUser) return;
+      const key = `dose_sum_last_${currentUser}`;
+      const last = Number(localStorage.getItem(key)||0);
+      const now = Date.now();
+      if(last && (now-last) < SUMMARY_COOLDOWN_MS){
+        const remain = Math.ceil((SUMMARY_COOLDOWN_MS-(now-last))/1000);
+        toast(`요약 갱신 쿨타임: ${remain}초 남았습니다.`,"warn","요약 갱신");
+        if(!silent) setStatus(`요약 갱신 쿨타임: ${remain}초`);
+        return;
+      }
+      localStorage.setItem(key, String(now));
+      // 요약만 갱신: 유저 + KPI + 유저표 (컨텐츠는 갱신하지 않습니다)
+      await loadUsersOnce({force:true, reason:"admin"});
+      await loadDashKpis();
+      await loadUserTable();
+      toast("요약이 갱신되었습니다.","good","요약");
+      if(!silent) setStatus("요약이 갱신되었습니다.");
+    }
+
     async function refreshAll({silent}={}){
-      await loadUsersOnce();
+      await loadUsersOnce({force:true, reason:"admin"});
       await loadDashKpis();
       await loadUserTable();
       await loadContentPage(0);
       if(!silent) setStatus("갱신되었습니다.");
     }
 
-    async function loadUsersOnce({force=false}={}){
+    async function loadUsersOnce({force=false, reason=""}={}){
       const now=Date.now();
-      if(!force && lastUsersLoadAt && (now-lastUsersLoadAt)<USERS_COOLDOWN_MS){
+      const bypass = (isAdmin() && reason==="admin");
+      if(!bypass && !force && lastUsersLoadAt && (now-lastUsersLoadAt)<USERS_COOLDOWN_MS){
         const remain=Math.ceil((USERS_COOLDOWN_MS-(now-lastUsersLoadAt))/1000);
         setStatus(`유저 목록 갱신 쿨타임: ${remain}초 남았습니다.`);
+        toast(`유저 목록 갱신 쿨타임: ${remain}초 남았습니다.`, "warn", "쿨타임");
         return;
       }
       const s=await getDocs(colUsers);
@@ -940,7 +975,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
 
         await updateDoc(doc(db,"users",currentUser), updates);
 
-        setStatus("출근 처리되었습니다.");
+        toast("출근 처리되었습니다.","good","출근");
         await refreshAll({silent:true});
       }catch(e){
         console.error(e);
@@ -1003,7 +1038,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
 
         await updateDoc(doc(db,"users",currentUser), updates);
 
-        setStatus("퇴근 처리되었습니다.");
+        toast("퇴근 처리되었습니다.","good","퇴근");
         await refreshAll({silent:true});
       }catch(e){
         console.error(e);
@@ -1122,7 +1157,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
               <span class="tiny">${esc(time)}</span>
             </div>
             <div class="meta">${boldWriter} ${edited}</div>
-            <div class="p">참여자: ${parts.map(esc).join(", ") || "-"}</div>
+            <div class="p">참여자: ${renderParticipants(parts, r.edited?.added, r.edited?.removed)}</div>
             <div class="row" style="margin-top:10px;">
               ${canEdit?`<button class="pill" data-edit="${d.id}">수정</button>`:""}
               ${canDelete?`<button class="pill danger" data-del="${d.id}">삭제</button>`:""}
@@ -1285,7 +1320,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
 
       showModal("createModal", false);
       setStatus("작성되었습니다.");
-      await loadUsersOnce();
+      await loadUsersOnce({force:true, reason:"admin"});
       await loadDashKpis();
       await loadUserTable();
       await loadContentPage(0);
@@ -1293,7 +1328,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
 
     // edit content modal (participants 수정 + outcome 수정, 권한: 작성자 또는 관리자)
     let editId=null, editData=null, editSelected=new Set(), editSearch="";
-    async function openEditContent(id){
+    async async async function openEditContent(id){
       const s=await getDoc(doc(db,"contentRecords",id));
       if(!s.exists()) return alert("기록이 없습니다.");
       const r=s.data();
@@ -1353,9 +1388,27 @@ async function ensureUserDocDefaultsOnce(userId, userData){
         if(v==="O") outcome=true; else if(v==="X") outcome=false; else outcome=null;
       }
 
+      // 변경 사항(추가/삭제)을 계산합니다.
+      const oldPartsArr = Array.isArray(editData.participants)?editData.participants:[];
+      const oldSet = new Set(oldPartsArr.map(x=>String(x||"").trim()).filter(Boolean));
+      if(editData.writer) oldSet.add(String(editData.writer));
+      const newSet = new Set(parts.map(x=>String(x||"").trim()).filter(Boolean));
+
+      const added = Array.from(newSet).filter(x=>!oldSet.has(x));
+      const removed = Array.from(oldSet).filter(x=>!newSet.has(x));
+
+      // 변경 사항(추가/삭제)을 계산합니다.
+      const oldPartsArr = Array.isArray(editData.participants)?editData.participants:[];
+      const oldSet = new Set(oldPartsArr.map(x=>String(x||"").trim()).filter(Boolean));
+      if(editData.writer) oldSet.add(String(editData.writer));
+      const newSet = new Set(parts.map(x=>String(x||"").trim()).filter(Boolean));
+
+      const added = Array.from(newSet).filter(x=>!oldSet.has(x));
+      const removed = Array.from(oldSet).filter(x=>!newSet.has(x));
+
       const edited = (isAdmin() && editData.writer!==currentUser)
-        ? {mode:"admin", by: currentUser, at: serverTimestamp()}
-        : {mode:"self", by: editData.writer||currentUser, at: serverTimestamp()};
+        ? {mode:"admin", by: currentUser, at: serverTimestamp(), added, removed}
+        : {mode:"self", by: editData.writer||currentUser, at: serverTimestamp(), added, removed};
 
       await updateDoc(doc(db,"contentRecords",editId),{
         participants: parts,
@@ -1364,7 +1417,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       });
 
       showModal("editModal", false);
-      setStatus("저장되었습니다.");
+      toast("저장되었습니다.","good","컨텐츠 수정"); setStatus("저장되었습니다.");
       await loadContentPage(0);
     }
 
@@ -1527,7 +1580,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
         }).catch(()=>{});
       }
       setStatus("초기화 완료");
-      await loadUsersOnce();
+      await loadUsersOnce({force:true, reason:"admin"});
       await loadDashKpis();
       await loadUserTable();
     }
@@ -1563,7 +1616,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       });
       $("addNick").value=""; $("addPw").value="";
       setStatus("유저 추가 완료");
-      await loadUsersOnce();
+      await loadUsersOnce({force:true, reason:"admin"});
       await loadDashKpis();
       await loadUserTable();
       await renderAdminUserCards();
@@ -1653,8 +1706,8 @@ async function ensureUserDocDefaultsOnce(userId, userData){
 
       await updateDoc(doc(db,"users",id), updates);
       if(pwEl) pwEl.value="";
-      setStatus("저장 완료");
-      await loadUsersOnce();
+      toast("저장 완료","good","관리"); setStatus("저장 완료");
+      await loadUsersOnce({force:true, reason:"admin"});
       await loadDashKpis();
       await loadUserTable();
       await renderAdminUserCards();
@@ -1668,7 +1721,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       // 없는 부서 입력도 허용(자유), 대신 표준 부서만 쓰길 권장
       await updateDoc(doc(db,"users",id), { deptLeaderOf: arr });
       setStatus("부서장 권한 저장");
-      await loadUsersOnce();
+      await loadUsersOnce({force:true, reason:"admin"});
       await renderAdminUserCards();
     }
 
@@ -1819,6 +1872,8 @@ async function ensureUserDocDefaultsOnce(userId, userData){
         if(active && admin.contains(active)) active.blur?.();
         admin.hidden=true;
         admin.setAttribute("aria-hidden","true");
+        const bd=$("adminBackdrop"); if(bd){ bd.classList.remove("show"); bd.hidden=true; }
+        lockBody(false);
       }
     }
     function openAdminPanel(){
@@ -1828,6 +1883,8 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       if(admin){
         admin.hidden=false;
         admin.setAttribute("aria-hidden","false");
+        const bd=$("adminBackdrop"); if(bd){ bd.hidden=false; bd.classList.add("show"); }
+        lockBody(true);
         // 관리자 카드 렌더는 열릴 때만 수행하여 렉을 줄입니다.
         renderAdminUserCards();
         loadWorkPage(0);
@@ -1863,6 +1920,10 @@ async function ensureUserDocDefaultsOnce(userId, userData){
 
       $("btnLogin").addEventListener("click", login);
       $("btnLogout").addEventListener("click", logout);
+
+      $("btnSummary").addEventListener("click", ()=>refreshSummary({silent:false}));
+
+      $("btnSummary").addEventListener("click", ()=>refreshSummary({silent:false}));
 
       $("btnRefresh").addEventListener("click", ()=>refreshAll({silent:false}));
 
@@ -1980,6 +2041,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
         </div>
         <div class="right">
           <div id="who" class="row"></div>
+          <button id="btnSummary" class="pill">요약 갱신</button>
           <button id="btnRefresh" class="pill">새로고침</button>
           <button id="btnAdmin" class="pill primary" hidden>관리</button>
           <button id="btnLogout" class="pill danger">로그아웃</button>
@@ -2085,11 +2147,13 @@ async function ensureUserDocDefaultsOnce(userId, userData){
         
 
         <!-- ADMIN SIDE -->
+        <div id="adminBackdrop" class="adminBackdrop" hidden></div>
         <div id="adminCol" class="card adminCol" data-view="adminpanel" hidden aria-hidden="true">
           <div class="row">
             <h3 style="margin:0;">관리자 패널</h3>
             <span class="spacer"></span>
             <span class="badge role">관리자 전용</span>
+            <button id="btnAdminClose" class="pill">닫기</button>
           </div>
 
           <div class="two" style="margin-top:12px;">
@@ -2102,6 +2166,13 @@ async function ensureUserDocDefaultsOnce(userId, userData){
               </div>
               <div class="row" style="margin-top:10px;">
                 <input id="adminSearch" class="w320" placeholder="유저 검색" />
+                <span class="spacer"></span>
+                <select id="adminSort" class="w220"></select>
+              </div>
+              <div class="row" style="margin-top:10px;">
+                <button id="adminPrev" class="pill">이전</button>
+                <button id="adminNext" class="pill">다음</button>
+                <span id="adminPageInfo" class="tinyStatus"></span>
               </div>
               <div id="adminUserCards"></div>
             </div>
