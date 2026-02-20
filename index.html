@@ -2042,35 +2042,8 @@ function toast(message, kind="info"){
       });
     }
 
-    async function adminAddUser(){
-      const nick=document.getElementById("admNewNick").value.trim();
-      const pw=document.getElementById("admNewPw").value.trim();
-      const rank=document.getElementById("admNewRank").value;
-      const dept=document.getElementById("admNewDept").value;
-      if(!nick||!pw) return uiMsg("닉네임/비밀번호를 입력해 주세요.","error");
+    /* removed duplicate adminAddUser */
 
-      const ref=doc(db,"users",nick);
-      const snap=await getDoc(ref);
-      if(snap.exists()) return uiMsg("이미 존재하는 유저입니다.","error");
-
-      await setDoc(ref,{
-        password: pw,
-        rank, dept,
-        isAdmin:false,
-        isHidden:false,
-        isOnline:false,
-        todaySeconds:0,
-        weekSeconds:0,
-        contentCounts:{supply:0,plant:0,escort:0},
-        contentLast:{supply:null,plant:null,escort:null}
-      },{merge:true});
-
-      uiMsg("유저가 추가되었습니다.","success");
-      document.getElementById("admNewNick").value="";
-      document.getElementById("admNewPw").value="";
-      await loadUsersOnce(true);
-      renderAdminUserList();
-    }
 
     function getAdminListFiltered(){
       const q=(document.getElementById("admSearch").value||"").trim().toLowerCase();
