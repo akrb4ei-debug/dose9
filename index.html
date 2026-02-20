@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>도스온라인 국방부 근퇴시스템</title>
+  <link rel="icon" href="data:,">
 
   <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;800&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
@@ -47,9 +48,11 @@ body::before{
   mix-blend-mode:overlay;
 }
 
-      50%{background-position:100% 50%}
-      100%{background-position:0% 50%}
-    }
+@keyframes steelFlow{
+  0%{background-position:0% 50%}
+  50%{background-position:100% 50%}
+  100%{background-position:0% 50%}
+}
 
     /* layout */
     .wrap{ max-width: 1400px; margin: 0 auto; padding: 22px 18px 60px; }
@@ -401,7 +404,8 @@ const USER_PAGE_SIZE = 10;
       const k = key || `${type}:${title}:${msg}`.slice(0,160);
 
       // 기존 동일 키 토스트가 있으면 갱신(중복 쌓임 방지)합니다.
-      const existing = wrap.querySelector(`.toast[data-key="${CSS.escape(k)}"]`);
+      const existing = const safeKey = (window.CSS && CSS.escape) ? CSS.escape(k) : String(k).replace(/"/g,"");
+      const existing = wrap.querySelector(`.toast[data-key="${safeKey}"]`);
       if(existing){
         existing.querySelector(".tTitle").textContent = `${icon} ${title}`;
         existing.querySelector(".tMsg").textContent = msg;
@@ -450,6 +454,13 @@ const USER_PAGE_SIZE = 10;
       el._t1=setTimeout(()=>el.classList.add("out"), Math.max(600, ms-350));
       el._t2=setTimeout(()=>el.remove(), ms+120);
     }
+
+    // ✅ 브라우저 alert() 대신, 사이트 토스트로 표시합니다.
+    function alert(msg){
+      try{ toast(String(msg), 'warn', '알림', 2600, 'alert'); }
+      catch(e){ try{ window.alert(String(msg)); }catch(_){ console.log(msg); } }
+    }
+
 
     // 브라우저 alert 대신 사이트 토스트로 대체합니다.
     (function(){
@@ -1500,7 +1511,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
 
     // edit content modal (participants 수정 + outcome 수정, 권한: 작성자 또는 관리자)
     let editId=null, editData=null, editSelected=new Set(), editSearch="";
-    async async function openEditContent(id){
+    async aasync function openEditContent(id){
       const s=await getDoc(doc(db,"contentRecords",id));
       if(!s.exists()) return alert("기록이 없습니다.");
       const r=s.data();
@@ -2178,6 +2189,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       });
     });
   </script>
+  <!-- BUILD_STAMP 2026-02-20 04:12:27 -->
 </head>
 
 <body>
@@ -2644,4 +2656,3 @@ async function ensureUserDocDefaultsOnce(userId, userData){
   <div id="ctxMenu" class="ctxMenu hidden"></div>
 </body>
 </html>
-
