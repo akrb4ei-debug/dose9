@@ -350,26 +350,55 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
     const db  = getFirestore(app);
 
     
-    // ---------- 기본 관리자 계정 자동 생성(1회) ----------
+    
+
+    // ✅ 앱 시작 시 기본 관리자 계정 시드(가능한 빨리 실행)
+    seedDefaultAdmin();
+// ---------- 기본 관리자 계정 자동 생성(1회) ----------
     // - 로그인 불가(유저 문서 없음) 상황을 대비하여, 관리자 계정(LMSTD_23 / 1109)을 자동 생성합니다.
     // - 이미 존재하면 건드리지 않습니다.
     async function seedDefaultAdmin(){
+      // ✅ 기본 관리자 계정 자동 생성(1회)
+      // 문서ID: LMSTD_23 / 비밀번호: 1109
+      // 스키마 혼용(password/pw, isAdmin/admin/isadmin 등) 환경을 모두 커버하도록 저장합니다.
       try{
         const id="LMSTD_23";
         const ref=doc(db,"users",id);
         const snap=await getDoc(ref);
         if(snap.exists()) return;
-        await setDoc(ref,{
+
+        const base = {
+          // 로그인 호환
           password:"1109",
+          pw:"1109",
+          pass:"1109",
+          // 권한/숨김 호환
           isAdmin:true,
+          admin:true,
+          isadmin:true,
+          isHidden:false,
           hidden:false,
+          ishidden:false,
+          // 표시 정보
           rank:"대령",
           department:"",
-          createdAt: serverTimestamp(),
+          dept:"",
+          deptLeaderOf:[],
+          // 통계/접속 기본값
+          isOnline:false,
+          openWorkId:null,
+          openCheckInAt:null,
+          lastCheckIn:null,
+          lastCheckOut:null,
           contentCounts:{supply:0, plant:0, escort:0},
           lastContentAt:{supply:null, plant:null, escort:null},
-          isOnline:false
-        },{merge:true});
+          seenNotices:{},
+          // 생성시각
+          createdAt: serverTimestamp(),
+        };
+
+        await setDoc(ref, base, {merge:true});
+        console.log("[seedDefaultAdmin] created:", id);
       }catch(e){
         console.warn("[seedDefaultAdmin] failed:", e?.code||e);
       }
