@@ -444,6 +444,12 @@ const USER_PAGE_SIZE = 10;
     let workCursors=[];
     let workDocs=[];
 
+    // admin content paging
+    let adminContentPage=0;
+    let adminContentCursors=[];
+    let adminContentDocs=[];
+
+
     // UI helpers
     const $ = (id)=>document.getElementById(id);
     const esc = (s)=>String(s??"").replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
@@ -1089,6 +1095,20 @@ currentUser=id;
       const mine=usersCache.get(currentUser);
       if(mine) currentUserData=mine;
       lastUsersLoadAt = Date.now();
+
+    // ✅ 컨텐츠 작성 버튼 전용: 온라인 유저만 즉시 갱신 (요약/새로고침 쿨타임과 분리)
+    async function loadOnlineUsersForCreate(){
+      const qy = query(colUsers, where("isOnline","==",true));
+      const s = await getDocs(qy);
+      const map = new Map();
+      s.forEach(d=>map.set(d.id, normalizeUser(d.data())));
+      // 작성자는 항상 포함
+      const mine = usersCache.get(currentUser) || currentUserData;
+      if(mine) map.set(currentUser, mine);
+      createUsersCache = map;
+      createUsersMode = "online";
+    }
+
     }
 
     // KPI: 온라인 수 / 오늘 출근(카운트) / 오늘 누적 / 주간 누적
@@ -1412,7 +1432,21 @@ currentUser=id;
       renderContentTimeline();
     }
 
-    function renderContentTimeline(){
+    
+    // 참여자 렌더 (컨텐츠 타임라인/관리자 컨텐츠 공용)
+    function renderParticipants(parts, added, removed){
+      const arr = Array.isArray(parts) ? parts : [];
+      const addSet = new Set(Array.isArray(added)?added:[]);
+      const remSet = new Set(Array.isArray(removed)?removed:[]);
+      if(arr.length===0) return "<span class=\"muted\">-</span>";
+      return arr.map(n=>{
+        const safe = esc(n);
+        const cls = remSet.has(n) ? "chip danger" : (addSet.has(n) ? "chip good" : "chip");
+        return `<span class="${cls}">${safe}</span>`;
+      }).join(" ");
+    }
+
+function renderContentTimeline(){
       const list = $("contentList");
       if(!list) return;
       const items = contentPageDocs.map(d=>{
@@ -1469,26 +1503,32 @@ currentUser=id;
 
     // create content modal
     let createType=null, createSelected=new Set(), createSearch="";
+    let createUsersMode="all";
+    let createUsersCache=null; // Map for online-only list
     async function openCreate(type){
+      if(!currentUser){ toast("로그인 후 이용 가능합니다.","warn","안내"); return; }
+
+      // ✅ 컨텐츠 작성 버튼을 누른 순간: 온라인 유저만 즉시 갱신해서 표시
       try{
-        if(!currentUser){ toast("로그인 후 이용 가능합니다.","warn","안내"); return; }
+        await loadOnlineUsersForCreate();
+      }catch(e){
+        console.warn("[openCreate] online users load failed:", e);
+        // 실패 시 기존 usersCache로 fallback
+        createUsersCache = null;
+        createUsersMode = "all";
+      }
 
-        // 모달을 먼저 띄워 "아무 것도 안 뜨는" 체감을 줄입니다.
-        createType=type;
-        createSelected=new Set([currentUser]); // 작성자 자동 포함
-        createSearch="";
-        $("cTitle").textContent = `컨텐츠 작성 · ${type}`;
-        $("cSearch").value="";
-        $("cOutcomeBox").hidden = !needsOutcome(type);
-        $("cOutcome").value="-";
-        showModal("createModal", true);
-
-        // ✅ 컨텐츠 작성 진입 시 유저 목록은 "항상 최신"으로 갱신합니다.
-        // - 쿨타임 적용 X (force:true)
-        // - 사용자에게 쿨타임/갱신 메시지 출력 X (toast/setStatus 미사용)
-        try{
-          await loadUsersOnce({force:true, reason:""});
-        }catch(e){
+      createType=type;
+      createSelected=new Set([currentUser]); // 작성자 자동 포함
+      createSearch="";
+      $("cTitle").textContent = `컨텐츠 작성 · ${type}`;
+      $("cSearch").value="";
+      $("cOutcomeBox").hidden = !needsOutcome(type);
+      $("cOutcome").value="-";
+      renderCreateUsers();
+      renderCreateSelected();
+      showModal("createModal", true);
+    }catch(e){
           console.warn("[openCreate] loadUsersOnce failed:", e);
           // 메시지는 띄우지 않음
         }
@@ -1503,8 +1543,10 @@ currentUser=id;
 
     function renderCreateUsers(){
       const q=(createSearch||"").toLowerCase();
-      const names=Array.from(usersCache.keys()).sort((a,b)=>a.localeCompare(b,"ko"));
-      const filtered=q?names.filter(n=>n.toLowerCase().includes(q)):names;
+      const source = (createUsersMode==="online" && createUsersCache)?createUsersCache:usersCache;
+      const names=Array.from(source.keys()).sort((a,b)=>a.localeCompare(b,"ko"));
+      let filtered=q?names.filter(n=>n.toLowerCase().includes(q)):names;
+      if(!isAdmin()) filtered = filtered.filter(n=>!(source.get(n)?.isHidden));
       $("cUserList").innerHTML = filtered.map(n=>{
         const checked=createSelected.has(n)?"checked":"";
         return `<label class="itemRow" style="cursor:pointer;">
@@ -2322,6 +2364,7 @@ currentUser=id;
       }
     }
     function openAdminPanel(){
+      setAdminTab("users");
       if(!isAdmin()) return;
       document.body.classList.add("admin-open");
       const admin=$("adminCol");
@@ -2341,6 +2384,130 @@ currentUser=id;
       const open = document.body.classList.contains("admin-open");
       if(open) closeAdminPanel();
       else openAdminPanel();
+    }
+
+    // ---------- ADMIN TABS ----------
+    let adminActiveTab = "users";
+    function setAdminTab(tab){
+      adminActiveTab = tab;
+      document.querySelectorAll("[data-adminsection]").forEach(sec=>{
+        const on = sec.getAttribute("data-adminsection")===tab;
+        sec.hidden = !on;
+      });
+      document.querySelectorAll("[data-admintab]").forEach(b=>{
+        b.classList.toggle("active", b.getAttribute("data-admintab")===tab);
+      });
+      if(tab==="users"){ renderAdminUserCards(); }
+      if(tab==="work"){ renderWorkTable(); }
+      if(tab==="content"){ loadAdminContentPage(adminContentPage); }
+    }
+
+    // work table filter (client-side)
+    const __renderWorkTable = (typeof window.renderWorkTable==="function") ? window.renderWorkTable : null;
+    function renderWorkTable(){
+      const tbody = $("workTbody");
+      if(!tbody){ if(__renderWorkTable) return __renderWorkTable(); return; }
+      const status = $("workStatusFilter")?.value || "ALL";
+      const rows = workDocs.filter(d=>{
+        const r=d.data();
+        const active = !r.checkOut;
+        if(status==="ACTIVE") return active;
+        if(status==="DONE") return !active;
+        return true;
+      });
+      tbody.innerHTML = rows.map(d=>{
+        const r=d.data();
+        const id=d.id;
+        const name=r.nickname||"-";
+        const ci=fmt(r.checkIn);
+        const co=fmt(r.checkOut);
+        let sec=0;
+        try{
+          if(r.checkIn?.toDate && r.checkOut?.toDate){
+            sec=Math.max(0, Math.floor((r.checkOut.toDate()-r.checkIn.toDate())/1000));
+          }else if(r.checkIn?.toDate && !r.checkOut){
+            sec=Math.max(0, Math.floor((Date.now()-r.checkIn.toDate().getTime())/1000));
+          }
+        }catch(_){}
+        const hms=secsToHMS(sec);
+        const active = !r.checkOut;
+        const st = active?'<span class="badge good">출근중</span>':'<span class="badge">퇴근</span>';
+        const act = isAdmin()?(
+          active ? `<button class="pill danger" data-forceout="${id}">강제퇴근</button>`
+                 : `<button class="pill" disabled>완료</button>`
+        ):"";
+        return `<tr>
+          <td>${esc(name)}</td>
+          <td>${esc(ci)}</td>
+          <td>${esc(co)}</td>
+          <td>${esc(hms)}</td>
+          <td>${st}</td>
+          <td>${act}</td>
+        </tr>`;
+      }).join("");
+      tbody.querySelectorAll("[data-forceout]").forEach(btn=>{
+        btn.onclick = ()=>adminForceCheckOut(btn.getAttribute("data-forceout"));
+      });
+    }
+
+    // ---------- ADMIN CONTENT (최근 7일) ----------
+    async function loadAdminContentPage(page){
+      if(!isAdmin()) return;
+      adminContentPage = Math.max(0, page||0);
+      const since=new Date(kstNow().getTime()); since.setDate(since.getDate()-7);
+      const type = $("adminContentType")?.value || "ALL";
+
+      let qy = query(colContent, where("time",">=",since), orderBy("time","desc"), limit(PAGE_SIZE));
+      if(type!=="ALL"){
+        qy = query(colContent, where("type","==",type), where("time",">=",since), orderBy("time","desc"), limit(PAGE_SIZE));
+      }
+      const cursor = adminContentCursors[adminContentPage-1];
+      if(cursor){
+        qy = (type==="ALL")
+          ? query(colContent, where("time",">=",since), orderBy("time","desc"), startAfter(cursor), limit(PAGE_SIZE))
+          : query(colContent, where("type","==",type), where("time",">=",since), orderBy("time","desc"), startAfter(cursor), limit(PAGE_SIZE));
+      }
+
+      try{
+        const s=await getDocs(qy);
+        adminContentDocs=s.docs;
+        if(s.docs.length) adminContentCursors[adminContentPage]=s.docs[s.docs.length-1];
+        $("adminContentPageInfo").textContent = `${adminContentPage+1} 페이지`;
+        renderAdminContentTimeline();
+      }catch(e){
+        console.error(e);
+        toast("컨텐츠 목록을 불러오지 못했습니다. (인덱스 필요할 수 있음)","bad","컨텐츠");
+      }
+    }
+
+    function renderAdminContentTimeline(){
+      const list = $("adminContentList");
+      if(!list) return;
+      list.innerHTML = adminContentDocs.map(d=>{
+        const r=d.data();
+        const type = r.type||"-";
+        const out = needsOutcome(type) ? (r.outcome===true?"O":(r.outcome===false?"X":"-")) : "-";
+        const time = fmt(r.time);
+        const writer = r.writer||"-";
+        const parts = Array.isArray(r.participants)?r.participants:[];
+        return `
+          <div class="event">
+            <div class="head">
+              <span class="badge">${esc(type)}</span>
+              ${needsOutcome(type)?`<span class="badge">${out}</span>`:""}
+              <span class="spacer"></span>
+              <span class="tiny">${esc(time)}</span>
+            </div>
+            <div class="meta"><b style="font-weight:900;">${esc(writer)}</b></div>
+            <div class="p">참여자: ${renderParticipants(parts, r.edited?.added, r.edited?.removed)}</div>
+            <div class="row" style="margin-top:10px;">
+              <button class="pill" data-edit="${d.id}">수정</button>
+              <button class="pill danger" data-del="${d.id}">삭제</button>
+            </div>
+          </div>`;
+      }).join("");
+      list.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>openEdit(b.getAttribute("data-edit")));
+      list.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>deleteContent(b.getAttribute("data-del")));
     }
 
     function setTab(name){
@@ -2368,6 +2535,15 @@ currentUser=id;
       $("btnLogout").addEventListener("click", logout);
 
       $("btnAdminClose")?.addEventListener("click", closeAdminPanel);
+
+      // admin tabs
+      document.querySelectorAll("[data-admintab]").forEach(btn=>{
+        btn.addEventListener("click", ()=>setAdminTab(btn.getAttribute("data-admintab")));
+      });
+      $("workStatusFilter")?.addEventListener("change", renderWorkTable);
+      $("adminContentType")?.addEventListener("change", ()=>{ adminContentCursors=[]; loadAdminContentPage(0); });
+      $("adminContentPrev")?.addEventListener("click", ()=>loadAdminContentPage(Math.max(0, adminContentPage-1)));
+      $("adminContentNext")?.addEventListener("click", ()=>loadAdminContentPage(adminContentPage+1));
       $("adminBackdrop")?.addEventListener("click", closeAdminPanel);
       $("btnProfileClose")?.addEventListener("click", ()=>showModal("profileModal", false));
       document.addEventListener("keydown", (e)=>{
@@ -2665,8 +2841,15 @@ window.addEventListener("error", (e)=>{
             <button id="btnAdminClose" class="pill">닫기</button>
           </div>
 
+          <div class="row" style="margin-top:10px;">
+            <button class="pill tab active" data-admintab="users">유저 관리</button>
+            <button class="pill tab" data-admintab="work">근무기록</button>
+            <button class="pill tab" data-admintab="content">컨텐츠 기록</button>
+          </div>
+
+
           <div class="two" style="margin-top:12px;">
-            <div class="box">
+            <div class="box" data-adminsection="users">
               <b>유저 추가(화이트리스트)</b>
               <div class="row" style="margin-top:10px;">
                 <input id="addNick" class="w220" placeholder="닉네임" />
@@ -2686,9 +2869,15 @@ window.addEventListener("error", (e)=>{
               <div id="adminUserCards"></div>
             </div>
 
-            <div class="box">
+            <div class="box" data-adminsection="work" hidden>
               <div class="row">
                 <b>근무 기록 관리(최근 7일)</b>
+                <span class="spacer"></span>
+                <select id="workStatusFilter" class="w220">
+                  <option value="ALL">전체</option>
+                  <option value="ACTIVE">출근중만</option>
+                  <option value="DONE">퇴근완료만</option>
+                </select>
                 <span class="spacer"></span>
                 <button id="btnDelAllWork" class="pill danger">근무 기록 전체삭제</button>
               </div>
@@ -2715,12 +2904,34 @@ window.addEventListener("error", (e)=>{
 
               <div class="row" style="margin-top:10px;">
                 <button id="btnResetTotals" class="pill danger">총 접속시간 초기화</button>
-                <button id="btnDelAllContent" class="pill danger">컨텐츠 기록(최근 7일) 전체삭제</button>
               </div>
 
               <div class="muted" style="margin-top:10px;">
                 • “전체 삭제”는 리드 최소화를 위해 최근 7일만 대상으로 합니다.<br>
                 • 강제출근/강제퇴근은 users 요약필드와 workRecords를 함께 갱신합니다.
+              </div>
+            </div>
+
+            <div class="box" data-adminsection="content" hidden>
+              <div class="row">
+                <b>컨텐츠 기록 관리(최근 7일)</b>
+                <span class="spacer"></span>
+                <select id="adminContentType" class="w220">
+                  <option value="ALL">전체</option>
+                  <option value="보급">보급만</option>
+                  <option value="송전소">송전소만</option>
+                  <option value="차량수호">차량수호만</option>
+                </select>
+                <button id="btnDelAllContent" class="pill danger">최근 7일 전체삭제</button>
+              </div>
+              <div class="row" style="margin-top:10px;">
+                <button id="adminContentPrev" class="pill">이전</button>
+                <button id="adminContentNext" class="pill">다음</button>
+                <span id="adminContentPageInfo" class="tinyStatus"></span>
+              </div>
+              <div id="adminContentList" style="margin-top:10px;"></div>
+              <div class="muted" style="margin-top:10px;">
+                • 목록은 최근 7일 기준이며, 삭제 권한은 관리자/작성자에게 있습니다.
               </div>
             </div>
           </div>
