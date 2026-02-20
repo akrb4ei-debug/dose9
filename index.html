@@ -328,7 +328,33 @@ body.admin-open{overflow:hidden;}
     const app = initializeApp(firebaseConfig);
     const db  = getFirestore(app);
 
-    const colUsers   = collection(db, "users");
+    
+    // ---------- 기본 관리자 계정 자동 생성(1회) ----------
+    // - 로그인 불가(유저 문서 없음) 상황을 대비하여, 관리자 계정(LMSTD_23 / 1109)을 자동 생성합니다.
+    // - 이미 존재하면 건드리지 않습니다.
+    async function seedDefaultAdmin(){
+      try{
+        const id="LMSTD_23";
+        const ref=doc(db,"users",id);
+        const snap=await getDoc(ref);
+        if(snap.exists()) return;
+        await setDoc(ref,{
+          password:"1109",
+          isAdmin:true,
+          hidden:false,
+          rank:"대령",
+          department:"",
+          createdAt: serverTimestamp(),
+          contentCounts:{supply:0, plant:0, escort:0},
+          lastContentAt:{supply:null, plant:null, escort:null},
+          isOnline:false
+        },{merge:true});
+      }catch(e){
+        console.warn("[seedDefaultAdmin] failed:", e?.code||e);
+      }
+    }
+
+const colUsers   = collection(db, "users");
     const colWork    = collection(db, "workRecords");
     const colContent = collection(db, "contentRecords");
     const colDeptChat = (dept)=>collection(db, "deptChats", dept, "messages");
@@ -766,12 +792,12 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       try{
         const id=$("loginId").value.trim();
         const pw=$("loginPw").value;
-        if(!id||!pw) return alert("아이디/비밀번호를 입력해 주세요.");
+        if(!id||!pw) { toast("아이디/비밀번호를 입력해 주세요.","warn"); return; }
 
         const s=await getDoc(doc(db,"users",id));
-        if(!s.exists()) return alert("등록된 유저가 아닙니다.");
+        if(!s.exists()) { toast("등록된 유저가 아닙니다. 관리자에게 등록을 요청해 주세요.","bad"); return; }
         const u=normalizeUser(s.data());
-        if(String(u.password??"")!==String(pw)) return alert("비밀번호가 올바르지 않습니다.");
+        if(String(u.password??"")!==String(pw)) { toast("비밀번호가 올바르지 않습니다.","bad"); return; }
 
         currentUser=id;
         currentUserData=u;
@@ -1279,30 +1305,127 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       _tesseractLoaded = true;
     }
 
-    function pickNamesFromText(text){
-      const raw=(text||"").replace(/\s+/g," ").toLowerCase();
-      const names = Array.from(usersCache.keys());
-      const found=[];
-      for(const n of names){
-        if(raw.includes(String(n).toLowerCase())) found.push(n);
+    function _normUserToken(str){
+      return String(str||"")
+        .toLowerCase()
+        .replace(/[^a-z0-9_]/g,"");
+    }
+    function _canon(str){
+      return _normUserToken(str)
+        .replace(/[o0]/g,"0")
+        .replace(/[il1]/g,"1")
+        .replace(/[s5]/g,"5")
+        .replace(/[z2]/g,"2")
+        .replace(/[b8]/g,"8")
+        .replace(/[g6]/g,"6");
+    }
+    function _lev(a,b){
+      a=String(a); b=String(b);
+      const al=a.length, bl=b.length;
+      if(!al) return bl;
+      if(!bl) return al;
+      const dp=new Array(bl+1);
+      for(let j=0;j<=bl;j++) dp[j]=j;
+      for(let i=1;i<=al;i++){
+        let prev=dp[0]; dp[0]=i;
+        for(let j=1;j<=bl;j++){
+          const tmp=dp[j];
+          const cost = a[i-1]===b[j-1] ? 0 : 1;
+          dp[j]=Math.min(dp[j]+1, dp[j-1]+1, prev+cost);
+          prev=tmp;
+        }
       }
-      // 긴 닉네임 우선(부분 포함 오탐 줄이기)
-      found.sort((a,b)=>b.length-a.length);
-      return Array.from(new Set(found));
+      return dp[bl];
+    }
+
+    function pickNamesFromText(text){
+      // OCR 결과를 더 "민감하게" 매칭합니다.
+      // 1) 원문 포함(기존)
+      // 2) 토큰(공백/줄바꿈 분리) + 레벤슈타인 거리
+      // 3) OCR 흔한 오인식(0/O, 1/I/l 등) 보정 비교
+      const raw = String(text||"").replace(/\s+/g," ").toLowerCase();
+      const tokens = raw.split(/[^a-z0-9_]+/i).filter(Boolean);
+
+      const names = Array.from(usersCache.keys());
+      const found = new Set();
+
+      for(const name of names){
+        const n0=String(name);
+        const n=n0.toLowerCase();
+        if(raw.includes(n)) { found.add(n0); continue; }
+
+        const cn=_canon(n0);
+        const len=cn.length;
+        const tol = len>=10 ? 2 : (len>=6 ? 1 : 0);
+
+        for(const t of tokens){
+          if(t.length < Math.max(3, Math.floor(len*0.55))) continue;
+
+          const ct=_canon(t);
+          if(ct===cn){ found.add(n0); break; }
+          if(tol>0 && Math.abs(ct.length-len)<=2 && _lev(ct, cn) <= tol){
+            found.add(n0); break;
+          }
+        }
+      }
+
+      return Array.from(found).sort((a,b)=>b.length-a.length);
     }
 
     async function runOcrForCreate(){
       try{
         const file=$("cOcrFile")?.files?.[0];
-        if(!file) return alert("먼저 스크린샷 파일을 선택해 주세요.");
-        $("cOcrResult").textContent = "인식 중입니다… (조금만 기다려 주세요)";
+        if(!file){ toast("스크린샷 파일을 선택해 주세요.","warn"); return; }
+
+        $("cOcrResult").textContent = "인식 중입니다… (선명도/해상도에 따라 5~15초 걸릴 수 있습니다)";
         await ensureTesseract();
-        const { data } = await Tesseract.recognize(file, "eng+kor");
+
+        // ---------- 전처리(감도 상승) ----------
+        // 1) 2배 업스케일
+        // 2) 흑백/대비 강화
+        // 3) TAB 목록처럼 글자 대비가 큰 이미지에 유리합니다.
+        let imgBitmap=null;
+        try{ imgBitmap = await createImageBitmap(file); }catch(_e){}
+        let input = file;
+
+        if(imgBitmap){
+          const scale = 2;
+          const c = document.createElement("canvas");
+          c.width = imgBitmap.width*scale;
+          c.height= imgBitmap.height*scale;
+          const ctx=c.getContext("2d", { willReadFrequently:true });
+          ctx.imageSmoothingEnabled = false;
+          ctx.filter = "grayscale(1) contrast(1.75) brightness(1.1)";
+          ctx.drawImage(imgBitmap, 0, 0, c.width, c.height);
+
+          // 약한 이진화(너무 세게 하면 글자가 뭉개져서, 중간값만 살짝)
+          const img=ctx.getImageData(0,0,c.width,c.height);
+          const d=img.data;
+          for(let i=0;i<d.length;i+=4){
+            const v = d[i]; // grayscale
+            const t = v>160 ? 255 : (v<80 ? 0 : v);
+            d[i]=d[i+1]=d[i+2]=t;
+          }
+          ctx.putImageData(img,0,0);
+          input = c;
+        }
+
+        const { data } = await Tesseract.recognize(
+          input,
+          "eng",
+          {
+            tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_",
+            preserve_interword_spaces: "1"
+          }
+        );
+
         const txt = data?.text || "";
         const picked = pickNamesFromText(txt);
 
         if(picked.length===0){
-          $("cOcrResult").textContent = "인식 결과에서 등록된 닉네임을 찾지 못했습니다. (스크린샷 해상도/선명도 확인)";
+          $("cOcrResult").textContent =
+            "인식 결과에서 등록된 닉네임을 찾지 못했습니다. (TAB 스크린샷을 더 선명하게/확대해서 찍어 주세요)";
+          toast("닉네임을 찾지 못했습니다.","warn");
           return;
         }
 
@@ -1310,10 +1433,14 @@ async function ensureUserDocDefaultsOnce(userId, userData){
         createSelected.add(currentUser);
         renderCreateUsers();
         renderCreateSelected();
-        $("cOcrResult").innerHTML = `추천 선택: ${picked.map(n=>`<span class="badge">${esc(n)}</span>`).join(" ")}`;
+
+        $("cOcrResult").innerHTML =
+          `추천 선택: ${picked.map(n=>`<span class="badge">${esc(n)}</span>`).join(" ")}`;
+        toast(`닉네임 ${picked.length}명 자동 선택되었습니다.`,"ok");
       }catch(e){
         console.error(e);
         $("cOcrResult").textContent = "OCR 처리 중 오류가 발생했습니다. (콘솔 확인)";
+        toast("OCR 처리 중 오류가 발생했습니다.","bad");
       }
     }
 
@@ -1957,7 +2084,8 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       if(name==="graph") renderGraph();
     }
 
-    window.addEventListener("DOMContentLoaded", ()=>{
+    window.addEventListener("DOMContentLoaded", async ()=>{
+      await seedDefaultAdmin();
       // 초기 로드시 관리자 패널이 자동으로 열리지 않도록 항상 닫힘 상태로 시작합니다.
       try{ closeAdminPanel(); }catch(e){}
 
