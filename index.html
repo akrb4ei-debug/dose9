@@ -309,6 +309,16 @@ body::before{
 .adminCol .box{background: rgba(255,255,255,0.03); border:1px solid var(--stroke); border-radius:16px;}
 body.admin-open{overflow:hidden;}
 
+
+  .modalCard.wide{width:min(900px,94vw);}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .grid2 .card{padding:12px;border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.03);}
+  .grid2 .k{font-size:12px;color:var(--muted);margin-top:6px;}
+  .grid2 .v{font-size:14px;}
+  @media (max-width:820px){.grid2{grid-template-columns:1fr;}}
+
+  .link{cursor:pointer;text-decoration:underline;text-decoration-color:rgba(255,255,255,.35);text-underline-offset:3px;}
+  .link:hover{text-decoration-color:rgba(255,255,255,.7);}
 </style>
 
   <script type="module">
@@ -398,62 +408,87 @@ const USER_PAGE_SIZE = 10;
     // =============================
     // UI 토스트 (브라우저 alert 대체)
     // =============================
-    function toast(msg,type="good",title="알림",ms=2200,key=null){
-      const wrap=document.getElementById("toastWrap");
-      if(!wrap) return;
+    // ✅ 토스트: 큐 + 중복키 갱신 + 최대 3개 표시
+    const toastQueue = [];
+    let toastShowing = false;
 
-      const icon = (type==="good")?"✅":(type==="warn")?"⚠️":(type==="bad")?"❌":"ℹ️";
-      const k = key || `${type}:${title}:${msg}`.slice(0,160);
-      // 기존 동일 키 토스트가 있으면 갱신(중복 쌓임 방지)합니다.
-      const safeKey = (window.CSS && CSS.escape) ? cssEsc(k) : String(k).replace(/"/g,"");
-      const existing = wrap.querySelector(`.toast[data-key="${safeKey}"]`);
-      if(existing){
-        existing.querySelector(".tTitle").textContent = `${icon} ${title}`;
-        existing.querySelector(".tMsg").textContent = msg;
-        existing.classList.remove("out");
-        existing.dataset.type = type;
-        existing.style.setProperty("--ms", `${ms}ms`);
-        // 프로그레스 리셋
-        const bar = existing.querySelector(".tBar");
-        if(bar){
-          bar.style.animation="none";
-          // reflow
-          void bar.offsetWidth;
-          bar.style.animation="";
+    function toast(message, tone="good", title="알림", key=null, ms=2600){
+      try{
+        const wrap = $("toastWrap");
+        if(!wrap) return;
+
+        // 같은 key가 있으면 기존 토스트를 갱신합니다.
+        if(key){
+          const safeKey = (window.CSS && CSS.escape) ? CSS.escape(String(key)) : String(key).replace(/"/g,'\\"');
+          const existing = wrap.querySelector(`.toast[data-key="${safeKey}"]`);
+          if(existing){
+            const t = existing.querySelector(".tTitle");
+            const b = existing.querySelector(".tBody");
+            if(t) t.textContent = title || "알림";
+            if(b) b.textContent = message;
+            existing.classList.remove("good","warn","bad");
+            existing.classList.add(tone);
+            // 리셋 애니메이션
+            existing.style.animation = "none";
+            void existing.offsetWidth;
+            existing.style.animation = "";
+            // 타이머 재설정
+            clearTimeout(existing._tm);
+            existing._tm = setTimeout(()=>removeToast(existing), ms);
+            return;
+          }
         }
-        clearTimeout(existing._t1);
-        clearTimeout(existing._t2);
-        existing._t1=setTimeout(()=>existing.classList.add("out"), Math.max(600, ms-350));
-        existing._t2=setTimeout(()=>existing.remove(), ms+120);
+
+        toastQueue.push({message, tone, title, key, ms});
+        processToastQueue();
+      }catch(e){
+        console.error(e);
+      }
+    }
+
+    function processToastQueue(){
+      if(toastShowing) return;
+      toastShowing = true;
+
+      const wrap = $("toastWrap");
+      if(!wrap){ toastQueue.length=0; toastShowing=false; return; }
+
+      while(toastQueue.length){
+        const item = toastQueue.shift();
+        const el = document.createElement("div");
+        el.className = `toast ${item.tone||"good"}`;
+        if(item.key!=null) el.dataset.key = String(item.key);
+        el.innerHTML = `
+          <div class="tTop">
+            <div class="tTitle">${esc(item.title||"알림")}</div>
+            <button class="tX" aria-label="닫기">×</button>
+          </div>
+          <div class="tBody">${esc(item.message||"")}</div>
+          <div class="tBar"></div>
+        `;
+        wrap.prepend(el);
+
+        // 최대 3개 유지
+        while(wrap.children.length>3){
+          removeToast(wrap.lastElementChild, true);
+        }
+
+        el.querySelector(".tX").onclick = ()=>removeToast(el);
+        el._tm = setTimeout(()=>removeToast(el), item.ms || 2600);
+      }
+
+      toastShowing = false;
+    }
+
+    function removeToast(el, instant=false){
+      if(!el) return;
+      try{ clearTimeout(el._tm); }catch(e){}
+      if(instant){
+        el.remove();
         return;
       }
-
-      // 너무 많이 쌓이면 오래된 것부터 정리합니다(최대 3개).
-      while(wrap.children.length>=3){
-        wrap.firstElementChild?.remove();
-      }
-
-      const el=document.createElement("div");
-      el.className=`toast ${type}`;
-      el.dataset.key = k;
-      el.dataset.type = type;
-      el.style.setProperty("--ms", `${ms}ms`);
-      el.innerHTML = `
-        <div class="tHead">
-          <div class="tTitle">${icon} ${title}</div>
-          <button class="tX" aria-label="닫기">×</button>
-        </div>
-        <div class="tMsg"></div>
-        <div class="tBar"></div>
-      `;
-      el.querySelector(".tMsg").textContent = msg;
-      el.querySelector(".tX").onclick=()=>{ el.classList.add("out"); setTimeout(()=>el.remove(),180); };
-
-      wrap.appendChild(el);
-
-      // 자동 종료
-      el._t1=setTimeout(()=>el.classList.add("out"), Math.max(600, ms-350));
-      el._t2=setTimeout(()=>el.remove(), ms+120);
+      el.classList.add("out");
+      setTimeout(()=>{ try{ el.remove(); }catch(e){} }, 260);
     }
 
     // ✅ 브라우저 alert() 대신, 사이트 토스트로 표시합니다.
@@ -529,7 +564,42 @@ const USER_PAGE_SIZE = 10;
       lockBody(false);
     }
 
-    async function openUserModal(uid){
+    async 
+    function openProfile(userId){
+      const u = usersCache.get(userId) || {};
+      const body = $("profileBody");
+      if(!body) return;
+      const wk = u.weekSeconds!=null ? u.weekSeconds : (u.weekWorkSeconds!=null?u.weekWorkSeconds:null);
+      const weekH = wk!=null ? (Math.floor(wk/3600)+"시간 "+Math.floor((wk%3600)/60)+"분") : "데이터 없음";
+      const lastIn = u.lastIn ? fmt(u.lastIn) : (u.lastCheckIn?fmt(u.lastCheckIn):"-");
+      const lastOut = u.lastOut ? fmt(u.lastOut) : (u.lastCheckOut?fmt(u.lastCheckOut):"-");
+      const c1 = u.cntPlant7d ?? u.plant7d ?? "-";
+      const c2 = u.cntSupply7d ?? u.supply7d ?? "-";
+      const c3 = u.cntEscort7d ?? u.escort7d ?? "-";
+
+      body.innerHTML = `
+        <div class="grid2">
+          <div class="card">
+            <div class="k">닉네임</div><div class="v"><b>${esc(userId)}</b></div>
+            <div class="k">계급</div><div class="v">${esc(u.rank||"-")}</div>
+            <div class="k">부서</div><div class="v">${esc(u.department||"-")}</div>
+            <div class="k">온라인</div><div class="v">${u.isOnline?"O":"X"}</div>
+          </div>
+          <div class="card">
+            <div class="k">최근 7일 근무</div><div class="v">${esc(weekH)}</div>
+            <div class="k">마지막 출근</div><div class="v">${esc(lastIn)}</div>
+            <div class="k">마지막 퇴근</div><div class="v">${esc(lastOut)}</div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:12px;">
+          <div class="k">최근 7일 컨텐츠 참여</div>
+          <div class="v">송전소: <b>${esc(String(c1))}</b> · 보급: <b>${esc(String(c2))}</b> · 차량수호: <b>${esc(String(c3))}</b></div>
+          <div class="tiny muted" style="margin-top:8px;">※ 이 프로필은 현재 로딩된 요약/유저 문서 기반으로 표시됩니다.</div>
+        </div>
+      `;
+      showModal("profileModal", true);
+    }
+function openUserModal(uid){
       try{
         if(!uid) return;
         document.getElementById("userModalTitle").textContent = `유저 상세 · ${uid}`;
@@ -821,7 +891,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
         await ensureUserDocDefaultsOnce(id, currentUserData);
 
         $("who").innerHTML = `
-          <span class="chip">ID <b>${esc(id)}</b></span>
+          <span class="chip">ID <b class="link" data-profile="${esc(id)}">${esc(id)}</b></span>
           <span class="chip">계급 <b>${esc(u.rank||"-")}</b></span>
           <span class="chip">부서 <b>${esc(u.department||"-")}</b></span>
           <span class="chip">관리자 <b>${u.isAdmin?"O":"X"}</b></span>
@@ -1226,8 +1296,14 @@ async function ensureUserDocDefaultsOnce(userId, userData){
         const type = r.type || "-";
         const out = needsOutcome(type) ? (r.outcome===true?"O":(r.outcome===false?"X":"-")) : "-";
         const writer = r.writer || "-";
+        const writerHidden = (!isAdmin() && usersCache.get(writer)?.isHidden);
+        if(writerHidden) return null;
         const time = fmt(r.time);
-        const parts = Array.isArray(r.participants)?r.participants:[];
+        let parts = Array.isArray(r.participants)?r.participants:[];
+        if(!isAdmin()){
+          parts = parts.filter(n=>!(usersCache.get(n)?.isHidden));
+          if(parts.length===0) return null;
+        }
         const boldWriter = `<b style="font-weight:900;">${esc(writer)}</b>`;
         const edited = r.edited?.mode==="admin" ? `<span class="tiny">수정:${esc(r.edited.by||"-")}</span>` :
                       r.edited?.mode==="self" ? `<span class="tiny">(수정됨)</span>` : "";
@@ -1999,12 +2075,12 @@ async function ensureUserDocDefaultsOnce(userId, userData){
     async function postNotice(){
       const dept=currentUserData?.department;
       if(!dept) return;
-      if(!isDeptLeaderOf(dept)) return alert("부서장 권한이 없습니다.");
+      if(!isDeptLeaderOf(dept)) return toast("부서장 권한이 없습니다.","bad","공지");
       const text=$("noticeText").value.trim();
-      if(!text) return alert("공지 내용을 입력해 주세요.");
+      if(!text) return toast("공지 내용을 입력해 주세요.","warn","공지");
       await setDoc(docDeptNotice(dept), { text, by: currentUser, at: serverTimestamp(), id: `${Date.now()}_${Math.random().toString(16).slice(2)}` }, {merge:true});
       $("noticeText").value="";
-      setStatus("공지 등록됨");
+      toast("공지가 등록되었습니다.","good","공지"); setStatus("공지 등록됨");
       await loadChat();
     }
 
@@ -2150,6 +2226,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
 
       $("btnAdminClose")?.addEventListener("click", closeAdminPanel);
       $("adminBackdrop")?.addEventListener("click", closeAdminPanel);
+      $("btnProfileClose")?.addEventListener("click", ()=>showModal("profileModal", false));
       document.addEventListener("keydown", (e)=>{
         if(e.key==="Escape"){
           try{ closeAdminPanel(); }catch(_){ }
@@ -2704,5 +2781,17 @@ async function ensureUserDocDefaultsOnce(userId, userData){
 
   <!-- 우클릭 컨텍스트 메뉴(관리자 전용) -->
   <div id="ctxMenu" class="ctxMenu hidden"></div>
+
+  <!-- 프로필 모달 -->
+  <div id="profileModal" class="modalBack hidden" role="dialog" aria-modal="true">
+    <div class="modalCard wide">
+      <div class="modalHead">
+        <div class="modalTitle">유저 프로필</div>
+        <button class="pill" id="btnProfileClose">닫기</button>
+      </div>
+      <div id="profileBody" class="modalBody"></div>
+    </div>
+  </div>
+
 </body>
 </html>
