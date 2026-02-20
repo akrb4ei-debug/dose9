@@ -630,13 +630,6 @@ const USER_PAGE_SIZE = 10;
     let work7dLoadedAt=0;
     const CACHE_7D_MS = 60*1000; // 1분 캐시
 
-    // ✅ 최근 7일 기준 Date (누락 방지)
-    function sevenDaysAgo(){
-      const d = new Date();
-      d.setDate(d.getDate() - 7);
-      return d;
-    }
-
     async function loadWork7dOnce(){
       const now=Date.now();
       if(work7dCache && (now-work7dLoadedAt)<CACHE_7D_MS) return work7dCache;
