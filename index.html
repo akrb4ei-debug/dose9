@@ -928,8 +928,16 @@ if(!id||!pw) { toast("아이디/비밀번호를 입력해 주세요.","warn"); r
 
         const s=await getDoc(doc(db,"users",id));
         if(!s.exists()) { toast("등록된 유저가 아닙니다. 관리자에게 등록을 요청해 주세요.","bad"); return; }
-        const u=normalizeUser(s.data());
-        const savedPw = String(u.password ?? "").trim().normalize("NFC");
+        const raw = s.data();
+        const u=normalizeUser(raw);
+        // password 필드명이 환경마다 다를 수 있어 fallback을 둡니다.
+        const savedPwRaw = (u.password ?? u.pw ?? u.pass ?? u.passwd ?? raw?.password ?? raw?.pw ?? raw?.pass ?? raw?.passwd ?? "");
+        const savedPw = String(savedPwRaw ?? "").trim().normalize("NFC");
+        if(!savedPw){
+          console.warn("[login] missing password field", { id, keys: Object.keys(raw||{}) });
+          toast("해당 계정에 비밀번호(password) 필드가 없습니다. Firestore 문서 ID/필드를 확인해 주세요.","bad","로그인");
+          return;
+        }
         if(savedPw !== pw){
           console.warn("[login] pw mismatch", { typed: pw, saved: savedPw });
           toast("비밀번호가 올바르지 않습니다.","bad");
