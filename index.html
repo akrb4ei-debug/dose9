@@ -345,7 +345,23 @@ body.admin-open #adminBackdrop{ display:block; }
       #adminCol{position:relative;top:auto;}
     }
 
-  </style>
+  
+    .adminHeaderDrag{display:flex;align-items:center;justify-content:space-between;gap:10px;}
+    .adminTitle{display:flex;align-items:center;gap:10px;}
+    .adminFloatBtns{display:flex;gap:6px;}
+    .adminTopTabs{display:flex;gap:10px;margin-top:12px;}
+    .adminTabBtn{padding:10px 12px;border:1px solid var(--stroke);background:var(--panel2);color:var(--text);border-radius:12px;cursor:pointer;font-weight:800}
+    .adminTabBtn.active{outline:2px solid rgba(185,198,255,0.35)}
+    .adminTabPane.hidden{display:none}
+    .admRow{border:1px solid var(--stroke);background:rgba(255,255,255,0.04);border-radius:14px;padding:12px;margin-bottom:10px}
+    .admRowHead{display:flex;align-items:center;justify-content:space-between;gap:10px;cursor:pointer}
+    .admRowMeta{font-size:12px;color:var(--muted)}
+    .admRowBody{margin-top:12px;display:none}
+    .admRow.open .admRowBody{display:block}
+    .admControls{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+    .admBtnRow{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+
+</style>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -1193,6 +1209,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       await loadDashKpis();
       await loadUserTable();
       await loadContentPage(0);
+      uiMsg("등록되었습니다.","success");
     }
 
     // edit content modal (participants 수정 + outcome 수정, 권한: 작성자 또는 관리자)
@@ -1261,10 +1278,19 @@ async function ensureUserDocDefaultsOnce(userId, userData){
         ? {mode:"admin", by: currentUser, at: serverTimestamp()}
         : {mode:"self", by: editData.writer||currentUser, at: serverTimestamp()};
 
+      // diff 계산(추가/삭제 표시)
+      const before = (editData?.participants||[]).slice();
+      const after  = parts.slice();
+      const beforeSet = new Set(before);
+      const afterSet  = new Set(after);
+      const diffAdded = after.filter(x=>!beforeSet.has(x));
+      const diffRemoved = before.filter(x=>!afterSet.has(x));
       await updateDoc(doc(db,"contentRecords",editId),{
         participants: parts,
         outcome,
-        edited
+        edited,
+        diffAdded,
+        diffRemoved
       });
 
       showModal("editModal", false);
@@ -1910,7 +1936,27 @@ async function ensureUserDocDefaultsOnce(userId, userData){
     });
   
     // ---------- Toast(사이트 내 알림) ----------
-    function toast(message, kind="info"){
+    
+    function formatParticipants(r){
+      const parts = (r.participants||[]).slice();
+      const added = new Set((r.diffAdded||[]));
+      const removed = new Set((r.diffRemoved||[]));
+      // 제거된 사람은 뒤로 보내고 취소선
+      const kept = parts.filter(p=>!removed.has(p));
+      const remv = [...removed].filter(p=>!kept.includes(p));
+      const ordered = kept.concat(remv);
+      return ordered.map(p=>{
+        let name = escapeHtml(p);
+        if(added.has(p)) name = "<b>"+name+"</b>";
+        if(removed.has(p)) name = "<s>"+name+"</s>";
+        return name;
+      }).join(", ");
+    }
+    function escapeHtml(x){
+      return String(x).replace(/[&<>"']/g, m=>({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[m]));
+    }
+
+function toast(message, kind="info"){
       const host = document.getElementById("toastHost");
       if(!host){ console.log("[toast]", message); return; }
       const el = document.createElement("div");
@@ -1923,6 +1969,245 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       setTimeout(()=>{ el.remove(); }, 3200);
     }
     function uiMsg(message, kind="info"){ toast(message, kind); }
+
+
+    // ======================
+    // 관리자 유저관리 (탭/아코디언/페이지)
+    // ======================
+    const RANKS = ["군의관","하사","중사","상사","원사","소위","중위","대위","소령","중령","대령"];
+    const DEPTS = ["참모부","국군 경비사령부","국군 특수전사령부","국군 방첩사령부","제 1경비단","군사경찰단","제1공수특수전여단","제3공수특전여단","제820방첩부대","국군의무사령부"];
+
+    function fillSelect(el, arr){
+      if(!el) return;
+      el.innerHTML = arr.map(v=>`<option value="${v}">${v}</option>`).join("");
+    }
+    function rankOrder(r){ const i=RANKS.indexOf(r||""); return i<0?0:i; }
+
+    let admPage=0;
+    const ADM_PAGE_SIZE=10;
+
+    function initAdminTabs(){
+      const btns=[...document.querySelectorAll(".adminTabBtn")];
+      btns.forEach(b=>{
+        b.addEventListener("click", ()=>{
+          btns.forEach(x=>x.classList.remove("active"));
+          b.classList.add("active");
+          const tab=b.dataset.tab;
+          document.getElementById("adminTabAdd").classList.toggle("hidden", tab!=="add");
+          document.getElementById("adminTabList").classList.toggle("hidden", tab!=="list");
+          if(tab==="list"){ admPage=0; renderAdminUserList(); }
+        });
+      });
+    }
+
+    async function adminAddUser(){
+      const nick=document.getElementById("admNewNick").value.trim();
+      const pw=document.getElementById("admNewPw").value.trim();
+      const rank=document.getElementById("admNewRank").value;
+      const dept=document.getElementById("admNewDept").value;
+      if(!nick||!pw) return uiMsg("닉네임/비밀번호를 입력해 주세요.","error");
+
+      const ref=doc(db,"users",nick);
+      const snap=await getDoc(ref);
+      if(snap.exists()) return uiMsg("이미 존재하는 유저입니다.","error");
+
+      await setDoc(ref,{
+        password: pw,
+        rank, dept,
+        isAdmin:false,
+        isHidden:false,
+        isOnline:false,
+        todaySeconds:0,
+        weekSeconds:0,
+        contentCounts:{supply:0,plant:0,escort:0},
+        contentLast:{supply:null,plant:null,escort:null}
+      },{merge:true});
+
+      uiMsg("유저가 추가되었습니다.","success");
+      document.getElementById("admNewNick").value="";
+      document.getElementById("admNewPw").value="";
+      await loadUsersOnce(true);
+      renderAdminUserList();
+    }
+
+    function getAdminListFiltered(){
+      const q=(document.getElementById("admSearch").value||"").trim().toLowerCase();
+      let list=[...usersCache.values()].map(u=>normalizeUser(u)).map(u=>({...u,nickname:u.nickname||u.id})).filter(u=>u.nickname);
+      if(q) list=list.filter(u=>u.nickname.toLowerCase().includes(q));
+
+      const sort=document.getElementById("admSortSelect").value;
+      list.sort((a,b)=>{
+        const ao=rankOrder(a.rank), bo=rankOrder(b.rank);
+        if(sort==="rankDesc") return bo-ao;
+        if(sort==="rankAsc") return ao-bo;
+        if(sort==="onlineFirst") return (b.isOnline?1:0)-(a.isOnline?1:0) || (bo-ao);
+        return (a.nickname||"").localeCompare(b.nickname||"");
+      });
+      return list;
+    }
+
+    async function adminUpdateUser(nick, patch){
+      await updateDoc(doc(db,"users",nick), patch);
+    }
+
+    async function adminForceOut(nick){
+      if(typeof forceCheckOutUser==="function"){
+        await forceCheckOutUser(nick);
+        uiMsg("강제퇴근 완료","success");
+      }else{
+        uiMsg("강제퇴근 기능이 연결되지 않았습니다.","error");
+      }
+    }
+
+    function renderAdminUserList(){
+      const host=document.getElementById("admUserList");
+      if(!host) return;
+
+      const list=getAdminListFiltered();
+      const total=Math.max(1, Math.ceil(list.length/ADM_PAGE_SIZE));
+      admPage=Math.min(admPage, total-1);
+
+      const start=admPage*ADM_PAGE_SIZE;
+      const items=list.slice(start,start+ADM_PAGE_SIZE);
+
+      host.innerHTML = items.map(u=>`
+        <div class="admRow" data-nick="${u.nickname}">
+          <div class="admRowHead">
+            <div>
+              <b>${u.nickname}</b>
+              <div class="admRowMeta">${u.rank||"-"} · ${u.dept||"-"} · 관리자:${u.isAdmin?"O":"X"} · 숨김:${u.isHidden?"O":"X"} · 접속:${u.isOnline?"O":"X"}</div>
+            </div>
+            <button class="pill">펼치기</button>
+          </div>
+          <div class="admRowBody">
+            <div class="admControls">
+              <div>
+                <div class="hint">계급</div>
+                <select class="in admRank"></select>
+              </div>
+              <div>
+                <div class="hint">부서</div>
+                <select class="in admDept"></select>
+              </div>
+              <div>
+                <div class="hint">비밀번호 변경</div>
+                <input class="in admPw" placeholder="새 비밀번호">
+              </div>
+              <div>
+                <div class="hint">토글</div>
+                <div class="row">
+                  <button class="pill admToggleAdmin">${u.isAdmin?"관리자 해제":"관리자 부여"}</button>
+                  <button class="pill admToggleHide">${u.isHidden?"숨김 해제":"숨김 처리"}</button>
+                </div>
+              </div>
+            </div>
+            <div class="admBtnRow">
+              <button class="pill ok admSave">저장</button>
+              <button class="pill admForceOut">강제퇴근</button>
+              <button class="pill danger admDelete">유저 삭제</button>
+            </div>
+          </div>
+        </div>
+      `).join("");
+
+      document.getElementById("admPageInfo").textContent = `${admPage+1} / ${total}`;
+
+      host.querySelectorAll(".admRow").forEach(row=>{
+        const nick=row.dataset.nick;
+        const head=row.querySelector(".admRowHead");
+        const btn=head.querySelector("button");
+
+        const toggle=()=>{
+          row.classList.toggle("open");
+          btn.textContent = row.classList.contains("open") ? "접기" : "펼치기";
+        };
+        head.addEventListener("click", (e)=>{
+          if(e.target.tagName==="BUTTON") return;
+          toggle();
+        });
+        btn.addEventListener("click",(e)=>{e.stopPropagation();toggle();});
+
+        const u=list.find(x=>x.nickname===nick) || {};
+        const selRank=row.querySelector(".admRank");
+        fillSelect(selRank,RANKS);
+        selRank.value = u.rank || RANKS[0];
+
+        const selDept=row.querySelector(".admDept");
+        fillSelect(selDept,DEPTS);
+        selDept.value = u.dept || DEPTS[0];
+
+        row.querySelector(".admToggleAdmin").onclick=async(e)=>{
+          e.stopPropagation();
+          await adminUpdateUser(nick,{isAdmin: !u.isAdmin});
+          uiMsg("관리자 권한이 변경되었습니다.","success");
+          await loadUsersOnce(true);
+          renderAdminUserList();
+        };
+        row.querySelector(".admToggleHide").onclick=async(e)=>{
+          e.stopPropagation();
+          await adminUpdateUser(nick,{isHidden: !u.isHidden});
+          uiMsg("숨김 상태가 변경되었습니다.","success");
+          await loadUsersOnce(true);
+          renderAdminUserList();
+        };
+        row.querySelector(".admSave").onclick=async(e)=>{
+          e.stopPropagation();
+          const pw=(row.querySelector(".admPw").value||"").trim();
+          const patch={rank:selRank.value, dept:selDept.value};
+          if(pw) patch.password=pw;
+          await adminUpdateUser(nick,patch);
+          uiMsg("저장되었습니다.","success");
+          await loadUsersOnce(true);
+          renderAdminUserList();
+        };
+        row.querySelector(".admForceOut").onclick=async(e)=>{
+          e.stopPropagation();
+          await adminForceOut(nick);
+          await loadUsersOnce(true);
+          renderAdminUserList();
+        };
+        row.querySelector(".admDelete").onclick=async(e)=>{
+          e.stopPropagation();
+          if(!confirm("정말 삭제하시겠습니까?")) return;
+          await deleteDoc(doc(db,"users",nick));
+          uiMsg("유저가 삭제되었습니다.","success");
+          await loadUsersOnce(true);
+          renderAdminUserList();
+        };
+      });
+    }
+
+    function initAdminPager(){
+      document.getElementById("admPrevPage").onclick=()=>{ admPage=Math.max(0,admPage-1); renderAdminUserList(); };
+      document.getElementById("admNextPage").onclick=()=>{ const total=Math.max(1, Math.ceil(getAdminListFiltered().length/ADM_PAGE_SIZE)); admPage=Math.min(total-1,admPage+1); renderAdminUserList(); };
+      document.getElementById("admSortSelect").onchange=()=>{ admPage=0; renderAdminUserList(); };
+      document.getElementById("admSearch").oninput=()=>{ admPage=0; renderAdminUserList(); };
+    }
+
+    // 관리자 패널 위치(위/아래) 조절
+    let adminNudge = 0;
+    function applyAdminNudge(){
+      const col=document.getElementById("adminCol");
+      if(!col) return;
+      col.style.transform = `translateY(${adminNudge}px)`;
+    }
+
+    function initAdminNudge(){
+      const up=document.getElementById("adminNudgeUp");
+      const dn=document.getElementById("adminNudgeDown");
+      if(up) up.onclick=()=>{ adminNudge=Math.max(-120, adminNudge-20); applyAdminNudge(); };
+      if(dn) dn.onclick=()=>{ adminNudge=Math.min(220, adminNudge+20); applyAdminNudge(); };
+      applyAdminNudge();
+    }
+
+    function initAdminUsersUI(){
+      fillSelect(document.getElementById("admNewRank"), RANKS);
+      fillSelect(document.getElementById("admNewDept"), DEPTS);
+      initAdminTabs();
+      initAdminPager();
+      initAdminNudge();
+      document.getElementById("admAddUserBtn").onclick = adminAddUser;
+    }
 
 </script>
 </head>
@@ -2070,77 +2355,64 @@ async function ensureUserDocDefaultsOnce(userId, userData){
 
         <!-- ADMIN SIDE -->
         <div id="adminCol" class="card adminCol" hidden aria-hidden="true">
-          <div class="row">
-            <h3 style="margin:0;">관리자 패널</h3>
-            <span class="spacer"></span>
-            <span class="badge role">관리자 전용</span>
+          <div class="adminHeaderDrag">
+            <div class="adminTitle">
+              <h3 style="margin:0;">관리자 패널</h3>
+              <span class="badge role">관리자 전용</span>
+            </div>
+            <div class="adminFloatBtns">
+              <button class="pill" id="adminNudgeUp" title="위로">▲</button>
+              <button class="pill" id="adminNudgeDown" title="아래로">▼</button>
+            </div>
           </div>
 
-          <div class="two" style="margin-top:12px;">
+          <div class="adminTopTabs">
+            <button class="adminTabBtn active" data-tab="add">유저 추가</button>
+            <button class="adminTabBtn" data-tab="list">유저 리스트</button>
+          </div>
+
+          <section class="adminTabPane" id="adminTabAdd">
             <div class="box">
               <b>유저 추가(화이트리스트)</b>
               <div class="row" style="margin-top:10px;">
-                <input id="addNick" class="w220" placeholder="닉네임" />
-                <input id="addPw" class="w220" placeholder="비밀번호" />
-                <button id="btnAddUser" class="pill primary">추가</button>
+                <input id="admNewNick" class="in" placeholder="닉네임(=ID)" style="flex:1;">
+                <input id="admNewPw" class="in" placeholder="비밀번호" style="width:150px;">
               </div>
               <div class="row" style="margin-top:10px;">
-                <input id="adminSearch" class="w320" placeholder="유저 검색" />
+                <select id="admNewRank" class="in" style="flex:1;"></select>
+                <select id="admNewDept" class="in" style="flex:1;"></select>
               </div>
-<div class="row" style="margin-top:10px; gap:10px; flex-wrap:wrap;">
-  <select id="adminSort" class="w220">
-    <option value="rankDesc">계급 높은순</option>
-    <option value="rankAsc">계급 낮은순</option>
-    <option value="onlineFirst">온라인 우선</option>
-    <option value="nameAsc">이름 가나다순</option>
-  </select>
-  <div class="row" style="gap:8px;">
-    <button id="adminPrev" class="pill">이전(10)</button>
-    <button id="adminNext" class="pill">다음(10)</button>
-    <span id="adminPageInfo" class="badge dim">1 / 1</span>
-  </div>
-</div>
-              <div id="adminUserCards"></div>
+              <div class="row" style="margin-top:10px;">
+                <button class="pill ok" id="admAddUserBtn">유저 추가</button>
+              </div>
+              <div class="hint" style="margin-top:8px;">닉네임과 문서ID가 동일합니다.</div>
             </div>
+          </section>
 
+          <section class="adminTabPane hidden" id="adminTabList">
             <div class="box">
-              <div class="row">
-                <b>근무 기록 관리(최근 7일)</b>
+              <div class="row" style="align-items:center;">
+                <b>유저 리스트</b>
                 <span class="spacer"></span>
-                <button id="btnDelAllWork" class="pill danger">근무 기록 전체삭제</button>
-              </div>
-              <div class="row" style="margin-top:10px;">
-                <button id="btnPrevWork" class="pill">이전</button>
-                <button id="btnNextWork" class="pill">다음</button>
-                <span id="workPageInfo" class="tinyStatus"></span>
-              </div>
-              <div class="tableWrap" style="margin-top:10px;">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>닉네임</th>
-                      <th>출근</th>
-                      <th>퇴근</th>
-                      <th>시간</th>
-                      <th>상태</th>
-                      <th>조치</th>
-                    </tr>
-                  </thead>
-                  <tbody id="workTbody"></tbody>
-                </table>
+                <select id="admSortSelect" class="in" style="width:160px;">
+                  <option value="rankDesc">계급 높은순</option>
+                  <option value="rankAsc">계급 낮은순</option>
+                  <option value="onlineFirst">온라인 우선</option>
+                  <option value="nameAsc">이름순</option>
+                </select>
+                <input id="admSearch" class="in" placeholder="검색(닉네임)" style="width:180px;">
               </div>
 
-              <div class="row" style="margin-top:10px;">
-                <button id="btnResetTotals" class="pill danger">총 접속시간 초기화</button>
-                <button id="btnDelAllContent" class="pill danger">컨텐츠 기록(최근 7일) 전체삭제</button>
-              </div>
+              <div id="admUserList" style="margin-top:10px;"></div>
 
-              <div class="muted" style="margin-top:10px;">
-                • “전체 삭제”는 리드 최소화를 위해 최근 7일만 대상으로 합니다.<br>
-                • 강제출근/강제퇴근은 users 요약필드와 workRecords를 함께 갱신합니다.
+              <div class="row" style="justify-content:center;margin-top:12px;">
+                <button class="pill" id="admPrevPage">이전</button>
+                <span id="admPageInfo" class="hint" style="padding:0 10px;"></span>
+                <button class="pill" id="admNextPage">다음</button>
               </div>
             </div>
-          </div>
+          </section>
+
         </div>
 
       </div><!-- grid -->
@@ -2376,9 +2648,6 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       </div>
     </div>
   </div>
-
-
-<div id="toastContainer" style="position:fixed;top:20px;right:20px;z-index:99999;"></div>
 
 </body>
 </html>
