@@ -1528,17 +1528,6 @@ function renderContentTimeline(){
       renderCreateUsers();
       renderCreateSelected();
       showModal("createModal", true);
-    }catch(e){
-          console.warn("[openCreate] loadUsersOnce failed:", e);
-          // 메시지는 띄우지 않음
-        }
-
-        renderCreateUsers();
-        renderCreateSelected();
-      }catch(e){
-        console.error(e);
-        toast("컨텐츠 작성창을 열지 못했습니다. 콘솔을 확인해 주세요.","bad","컨텐츠 작성");
-      }
     }
 
     function renderCreateUsers(){
