@@ -1065,7 +1065,11 @@ currentUser=id;
           <span class="chip">부서 <b>${esc(u.department||"-")}</b></span>
           <span class="chip">관리자 <b>${u.isAdmin?"O":"X"}</b></span>
         `;
-        qs("btnAdmin").hidden = !u.isAdmin;
+        $1        // 관리자 탭(상단)도 권한에 따라 숨김 처리
+        try{
+          const adminTabBtn = document.querySelector('.tab[data-tab="admin"]');
+          if(adminTabBtn) adminTabBtn.hidden = !u.isAdmin;
+        }catch(_){}
 
         qs("loginView").hidden=true;
         qs("appView").hidden=false;
@@ -1077,8 +1081,11 @@ currentUser=id;
         alert("로그인 중 오류가 발생했습니다. (콘솔 확인)");
       }
     }
-    function logout(){
-      currentUser=null; currentUserData=null;
+    $1      try{ closeAdminPanel(); }catch(_){}
+      try{
+        const adminTabBtn = document.querySelector('.tab[data-tab="admin"]');
+        if(adminTabBtn) adminTabBtn.hidden = true;
+      }catch(_){}
       usersCache=new Map();
       qs("loginPw").value="";
       qs("appView").hidden=true;
@@ -2422,7 +2429,14 @@ async function maybeShowNoticeOnce(){
       }
     }
     function toggleAdminPanel(){
-      if(!isAdmin()) return;
+      if(!isAdmin()){
+        try{ toast("관리자 권한이 없습니다.","warn","관리자"); }catch(_){}
+        // 탭 상태를 마지막 일반 탭으로 되돌립니다(무반응/헷갈림 방지)
+        try{
+          document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active", t.dataset.tab===lastNonAdminTab));
+        }catch(_){}
+        return;
+      }
       const open = document.body.classList.contains("admin-open");
       if(open) closeAdminPanel();
       else openAdminPanel();
@@ -2571,7 +2585,11 @@ async function maybeShowNoticeOnce(){
     window.addEventListener("DOMContentLoaded", async ()=>{
       await seedDefaultAdmin();
       // 초기 로드시 관리자 패널이 자동으로 열리지 않도록 항상 닫힘 상태로 시작합니다.
-      try{ closeAdminPanel(); }catch(e){}
+      $1      // 로그인 전에는 관리자 탭 숨김
+      try{
+        const adminTabBtn = document.querySelector('.tab[data-tab="admin"]');
+        if(adminTabBtn) adminTabBtn.hidden = true;
+      }catch(_){}
 
       qs("btnLogin").addEventListener("click", login);
       qs("btnLogout").addEventListener("click", logout);
