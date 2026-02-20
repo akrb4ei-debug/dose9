@@ -657,7 +657,7 @@ function openUserModal(uid){
       m.classList.add("hidden");
       m.innerHTML="";
     }
-    function showCtxMenu(x,y,uid){
+    async function showCtxMenu(x,y,uid){
       if(!isAdmin()) return;
       const m=document.getElementById("ctxMenu");
       if(!m) return;
