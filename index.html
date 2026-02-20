@@ -412,7 +412,8 @@ const USER_PAGE_SIZE = 10;
     const toastQueue = [];
     let toastShowing = false;
 
-    function toast(message, tone="good", title="알림", key=null, ms=2600){
+    async function toast(message, tone="good", title="알림", key=null, ms=2600){
+
       try{
         const wrap = $("toastWrap");
         if(!wrap) return;
@@ -446,7 +447,8 @@ const USER_PAGE_SIZE = 10;
       }
     }
 
-    function processToastQueue(){
+    async function processToastQueue(){
+
       if(toastShowing) return;
       toastShowing = true;
 
@@ -480,7 +482,8 @@ const USER_PAGE_SIZE = 10;
       toastShowing = false;
     }
 
-    function removeToast(el, instant=false){
+    async function removeToast(el, instant=false){
+
       if(!el) return;
       try{ clearTimeout(el._tm); }catch(e){}
       if(instant){
@@ -492,7 +495,8 @@ const USER_PAGE_SIZE = 10;
     }
 
     // ✅ 브라우저 alert() 대신, 사이트 토스트로 표시합니다.
-    function alert(msg){
+    async function alert(msg){
+
       try{ toast(String(msg), 'warn', '알림', 2600, 'alert'); }
       catch(e){ try{ window.alert(String(msg)); }catch(_){ console.log(msg); } }
     }
@@ -504,12 +508,14 @@ const USER_PAGE_SIZE = 10;
       window.__nativeAlert=_a;
       window.alert = (m)=>toast(String(m??""),"warn","안내",2400,"alert");
     })();
-    function applyTheme(theme){
+    async function applyTheme(theme){
+
       const t = theme || localStorage.getItem("dose_theme") || "dark";
       document.documentElement.setAttribute("data-theme", t);
       localStorage.setItem("dose_theme", t);
     }
-    function toggleTheme(){
+    async function toggleTheme(){
+
       const cur = document.documentElement.getAttribute("data-theme") || "dark";
       applyTheme(cur==="dark" ? "light" : "dark");
       toast("테마가 변경되었습니다.","good","테마");
@@ -545,7 +551,8 @@ const USER_PAGE_SIZE = 10;
       return content7dCache;
     }
 
-    function openModal(){
+    async function openModal(){
+
       const bd=document.getElementById("backdrop");
       const md=document.getElementById("userModal");
       if(!bd||!md) return;
@@ -554,7 +561,8 @@ const USER_PAGE_SIZE = 10;
       md.setAttribute("aria-hidden","false");
       lockBody(true);
     }
-    function closeModal(){
+    async function closeModal(){
+
       const bd=document.getElementById("backdrop");
       const md=document.getElementById("userModal");
       if(!bd||!md) return;
@@ -565,7 +573,8 @@ const USER_PAGE_SIZE = 10;
     }
 
     async 
-    function openProfile(userId){
+    async function openProfile(userId){
+
       const u = usersCache.get(userId) || {};
       const body = $("profileBody");
       if(!body) return;
@@ -599,7 +608,8 @@ const USER_PAGE_SIZE = 10;
       `;
       showModal("profileModal", true);
     }
-function openUserModal(uid){
+async function openUserModal(uid){
+
       try{
         if(!uid) return;
         document.getElementById("userModalTitle").textContent = `유저 상세 · ${uid}`;
@@ -651,13 +661,15 @@ function openUserModal(uid){
     // =============================
     // 컨텍스트 메뉴 (관리자 전용)
     // =============================
-    function hideCtxMenu(){
+    async function hideCtxMenu(){
+
       const m=document.getElementById("ctxMenu");
       if(!m) return;
       m.classList.add("hidden");
       m.innerHTML="";
     }
     async function showCtxMenu(x,y,uid){
+
       if(!isAdmin()) return;
       const m=document.getElementById("ctxMenu");
       if(!m) return;
@@ -730,7 +742,8 @@ function openUserModal(uid){
     // =============================
     // 관리자 패널 드래그 이동 (개인 설정)
     // =============================
-    function initAdminDrag(){
+    async function initAdminDrag(){
+
       const dock=document.getElementById("adminCol");
       if(!dock) return;
       const head=dock.querySelector(".row") || dock;
@@ -769,7 +782,8 @@ function openUserModal(uid){
 
     const lockBody=(on)=>document.body.classList.toggle("noscroll", !!on);
 
-    function normalizeUser(d){
+    async function normalizeUser(d){
+
       const u={...d};
       if(u.isadmin!==undefined && u.isAdmin===undefined) u.isAdmin=u.isadmin;
       if(u.ishidden!==undefined && u.isHidden===undefined) u.isHidden=u.ishidden;
