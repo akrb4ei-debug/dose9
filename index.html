@@ -1054,14 +1054,9 @@ currentUser=id;
         try{ toast("요약 갱신 중 오류가 발생했습니다. 콘솔을 확인해 주세요.","bad","요약"); }catch(_){}
       }
     }
-      localStorage.setItem(key, String(now));
-      // 요약만 갱신: 유저 + KPI + 유저표 (컨텐츠는 갱신하지 않습니다)
-      await loadUsersOnce({force:true, reason:"admin"});
-      await loadDashKpis();
-      await loadUserTable();
-      toast("요약이 갱신되었습니다.","good","요약");
-      if(!silent) setStatus("요약이 갱신되었습니다.");
-    }
+
+
+
 
     async function refreshAll({silent}={}){
       try{
