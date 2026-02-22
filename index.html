@@ -655,9 +655,14 @@ let usersPage = 0; // 유저 목록 페이지(10명 단위)
       const now=Date.now();
       if(work7dCache && (now-work7dLoadedAt)<CACHE_7D_MS) return work7dCache;
       const { start: wsStart, end: wsEnd } = last7DaysRange();
-      const qy = query(colWork, where("checkIn", ">=", wsStart), where("checkIn","<", wsEnd), orderBy("checkIn","desc"), limit(500));
+      const qy = query(colWork, orderBy("checkIn","desc"), limit(500));
       const snap = await getDocs(qy);
-      work7dCache = snap.docs.map(d=>({id:d.id, ...d.data()}));
+      work7dCache = snap.docs.map(d=>({id:d.id, ...d.data()})).filter(r=>{
+        const ci=r.checkIn;
+        let ms=null;
+        try{ if(ci?.toDate) ms=ci.toDate().getTime(); else if(typeof ci==="number") ms=ci; else if(ci?.seconds!=null) ms=ci.seconds*1000; }catch(e){}
+        return ms!=null && ms>=wsStart.getTime() && ms<wsEnd.getTime();
+      });
       work7dLoadedAt = now;
       return work7dCache;
     }
@@ -665,9 +670,14 @@ let usersPage = 0; // 유저 목록 페이지(10명 단위)
       const now=Date.now();
       if(content7dCache && (now-content7dLoadedAt)<CACHE_7D_MS) return content7dCache;
       const { start: wsStart, end: wsEnd } = last7DaysRange();
-      const qy = query(colContent, where("time", ">=", wsStart), where("time","<", wsEnd), orderBy("time","desc"), limit(500));
+      const qy = query(colContent, orderBy("time","desc"), limit(500));
       const snap = await getDocs(qy);
-      content7dCache = snap.docs.map(d=>({id:d.id, ...d.data()}));
+      content7dCache = snap.docs.map(d=>({id:d.id, ...d.data()})).filter(r=>{
+        const t=r.time;
+        let ms=null;
+        try{ if(t?.toDate) ms=t.toDate().getTime(); else if(typeof t==="number") ms=t; else if(t?.seconds!=null) ms=t.seconds*1000; }catch(e){}
+        return ms!=null && ms>=wsStart.getTime() && ms<wsEnd.getTime();
+      });
       content7dLoadedAt = now;
       return content7dCache;
     }
@@ -1491,39 +1501,23 @@ currentUser=id;
     function needsOutcome(type){ return type==="보급" || type==="차량수호"; }
 
     function contentBaseQuery(){
-      const { start: wsStart, end: wsEnd } = last7DaysRange();
       const fetchSize = (contentFilter==="ALL") ? PAGE_SIZE : (PAGE_SIZE*5); // 타입 필터는 클라에서 처리 (인덱스 불필요)
-      return query(colContent, where("time", ">=", wsStart), where("time","<", wsEnd), orderBy("time","desc"), limit(fetchSize));
+      return query(colContent, orderBy("time","desc"), limit(fetchSize));
     }
 
     async function loadContentPage(pageIndex){
-      contentPage = pageIndex;
-      const wsKey = dayKey(weekStartMonday0());
-
-      let qy;
-      if(pageIndex===0){
-        qy = contentBaseQuery();
-      }else{
-        const cursor = contentPageCursors[pageIndex-1];
-        if(!cursor){
-          // 커서가 없으면 이전 페이지부터 다시 계산
-          return loadContentPage(0);
-        }
-        if(contentFilter==="ALL"){
-          qy = query(colContent, where("time", ">=", wsStart), where("time","<", wsEnd), orderBy("time","desc"), startAfter(cursor), limit(fetchSize));
-        }else{
-          // 타입 필터는 렌더링 단계에서 필터링(인덱스 불필요)
-          qy = query(colContent, where("time", ">=", wsStart), where("time","<", wsEnd), orderBy("time","desc"), startAfter(cursor), limit(fetchSize));
-        }
+      contentPage = Math.max(0, pageIndex||0);
+      const fetchSize = (contentFilter==="ALL") ? PAGE_SIZE : (PAGE_SIZE*5);
+      let qy = query(colContent, orderBy("time","desc"), limit(fetchSize));
+      const cursor = contentPageCursors[contentPage-1];
+      if(cursor){
+        qy = query(colContent, orderBy("time","desc"), startAfter(cursor), limit(fetchSize));
       }
-
       const snap = await getDocs(qy);
       contentPageDocs = snap.docs;
-      // 다음 페이지 커서 저장
       if(snap.docs.length>0){
-        contentPageCursors[pageIndex] = snap.docs[snap.docs.length-1];
+        contentPageCursors[contentPage] = snap.docs[snap.docs.length-1];
       }
-
       renderContentTimeline();
     }
 
@@ -1544,8 +1538,22 @@ currentUser=id;
 function renderContentTimeline(){
       const list = qs("contentList");
       if(!list) return;
-      const docs = (contentFilter==="ALL") ? contentPageDocs : contentPageDocs.filter(d=>{
-        try{ return (d.data()?.type||"-")===contentFilter; }catch(_){ return false; }
+            const { start: rStart, end: rEnd } = last7DaysRange();
+      const startMs = rStart?.getTime ? rStart.getTime() : Date.now()-7*24*3600*1000;
+      const endMs = rEnd?.getTime ? rEnd.getTime() : Date.now();
+      const docs = contentPageDocs.filter(d=>{
+        const r=d.data();
+        const t=r?.time;
+        let ms=null;
+        try{
+          if(t && typeof t.toDate==="function") ms=t.toDate().getTime();
+          else if(typeof t==="number") ms=t;
+          else if(t && typeof t.seconds==="number") ms=t.seconds*1000;
+        }catch(e){}
+        if(ms==null) return false;
+        if(ms < startMs || ms >= endMs) return false;
+        if(contentFilter!=="ALL" && (r?.type||"-")!==contentFilter) return false;
+        return true;
       });
       const pageDocs = docs.slice(0, PAGE_SIZE);
       const items = pageDocs.map(d=>{
@@ -1996,23 +2004,22 @@ function renderContentTimeline(){
 
     // ---------- ADMIN: WORK RECORDS MANAGE (3-A,B,C,D 적용 중 A) ----------
     function workBaseQuery(){
-      const { start: wsStart, end: wsEnd } = last7DaysRange();
-      return query(colWork, where("checkIn", ">=", wsStart), where("checkIn","<", wsEnd), orderBy("checkIn","desc"), limit(PAGE_SIZE));
+      // 인덱스/타입혼용(타임스탬프 vs 숫자) 문제를 피하기 위해
+      // 서버에서 범위(where)로 자르지 않고, 최신 N개를 가져와 클라이언트에서 7일 필터링합니다.
+      const fetchSize = PAGE_SIZE * 10;
+      return query(colWork, orderBy("checkIn","desc"), limit(fetchSize));
     }
     async function loadWorkPage(pageIndex){
-      workPage=pageIndex;
-      const wsKey = dayKey(weekStartMonday0());
-      let qy;
-      if(pageIndex===0){
-        qy=workBaseQuery();
-      }else{
-        const cursor=workCursors[pageIndex-1];
-        if(!cursor) return loadWorkPage(0);
-        qy=query(colWork, where("checkIn", ">=", wsStart), where("checkIn","<", wsEnd), orderBy("checkIn","desc"), startAfter(cursor), limit(PAGE_SIZE));
+      workPage = Math.max(0, pageIndex||0);
+      let qy = workBaseQuery();
+      const cursor = workCursors[workPage-1];
+      if(cursor){
+        // workBaseQuery()와 동일한 정렬/limit 유지
+        qy = query(colWork, orderBy("checkIn","desc"), startAfter(cursor), limit(PAGE_SIZE*10));
       }
-      const snap=await getDocs(qy);
-      workDocs=snap.docs;
-      if(snap.docs.length>0) workCursors[pageIndex]=snap.docs[snap.docs.length-1];
+      const snap = await getDocs(qy);
+      workDocs = snap.docs;
+      if(snap.docs.length>0) workCursors[workPage] = snap.docs[snap.docs.length-1];
       renderWorkTable();
     }
     function renderWorkTableBase(){
@@ -2531,8 +2538,20 @@ async function maybeShowNoticeOnce(){
       const tbody = qs("workTbody");
       if(!tbody){ if(__renderWorkTable) return __renderWorkTable(); return; }
       const status = qs("workStatusFilter")?.value || "ALL";
+      const { start: rStart, end: rEnd } = last7DaysRange();
+      const startMs = rStart?.getTime ? rStart.getTime() : Date.now()-7*24*3600*1000;
+      const endMs = rEnd?.getTime ? rEnd.getTime() : Date.now();
       const rows = workDocs.filter(d=>{
         const r=d.data();
+        const ci = r.checkIn;
+        let ciMs = null;
+        try{
+          if(ci && typeof ci.toDate==="function") ciMs = ci.toDate().getTime();
+          else if(typeof ci==="number") ciMs = ci;
+          else if(ci && typeof ci.seconds==="number") ciMs = ci.seconds*1000;
+        }catch(e){}
+        if(ciMs==null) return false;
+        if(ciMs < startMs || ciMs >= endMs) return false;
         const active = !r.checkOut;
         if(status==="ACTIVE") return active;
         if(status==="DONE") return !active;
@@ -2572,6 +2591,14 @@ async function maybeShowNoticeOnce(){
       tbody.querySelectorAll("[data-forceout]").forEach(btn=>{
         btn.onclick = ()=>adminForceCheckOut(btn.getAttribute("data-forceout"));
       });
+
+      // 페이지 UI (서버 페이징이 아니라 "최근 N개" 기반이므로 보조정보만 표시)
+      const info = qs("workPageInfo");
+      if(info) info.textContent = `${workPage+1} 페이지 (최근 ${PAGE_SIZE*10}개 범위 조회 후 7일 필터)`;
+      const prev = qs("btnPrevWork"), next = qs("btnNextWork");
+      if(prev) prev.disabled = workPage<=0;
+      // 다음 페이지가 가능할지: 이번 조회가 fetchSize로 꽉 찼으면 "다음 가능"으로 간주
+      if(next) next.disabled = workDocs.length < (PAGE_SIZE*10);
     }
 
     // ---------- ADMIN CONTENT (최근 7일) ----------
@@ -2582,13 +2609,13 @@ async function maybeShowNoticeOnce(){
       const type = qs("adminContentType")?.value || "ALL";
       const fetchSize = (type==="ALL") ? PAGE_SIZE : (PAGE_SIZE*5);
 
-      let qy = query(colContent, where("time", ">=", wsStart), where("time","<", wsEnd), orderBy("time","desc"), limit(fetchSize));
+      let qy = query(colContent, orderBy("time","desc"), limit(fetchSize));
       if(type!=="ALL"){
         // 타입 필터는 렌더링 단계에서 처리 (인덱스 불필요)
       }
       const cursor = adminContentCursors[adminContentPage-1];
       if(cursor){
-        qy = query(colContent, where("time", ">=", wsStart), where("time","<", wsEnd), orderBy("time","desc"), startAfter(cursor), limit(fetchSize));
+        qy = query(colContent, orderBy("time","desc"), startAfter(cursor), limit(fetchSize));
       }
 
       try{
@@ -2606,9 +2633,23 @@ async function maybeShowNoticeOnce(){
     function renderAdminContentTimeline(){
       const list = qs("adminContentList");
       if(!list) return;
-      const selType = qs("adminContentType")?.value || "ALL";
-      const docs = (selType==="ALL") ? adminContentDocs : adminContentDocs.filter(d=>{
-        try{ return (d.data()?.type||"-")===selType; }catch(_){ return false; }
+            const selType = qs("adminContentType")?.value || "ALL";
+      const { start: rStart, end: rEnd } = last7DaysRange();
+      const startMs = rStart?.getTime ? rStart.getTime() : Date.now()-7*24*3600*1000;
+      const endMs = rEnd?.getTime ? rEnd.getTime() : Date.now();
+      const docs = adminContentDocs.filter(d=>{
+        const r=d.data();
+        const t=r.time;
+        let ms=null;
+        try{
+          if(t && typeof t.toDate==="function") ms=t.toDate().getTime();
+          else if(typeof t==="number") ms=t;
+          else if(t && typeof t.seconds==="number") ms=t.seconds*1000;
+        }catch(e){}
+        if(ms==null) return false;
+        if(ms < startMs || ms >= endMs) return false;
+        if(selType!=="ALL" && (r.type||"")!==selType) return false;
+        return true;
       });
       const pageDocs = docs.slice(0, PAGE_SIZE);
       list.innerHTML = pageDocs.map(d=>{
