@@ -1487,8 +1487,6 @@ currentUser=id;
       const fetchSize = (contentFilter==="ALL") ? PAGE_SIZE : (PAGE_SIZE*5); // 타입 필터는 클라에서 처리 (인덱스 불필요)
       return query(colContent, where("time", ">=", wsStart), where("time","<", wsEnd), orderBy("time","desc"), limit(fetchSize));
     }
-      return qy;
-    }
 
     async function loadContentPage(pageIndex){
       contentPage = pageIndex;
