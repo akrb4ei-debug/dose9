@@ -654,7 +654,7 @@ let usersPage = 0; // 유저 목록 페이지(10명 단위)
     async function loadWork7dOnce(){
       const now=Date.now();
       if(work7dCache && (now-work7dLoadedAt)<CACHE_7D_MS) return work7dCache;
-      const { start: wsStart, end: wsEnd } = weekRange();
+      const { start: wsStart, end: wsEnd } = last7DaysRange();
       const qy = query(colWork, where("checkIn", ">=", wsStart), where("checkIn","<", wsEnd), orderBy("checkIn","desc"), limit(500));
       const snap = await getDocs(qy);
       work7dCache = snap.docs.map(d=>({id:d.id, ...d.data()}));
@@ -664,7 +664,7 @@ let usersPage = 0; // 유저 목록 페이지(10명 단위)
     async function loadContent7dOnce(){
       const now=Date.now();
       if(content7dCache && (now-content7dLoadedAt)<CACHE_7D_MS) return content7dCache;
-      const { start: wsStart, end: wsEnd } = weekRange();
+      const { start: wsStart, end: wsEnd } = last7DaysRange();
       const qy = query(colContent, where("time", ">=", wsStart), where("time","<", wsEnd), orderBy("time","desc"), limit(500));
       const snap = await getDocs(qy);
       content7dCache = snap.docs.map(d=>({id:d.id, ...d.data()}));
@@ -1029,6 +1029,14 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       return s;
     }
 
+    // 최근 7일 범위 (KST now 기준)
+    function last7DaysRange(){
+      const end = kstNow();
+      const start = sevenDaysAgo();
+      return { start, end };
+    }
+
+
     // (관리자) 주간 초기화: 매주 월요일 00:00 기준으로 1회만 수행
     // - workRecords / contentRecords: 이번주 시작 이전 데이터 삭제
     // - users: 주간 요약필드 리셋
@@ -1328,7 +1336,7 @@ currentUser=id;
 
         const now = kstNow();
         const tKey = dayKey(todayStart());
-        const { start: wsStart, end: wsEnd } = weekRange();
+        const { start: wsStart, end: wsEnd } = last7DaysRange();
       const fetchSize = (contentFilter==="ALL") ? PAGE_SIZE : (PAGE_SIZE*5);
 
         // 2) workRecords 1건 추가 (write)
@@ -1396,7 +1404,7 @@ currentUser=id;
         const durSec = Math.max(0, Math.floor((co.getTime()-ci.getTime())/1000));
 
         const tKey = dayKey(todayStart());
-        const { start: wsStart, end: wsEnd } = weekRange();
+        const { start: wsStart, end: wsEnd } = last7DaysRange();
 
         // workRecords 마감
         await updateDoc(wrRef, {
@@ -1483,7 +1491,7 @@ currentUser=id;
     function needsOutcome(type){ return type==="보급" || type==="차량수호"; }
 
     function contentBaseQuery(){
-      const { start: wsStart, end: wsEnd } = weekRange();
+      const { start: wsStart, end: wsEnd } = last7DaysRange();
       const fetchSize = (contentFilter==="ALL") ? PAGE_SIZE : (PAGE_SIZE*5); // 타입 필터는 클라에서 처리 (인덱스 불필요)
       return query(colContent, where("time", ">=", wsStart), where("time","<", wsEnd), orderBy("time","desc"), limit(fetchSize));
     }
@@ -1976,7 +1984,7 @@ function renderContentTimeline(){
       // 최근 7일만 보지만, 전체 삭제는 contentRecords 전체를 대상으로 해야 함.
       // 리드 최소화 목적상, 여기서는 "최근 7일"만 삭제 옵션으로 제한합니다.
       if(!confirm("최근 7일 기록만 삭제합니다. 진행하시겠습니까?")) return;
-      const { start: wsStart, end: wsEnd } = weekRange();
+      const { start: wsStart, end: wsEnd } = last7DaysRange();
       const qy=query(colContent, where("time", ">=", wsStart), where("time","<", wsEnd), orderBy("time","desc"), limit(500));
       const snap=await getDocs(qy);
       for(const d of snap.docs){
@@ -1988,7 +1996,7 @@ function renderContentTimeline(){
 
     // ---------- ADMIN: WORK RECORDS MANAGE (3-A,B,C,D 적용 중 A) ----------
     function workBaseQuery(){
-      const { start: wsStart, end: wsEnd } = weekRange();
+      const { start: wsStart, end: wsEnd } = last7DaysRange();
       return query(colWork, where("checkIn", ">=", wsStart), where("checkIn","<", wsEnd), orderBy("checkIn","desc"), limit(PAGE_SIZE));
     }
     async function loadWorkPage(pageIndex){
@@ -2054,7 +2062,7 @@ function renderContentTimeline(){
     async function adminDeleteAllWork(){
       if(!isAdmin()) return;
       if(!confirm("최근 7일 근무 기록을 전체 삭제하시겠습니까?")) return;
-      const { start: wsStart, end: wsEnd } = weekRange();
+      const { start: wsStart, end: wsEnd } = last7DaysRange();
       const qy=query(colWork, where("checkIn", ">=", wsStart), where("checkIn","<", wsEnd), orderBy("checkIn","desc"), limit(500));
       const snap=await getDocs(qy);
       for(const d of snap.docs){
@@ -2570,7 +2578,7 @@ async function maybeShowNoticeOnce(){
     async function loadAdminContentPage(page){
       if(!isAdmin()) return;
       adminContentPage = Math.max(0, page||0);
-      const { start: wsStart, end: wsEnd } = weekRange();
+      const { start: wsStart, end: wsEnd } = last7DaysRange();
       const type = qs("adminContentType")?.value || "ALL";
       const fetchSize = (type==="ALL") ? PAGE_SIZE : (PAGE_SIZE*5);
 
@@ -2666,6 +2674,10 @@ async function maybeShowNoticeOnce(){
       qs("adminContentNext")?.addEventListener("click", ()=>loadAdminContentPage(adminContentPage+1));
       qs("adminBackdrop")?.addEventListener("click", closeAdminPanel);
       qs("btnProfileClose")?.addEventListener("click", ()=>showModal("profileModal", false));
+      // user detail modal (최근 7일) 닫기
+      qs("userModalClose")?.addEventListener("click", closeModal);
+      qs("backdrop")?.addEventListener("click", (e)=>{ if(e.target && e.target.id==="backdrop") closeModal(); });
+
       document.addEventListener("keydown", (e)=>{
         if(e.key==="Escape"){
           try{ closeAdminPanel(); }catch(_){ }
