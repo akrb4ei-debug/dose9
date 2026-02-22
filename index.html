@@ -875,7 +875,7 @@ async function openUserModal(uid){
           <div class="u7Header">
             <div>
               <div class="ttl">최근 7일 출퇴근</div>
-              <div class="sub">시간만 표시 · 날짜별 그룹 · <b>총 근무</b> ${esc(secsToHMS(totalWorkSec7d))}</div>
+              <div class="sub">시간만 표시 · 날짜별 그룹 · <b>7일간 근무</b> ${esc(secsToHMS(totalWorkSec7d))}</div>
             </div>
             <div class="u7Pager">
               <span class="pinfo">${wsAll.length?`${Math.min(wsAll.length,60)}건`:"0건"}</span>
@@ -2169,27 +2169,32 @@ function renderContentTimeline(){
 
 
     async function loadWorkPage(pageIndex){
-  if(!isAdmin()) return;
-  workPage = Math.max(0, pageIndex||0);
+  try{
+    if(!isAdmin()) return;
+    workPage = Math.max(0, pageIndex||0);
 
-  let qy;
-  if(workPage===0){
-    qy = query(colWork, orderBy("checkIn","desc"), limit(PAGE_SIZE));
-  }else{
-    const cursor = workCursors[workPage-1];
-    if(!cursor) return loadWorkPage(0);
-    qy = query(colWork, orderBy("checkIn","desc"), startAfter(cursor), limit(PAGE_SIZE));
+    let qy;
+    if(workPage===0){
+      qy = query(colWork, orderBy("checkIn","desc"), limit(PAGE_SIZE));
+    }else{
+      const cursor = workCursors[workPage-1];
+      if(!cursor) return loadWorkPage(0);
+      qy = query(colWork, orderBy("checkIn","desc"), startAfter(cursor), limit(PAGE_SIZE));
+    }
+
+    const snap = await getDocs(qy);
+    workDocs = snap.docs;
+
+    if(snap.docs.length>0){
+      workCursors[workPage] = snap.docs[snap.docs.length-1];
+    }
+    renderWorkTable();
+  }catch(e){
+    console.error('[admin work] load failed:', e);
+    try{ const tb=qs('workTbody'); if(tb){ tb.innerHTML = `<tr><td colspan="6" class="tiny" style="color:rgba(255,255,255,0.75);">근무 기록을 불러오지 못했습니다. 콘솔을 확인해 주세요.</td></tr>`; } }catch(_){ }
+    try{ toast('근무 기록을 불러오지 못했습니다. 콘솔을 확인해 주세요.','bad','근태'); }catch(_){ }
   }
-
-  const snap = await getDocs(qy);
-  workDocs = snap.docs;
-
-  if(snap.docs.length>0){
-    workCursors[workPage] = snap.docs[snap.docs.length-1];
-  }
-  renderWorkTable();
-}
-    function renderWorkTableBase(){
+}    function renderWorkTableBase(){
       qs("workPageInfo").textContent=`${workPage+1} 페이지`;
       qs("btnPrevWork").disabled = workPage===0;
       qs("btnNextWork").disabled = workDocs.length < PAGE_SIZE;
@@ -2297,7 +2302,7 @@ function renderContentTimeline(){
     // total reset(3-1 confirm): users 요약 리셋
     async function adminResetTotals(){
       if(!isAdmin()) return;
-      if(!confirm("총 출근(접속)시간을 초기화하시겠습니까?")) return;
+      if(!confirm("7일간 출근(접속)시간을 초기화하시겠습니까?")) return;
       if(!confirm("정말로 진행하시겠습니까? (되돌릴 수 없습니다)")) return;
 
       // 20~30명 규모이므로 전체 users 문서 업데이트 가능(쓰기 많지만 reads 줄이기 목적)
@@ -2704,8 +2709,8 @@ async function maybeShowNoticeOnce(){
         b.classList.toggle("active", b.getAttribute("data-admintab")===tab);
       });
       if(tab==="users"){ renderAdminUserCards(); }
-      if(tab==="work"){ try{ loadWorkPage(0); }catch(e){} try{ renderWorkTable(); }catch(e){} }
-      if(tab==="content"){ try{ adminContentCursors=[]; adminContentPage=0; }catch(e){} try{ loadAdminContentPage(0); }catch(e){} }
+      if(tab==="work"){ try{ const tb=qs("workTbody"); if(tb) tb.innerHTML = `<tr><td colspan="6" class="tiny">불러오는 중...</td></tr>`; }catch(e){} (async()=>{ try{ await loadWorkPage(0); }catch(e){} })(); }
+      if(tab==="content"){ try{ const list=qs("adminContentList"); if(list) list.innerHTML = `<div class="tiny" style="padding:12px;">불러오는 중...</div>`; }catch(e){} try{ adminContentCursors=[]; adminContentPage=0; }catch(e){} (async()=>{ try{ await loadAdminContentPage(0); }catch(e){} })(); }
     }
 
     // work table filter (client-side)
@@ -2763,29 +2768,34 @@ async function maybeShowNoticeOnce(){
 
     // ---------- ADMIN CONTENT (최근 7일) ----------
     async function loadAdminContentPage(page){
-  if(!isAdmin()) return;
-  adminContentPage = Math.max(0, page||0);
+  try{
+    if(!isAdmin()) return;
+    adminContentPage = Math.max(0, page||0);
 
-  const type = qs("adminContentType")?.value || "ALL";
-  const fetchSize = (type==="ALL") ? PAGE_SIZE : (PAGE_SIZE*5);
+    const type = qs("adminContentType")?.value || "ALL";
+    const fetchSize = (type==="ALL") ? PAGE_SIZE : (PAGE_SIZE*5);
 
-  let qy;
-  if(adminContentPage===0){
-    qy = query(colContent, orderBy("time","desc"), limit(fetchSize));
-  }else{
-    const cursor = adminContentCursors[adminContentPage-1];
-    if(!cursor) return loadAdminContentPage(0);
-    qy = query(colContent, orderBy("time","desc"), startAfter(cursor), limit(fetchSize));
+    let qy;
+    if(adminContentPage===0){
+      qy = query(colContent, orderBy("time","desc"), limit(fetchSize));
+    }else{
+      const cursor = adminContentCursors[adminContentPage-1];
+      if(!cursor) return loadAdminContentPage(0);
+      qy = query(colContent, orderBy("time","desc"), startAfter(cursor), limit(fetchSize));
+    }
+
+    const snap = await getDocs(qy);
+    adminContentDocs = snap.docs;
+    if(snap.docs.length>0){
+      adminContentCursors[adminContentPage] = snap.docs[snap.docs.length-1];
+    }
+    renderAdminContentTimeline();
+  }catch(e){
+    console.error('[admin content] load failed:', e);
+    try{ const list=qs('adminContentList'); if(list){ list.innerHTML = `<div class="tiny" style="color:rgba(255,255,255,0.75); padding:12px;">컨텐츠 기록을 불러오지 못했습니다. 콘솔을 확인해 주세요.</div>`; } }catch(_){ }
+    try{ toast('컨텐츠 기록을 불러오지 못했습니다. 콘솔을 확인해 주세요.','bad','컨텐츠'); }catch(_){ }
   }
-
-  const snap = await getDocs(qy);
-  adminContentDocs = snap.docs;
-  if(snap.docs.length>0){
-    adminContentCursors[adminContentPage] = snap.docs[snap.docs.length-1];
-  }
-  renderAdminContentTimeline();
 }
-
 function renderAdminContentTimeline(){
       const list = qs("adminContentList");
       if(!list) return;
@@ -2826,6 +2836,7 @@ function renderAdminContentTimeline(){
             </div>
           </div>`;
       }).join("");
+      if(!pageDocs.length){ list.innerHTML = `<div class="tiny" style="color:rgba(255,255,255,0.65); padding:12px;">최근 7일 컨텐츠 기록이 없습니다.</div>`; }
       list.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>openEdit(b.getAttribute("data-edit")));
       list.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>deleteContent(b.getAttribute("data-del")));
     }
