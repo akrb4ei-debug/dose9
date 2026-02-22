@@ -475,6 +475,16 @@ let usersPage = 0; // 유저 목록 페이지(10명 단위)
     // UI helpers
     // reusing global $ helper
     const esc = (s)=>String(s??"").replace(/[&<>"']/g,m=>({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[m]));
+
+    // CSS.escape 대체(일부 브라우저/환경에서 CSS.escape 미존재 시 대비)
+    const cssEsc = (v)=>{
+      const s = String(v ?? "");
+      try{
+        if (window.CSS && typeof CSS.escape === "function") return CSS.escape(s);
+      }catch(_){}
+      // fallback: attribute/class selector에서 깨질 수 있는 문자를 백슬래시 이스케이프
+      return s.replace(/[^a-zA-Z0-9_\-]/g, (ch)=>"\\" + ch);
+    };
     const setStatus=(msg)=>{ const el=qs("status"); if(!el) return; el.textContent=msg||""; if(msg) setTimeout(()=>{el.textContent="";},1200); };
 
     const hardHide = (id)=>{
@@ -644,8 +654,8 @@ let usersPage = 0; // 유저 목록 페이지(10명 단위)
     async function loadWork7dOnce(){
       const now=Date.now();
       if(work7dCache && (now-work7dLoadedAt)<CACHE_7D_MS) return work7dCache;
-      const since = sevenDaysAgo();
-      const qy = query(collection(db,"workRecords"), where("checkIn", ">=", since), orderBy("checkIn","desc"));
+      const wsKey = dayKey(weekStartMonday0());
+      const qy = query(colWork, where("weekStart","==", wsKey), orderBy("checkIn","desc"), limit(500));
       const snap = await getDocs(qy);
       work7dCache = snap.docs.map(d=>({id:d.id, ...d.data()}));
       work7dLoadedAt = now;
@@ -654,8 +664,8 @@ let usersPage = 0; // 유저 목록 페이지(10명 단위)
     async function loadContent7dOnce(){
       const now=Date.now();
       if(content7dCache && (now-content7dLoadedAt)<CACHE_7D_MS) return content7dCache;
-      const since = sevenDaysAgo();
-      const qy = query(collection(db,"contentRecords"), where("time", ">=", since), orderBy("time","desc"));
+      const wsKey = dayKey(weekStartMonday0());
+      const qy = query(colContent, where("weekStart","==", wsKey), orderBy("time","desc"), limit(500));
       const snap = await getDocs(qy);
       content7dCache = snap.docs.map(d=>({id:d.id, ...d.data()}));
       content7dLoadedAt = now;
@@ -802,7 +812,8 @@ async function openUserModal(uid){
           if(act==="forceout") return adminForceOut(uid);
           if(act==="toggleadmin"){
             const u=usersCache.get(uid); if(!u) return;
-            await updateDoc(doc(db,"users",uid),{isAdmin:!u.isAdmin});
+            try{ await updateDoc(doc(db,"users",uid),{isAdmin:!u.isAdmin}); }
+            catch(e){ console.error("[toggleadmin] failed",e); toast(`변경 실패: ${e?.code||e?.message||e}`,"bad","관리"); return; }
             toast("관리자 권한이 변경되었습니다.","good","관리");
             await loadUsersOnce({force:true, reason:"admin"});
             await loadUserTable();
@@ -811,7 +822,8 @@ async function openUserModal(uid){
           }
           if(act==="togglehidden"){
             const u=usersCache.get(uid); if(!u) return;
-            await updateDoc(doc(db,"users",uid),{isHidden:!u.isHidden});
+            try{ await updateDoc(doc(db,"users",uid),{isHidden:!u.isHidden, hidden:!u.isHidden}); }
+            catch(e){ console.error("[togglehidden] failed",e); toast(`변경 실패: ${e?.code||e?.message||e}`,"bad","관리"); return; }
             toast("숨김 상태가 변경되었습니다.","good","관리");
             await loadUsersOnce({force:true, reason:"admin"});
             await loadUserTable();
@@ -821,7 +833,8 @@ async function openUserModal(uid){
           if(act==="pw"){
             const np=prompt("새 비밀번호를 입력해 주세요.");
             if(!np) return;
-            await updateDoc(doc(db,"users",uid),{password:String(np)});
+            try{ await updateDoc(doc(db,"users",uid),{password:String(np)}); }
+            catch(e){ console.error("[pw] failed",e); toast(`변경 실패: ${e?.code||e?.message||e}`,"bad","관리"); return; }
             toast("비밀번호가 변경되었습니다.","good","관리");
             await loadUsersOnce({force:true, reason:"admin"});
             await renderAdminUserCards();
@@ -999,6 +1012,26 @@ async function ensureUserDocDefaultsOnce(userId, userData){
       const ws=new Date(d); ws.setDate(d.getDate()-diff);
       return ws; // 00:00
     }
+
+    // 최근 7일 기준 시간 (KST now 기준, 시각 유지)
+    function sevenDaysAgo(){
+      const d = kstNow();
+      const s = new Date(d);
+      s.setDate(s.getDate()-7);
+      return s;
+    }
+
+    // (관리자) 주간 초기화: 매주 월요일 00:00 기준으로 1회만 수행
+    // - workRecords / contentRecords: 이번주 시작 이전 데이터 삭제
+    // - users: 주간 요약필드 리셋
+    async function ensureWeeklyResetIfNeeded(){
+      // ✅ 주간 초기화: "삭제" 방식 제거 (리드/쓰기 폭탄 방지)
+      // 이번 주/오늘 표시 로직은 weekStart/todayKey 비교로 자동 0 처리하며,
+      // 기록 목록은 weekStart 필터로 이번 주만 조회합니다.
+      return;
+    }
+
+
     function fmt(ts){
       if(ts==null || ts==="") return "-";
       try{
@@ -1128,6 +1161,7 @@ currentUser=id;
 
     async function refreshAll({silent}={}){
       try{
+        try{ await ensureWeeklyResetIfNeeded(); }catch(e){}
         // 단계별 실패해도 가능한 만큼 진행
         try{ await loadUsersOnce({force:true, reason:"admin"}); }catch(e){ console.warn("[refreshAll] users failed", e); }
         try{ await loadDashKpis(); }catch(e){ console.warn("[refreshAll] kpi failed", e); }
@@ -1440,19 +1474,17 @@ currentUser=id;
     function needsOutcome(type){ return type==="보급" || type==="차량수호"; }
 
     function contentBaseQuery(){
-      const since = new Date(kstNow().getTime());
-      since.setDate(since.getDate()-7);
-      // ✅ 7일 제한
-      let qy = query(colContent, where("time", ">=", since), orderBy("time","desc"), limit(PAGE_SIZE));
+      const wsKey = dayKey(weekStartMonday0());
+      let qy = query(colContent, where("weekStart","==", wsKey), orderBy("time","desc"), limit(PAGE_SIZE));
       if(contentFilter!=="ALL"){
-        qy = query(colContent, where("time", ">=", since), where("type","==",contentFilter), orderBy("time","desc"), limit(PAGE_SIZE));
+        qy = query(colContent, where("weekStart","==", wsKey), where("type","==",contentFilter), orderBy("time","desc"), limit(PAGE_SIZE));
       }
       return qy;
     }
 
     async function loadContentPage(pageIndex){
       contentPage = pageIndex;
-      const since = new Date(kstNow().getTime()); since.setDate(since.getDate()-7);
+      const wsKey = dayKey(weekStartMonday0());
 
       let qy;
       if(pageIndex===0){
@@ -1464,9 +1496,9 @@ currentUser=id;
           return loadContentPage(0);
         }
         if(contentFilter==="ALL"){
-          qy = query(colContent, where("time", ">=", since), orderBy("time","desc"), startAfter(cursor), limit(PAGE_SIZE));
+          qy = query(colContent, where("weekStart","==", wsKey), orderBy("time","desc"), startAfter(cursor), limit(PAGE_SIZE));
         }else{
-          qy = query(colContent, where("time", ">=", since), where("type","==",contentFilter), orderBy("time","desc"), startAfter(cursor), limit(PAGE_SIZE));
+          qy = query(colContent, where("weekStart","==", wsKey), where("type","==",contentFilter), orderBy("time","desc"), startAfter(cursor), limit(PAGE_SIZE));
         }
       }
 
@@ -1792,12 +1824,17 @@ function renderContentTimeline(){
         const v=qs("cOutcome").value;
         if(v==="O") outcome=true; else if(v==="X") outcome=false; else outcome=null;
       }
+      const tKey = dayKey(todayStart());
+      const wsKey = dayKey(weekStartMonday0());
+
       await addDoc(colContent,{
         type:createType,
         writer: currentUser,
         participants: parts,
         outcome,
         time: serverTimestamp(),
+        dayKey: tKey,
+        weekStart: wsKey,
         edited: null
       });
 
@@ -1928,8 +1965,8 @@ function renderContentTimeline(){
       // 최근 7일만 보지만, 전체 삭제는 contentRecords 전체를 대상으로 해야 함.
       // 리드 최소화 목적상, 여기서는 "최근 7일"만 삭제 옵션으로 제한합니다.
       if(!confirm("최근 7일 기록만 삭제합니다. 진행하시겠습니까?")) return;
-      const since=new Date(kstNow().getTime()); since.setDate(since.getDate()-7);
-      const qy=query(colContent, where("time",">=",since), orderBy("time","desc"), limit(500));
+      const wsKey = dayKey(weekStartMonday0());
+      const qy=query(colContent, where("weekStart","==",wsKey), orderBy("time","desc"), limit(500));
       const snap=await getDocs(qy);
       for(const d of snap.docs){
         await deleteDoc(doc(db,"contentRecords",d.id));
@@ -1940,20 +1977,19 @@ function renderContentTimeline(){
 
     // ---------- ADMIN: WORK RECORDS MANAGE (3-A,B,C,D 적용 중 A) ----------
     function workBaseQuery(){
-      const since=new Date(kstNow().getTime()); since.setDate(since.getDate()-7);
-      return query(colWork, where("checkIn", ">=", since), orderBy("checkIn","desc"), limit(PAGE_SIZE));
+      const wsKey = dayKey(weekStartMonday0());
+      return query(colWork, where("weekStart","==",wsKey), orderBy("checkIn","desc"), limit(PAGE_SIZE));
     }
     async function loadWorkPage(pageIndex){
       workPage=pageIndex;
-      const since=new Date(kstNow().getTime()); since.setDate(since.getDate()-7);
-
+      const wsKey = dayKey(weekStartMonday0());
       let qy;
       if(pageIndex===0){
         qy=workBaseQuery();
       }else{
         const cursor=workCursors[pageIndex-1];
         if(!cursor) return loadWorkPage(0);
-        qy=query(colWork, where("checkIn", ">=", since), orderBy("checkIn","desc"), startAfter(cursor), limit(PAGE_SIZE));
+        qy=query(colWork, where("weekStart","==",wsKey), orderBy("checkIn","desc"), startAfter(cursor), limit(PAGE_SIZE));
       }
       const snap=await getDocs(qy);
       workDocs=snap.docs;
@@ -2007,8 +2043,8 @@ function renderContentTimeline(){
     async function adminDeleteAllWork(){
       if(!isAdmin()) return;
       if(!confirm("최근 7일 근무 기록을 전체 삭제하시겠습니까?")) return;
-      const since=new Date(kstNow().getTime()); since.setDate(since.getDate()-7);
-      const qy=query(colWork, where("checkIn",">=",since), orderBy("checkIn","desc"), limit(500));
+      const wsKey = dayKey(weekStartMonday0());
+      const qy=query(colWork, where("weekStart","==",wsKey), orderBy("checkIn","desc"), limit(500));
       const snap=await getDocs(qy);
       for(const d of snap.docs){
         await deleteDoc(doc(db,"workRecords",d.id));
@@ -2087,6 +2123,7 @@ function renderContentTimeline(){
       await setDoc(doc(db,"users",id),{
         password: pw,
         isAdmin:false,
+        hidden:false,
         isHidden:false,
         rank:"",
         department:"",
@@ -2236,13 +2273,21 @@ function renderContentTimeline(){
       const pwEl = qs("adminUserCards").querySelector(`input[data-pw="${cssEsc(id)}"]`);
       const pw = (pwEl?.value||"").trim();
 
-      const updates={ isAdmin:isA, isHidden:isH, rank, department:dept };
+      const updates={ isAdmin:isA, hidden:isH, isHidden:isH, rank, department:dept };
       if(pw) updates.password=pw;
 
-      await updateDoc(doc(db,"users",id), updates);
+      try{
+        await updateDoc(doc(db,"users",id), updates);
+      }catch(e){
+        console.error("[adminSaveUser] update failed", e);
+        toast(`저장 실패: ${e?.code||e?.message||e}`,"bad","관리");
+        return;
+      }
       if(pwEl) pwEl.value="";
       toast("저장 완료","good","관리",1800,"admin_saved"); toast("유저 설정이 저장되었습니다.","good","관리"); setStatus("저장 완료");
       await loadUsersOnce({force:true, reason:"admin"});
+      // 내가 수정된 경우(계급/부서 변경 등) 즉시 반영
+      try{ if(id===currentUser){ currentUserData = normalizeUser(usersCache.get(currentUser)||currentUserData||{}); } }catch(e){}
       await loadDashKpis();
       await loadUserTable();
       await renderAdminUserCards();
@@ -2256,7 +2301,13 @@ function renderContentTimeline(){
       const raw=(el?.value||"").trim();
       const arr=raw?raw.split(",").map(s=>s.trim()).filter(Boolean):[];
       // 없는 부서 입력도 허용(자유), 대신 표준 부서만 쓰길 권장
-      await updateDoc(doc(db,"users",id), { deptLeaderOf: arr });
+      try{
+        await updateDoc(doc(db,"users",id), { deptLeaderOf: arr });
+      }catch(e){
+        console.error("[adminSaveLeader] update failed", e);
+        toast(`부서장 저장 실패: ${e?.code||e?.message||e}`,"bad","관리");
+        return;
+      }
       toast("부서장 권한이 저장되었습니다.","good","관리"); setStatus("부서장 권한 저장");
       await loadUsersOnce({force:true, reason:"admin"});
       await renderAdminUserCards();
@@ -2451,8 +2502,8 @@ async function maybeShowNoticeOnce(){
         b.classList.toggle("active", b.getAttribute("data-admintab")===tab);
       });
       if(tab==="users"){ renderAdminUserCards(); }
-      if(tab==="work"){ renderWorkTable(); }
-      if(tab==="content"){ loadAdminContentPage(adminContentPage); }
+      if(tab==="work"){ try{ loadWorkPage(0); }catch(e){} try{ renderWorkTable(); }catch(e){} }
+      if(tab==="content"){ try{ adminContentCursors=[]; adminContentPage=0; }catch(e){} try{ loadAdminContentPage(0); }catch(e){} }
     }
 
     // work table filter (client-side)
@@ -2468,6 +2519,7 @@ async function maybeShowNoticeOnce(){
         if(status==="DONE") return !active;
         return true;
       });
+      if(!rows.length){ tbody.innerHTML = `<tr><td colspan="6" class="tiny muted">표시할 근무 기록이 없습니다. (최근 7일)</td></tr>`; return; }
       tbody.innerHTML = rows.map(d=>{
         const r=d.data();
         const id=d.id;
@@ -2507,18 +2559,18 @@ async function maybeShowNoticeOnce(){
     async function loadAdminContentPage(page){
       if(!isAdmin()) return;
       adminContentPage = Math.max(0, page||0);
-      const since=new Date(kstNow().getTime()); since.setDate(since.getDate()-7);
+      const wsKey = dayKey(weekStartMonday0());
       const type = qs("adminContentType")?.value || "ALL";
 
-      let qy = query(colContent, where("time",">=",since), orderBy("time","desc"), limit(PAGE_SIZE));
+      let qy = query(colContent, where("weekStart","==",wsKey), orderBy("time","desc"), limit(PAGE_SIZE));
       if(type!=="ALL"){
-        qy = query(colContent, where("type","==",type), where("time",">=",since), orderBy("time","desc"), limit(PAGE_SIZE));
+        qy = query(colContent, where("type","==",type), where("weekStart","==",wsKey), orderBy("time","desc"), limit(PAGE_SIZE));
       }
       const cursor = adminContentCursors[adminContentPage-1];
       if(cursor){
         qy = (type==="ALL")
-          ? query(colContent, where("time",">=",since), orderBy("time","desc"), startAfter(cursor), limit(PAGE_SIZE))
-          : query(colContent, where("type","==",type), where("time",">=",since), orderBy("time","desc"), startAfter(cursor), limit(PAGE_SIZE));
+          ? query(colContent, where("weekStart","==",wsKey), orderBy("time","desc"), startAfter(cursor), limit(PAGE_SIZE))
+          : query(colContent, where("type","==",type), where("weekStart","==",wsKey), orderBy("time","desc"), startAfter(cursor), limit(PAGE_SIZE));
       }
 
       try{
@@ -2737,7 +2789,6 @@ window.addEventListener("unhandledrejection", (e)=>{
 window.addEventListener("error", (e)=>{
   console.error("Global error:", e.message);
 });
-
 </script>
   <!-- BUILD_STAMP 2026-02-20 04:12:27 -->
 </head>
