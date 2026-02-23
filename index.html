@@ -2290,92 +2290,6 @@ async function adminDeleteAllContent(){
         console.error(e);
         alert("삭제 중 오류가 발생했습니다. 콘솔을 확인해 주세요.");
       }
-
-    // ----------------------------
-    // ADMIN: Work record edit modal
-    // (v12ab hotfix) saveEditWork/openEditWork missing -> implement
-    // ----------------------------
-    let wEditId = null;
-
-    function _toDateAny(v){
-      try{
-        if(!v) return null;
-        if(typeof v.toDate === "function") return v.toDate();
-        if(v instanceof Date) return v;
-        if(typeof v === "number") return new Date(v);
-        return null;
-      }catch(_){ return null; }
-    }
-    function _pad2(n){ return String(n).padStart(2,"0"); }
-    function msToDTLocal(v){
-      const d=_toDateAny(v);
-      if(!d) return "";
-      const yyyy=d.getFullYear();
-      const mm=_pad2(d.getMonth()+1);
-      const dd=_pad2(d.getDate());
-      const hh=_pad2(d.getHours());
-      const mi=_pad2(d.getMinutes());
-      return `${yyyy}-${mm}-${dd}T${hh}:${mi}`;
-    }
-    function dtLocalToMs(s){
-      const v=String(s||"").trim();
-      if(!v) return null;
-      const d=new Date(v);
-      const ms=d.getTime();
-      return Number.isFinite(ms) ? ms : null;
-    }
-
-    async function openEditWork(id){
-      try{
-        if(!isAdmin()) return;
-        const snap = await getDoc(doc(db,"workRecords", id));
-        if(!snap.exists()) return alert("기록을 찾을 수 없습니다.");
-        const r = snap.data() || {};
-        wEditId = id;
-        const nick = String(r.nickname||"").trim();
-        qs("wNick").value = nick;
-        qs("wIn").value = msToDTLocal(r.checkIn);
-        qs("wOut").value = msToDTLocal(r.checkOut);
-        showModal("workEditModal", true);
-      }catch(e){
-        console.error(e);
-        alert("근무 기록 수정창을 여는 중 오류가 발생했습니다. 콘솔을 확인해주세요.");
-      }
-    }
-
-    async function saveEditWork(){
-      try{
-        if(!isAdmin()) return;
-        if(!wEditId) return alert("수정 대상 기록이 없습니다.");
-        const nick = String(qs("wNick")?.value||"").trim();
-        const inMs = dtLocalToMs(qs("wIn")?.value);
-        const outMs = dtLocalToMs(qs("wOut")?.value);
-        if(!nick) return alert("닉네임을 입력해주세요.");
-        if(inMs==null) return alert("출근 시간을 입력해주세요.");
-        if(outMs!=null && outMs < inMs) return alert("퇴근 시간이 출근 시간보다 빠릅니다.");
-
-        const update = {
-          nickname: nick,
-          checkIn: inMs,
-          checkOut: (outMs==null ? null : outMs),
-        };
-        if(outMs!=null){
-          update.durationSec = Math.max(0, Math.floor((outMs - inMs)/1000));
-        }else{
-          // OPEN 상태
-          update.durationSec = null;
-        }
-
-        await updateDoc(doc(db,"workRecords", wEditId), update);
-        showModal("workEditModal", false);
-        setStatus("근무 기록이 저장되었습니다.");
-        // 최신 목록 반영
-        try{ await loadWorkPage(workPage||0); }catch(_){ try{ await loadWorkPage(0); }catch(__){} }
-      }catch(e){
-        console.error(e);
-        alert("저장 중 오류가 발생했습니다. 콘솔을 확인해주세요.");
-      }
-    }
       try{ workCursors=[]; workPage=0; }catch(_){}
       try{ await loadWorkPage(0); }catch(_){}
     }
@@ -3085,7 +2999,130 @@ async function maybeShowNoticeOnce(){
       qs("workEditModal").addEventListener("click",(e)=>{ if(e.target.id==="workEditModal") showModal("workEditModal", false); });
       qs("btnWorkClose").addEventListener("click", ()=>showModal("workEditModal", false));
       qs("btnWorkCancel").addEventListener("click", ()=>showModal("workEditModal", false));
-      qs("btnWorkSave").addEventListener("click", saveEditWork);
+      
+      // =============================
+      // 근무 기록 수정(관리자) - 누락된 함수 보강
+      // =============================
+      let _workEditId = null;
+
+      const anyToMs = (v)=>{
+        try{
+          if(v==null) return null;
+          // Firestore Timestamp
+          if(typeof v === "object" && typeof v.toDate === "function") return v.toDate().getTime();
+          if(v instanceof Date) return v.getTime();
+          if(typeof v === "number") return Number.isFinite(v)? v : null;
+          if(typeof v === "string"){
+            const n = Number(v);
+            if(Number.isFinite(n)) return n;
+            const d = new Date(v);
+            return isNaN(d.getTime()) ? null : d.getTime();
+          }
+          return null;
+        }catch(_){ return null; }
+      };
+
+      const msToDTLocal = (v)=>{
+        const ms = anyToMs(v);
+        if(ms==null) return "";
+        const d = new Date(ms);
+        const p=(n)=>String(n).padStart(2,"0");
+        return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+      };
+
+      const dtLocalToMs = (val)=>{
+        const s = String(val||"").trim();
+        if(!s) return null;
+        const d = new Date(s);
+        const ms = d.getTime();
+        return isNaN(ms) ? null : ms;
+      };
+
+      async function openEditWork(id){
+        try{
+          if(!isAdmin()) return toast("관리자 권한이 없습니다.","warn","관리");
+          if(!id) return;
+          const ref = doc(db,"workRecords", String(id));
+          const snap = await getDoc(ref);
+          if(!snap.exists()) return toast("근무 기록을 찾지 못했습니다.","bad","관리");
+
+          const r = snap.data() || {};
+          _workEditId = snap.id;
+
+          qs("wNick").value = String(r.nickname||"").trim();
+          qs("wIn").value   = msToDTLocal(r.checkIn);
+          qs("wOut").value  = msToDTLocal(r.checkOut);
+
+          showModal("workEditModal", true);
+        }catch(e){
+          console.error(e);
+          toast("근무 기록 수정창을 여는 중 오류가 발생했습니다.","bad","관리");
+        }
+      }
+
+      async function saveEditWork(){
+        try{
+          if(!isAdmin()) return toast("관리자 권한이 없습니다.","warn","관리");
+          if(!_workEditId) return toast("수정 대상 기록이 없습니다.","warn","관리");
+
+          const nick = String(qs("wNick")?.value||"").trim();
+          const inMs = dtLocalToMs(qs("wIn")?.value);
+          const outMs = dtLocalToMs(qs("wOut")?.value);
+
+          if(!nick) return toast("닉네임을 입력해 주세요.","warn","관리");
+          if(inMs==null) return toast("출근 시간을 입력해 주세요.","warn","관리");
+          if(outMs!=null && outMs < inMs) return toast("퇴근 시간이 출근 시간보다 빠릅니다.","warn","관리");
+
+          const inDate = new Date(inMs);
+          const outDate = (outMs==null) ? null : new Date(outMs);
+
+          const ws = weekStartMonday0();      // Date
+          const wsKey = dayKey(ws);           // YYYY-MM-DD
+          const tKey = dayKey(todayStart());  // YYYY-MM-DD
+
+          // checkIn 기준으로 day/week 키 산출
+          const ciDay = new Date(inDate.getFullYear(), inDate.getMonth(), inDate.getDate(), 0,0,0,0);
+          const ciKey = dayKey(ciDay);
+
+          // weekStartMonday0()는 "오늘" 기준이므로, checkIn 기준 주차도 계산
+          const tmp = new Date(ciDay);
+          const dow = tmp.getDay(); // 0..6
+          const diff = (dow===0?6:dow-1);
+          tmp.setDate(tmp.getDate()-diff);
+          const ciWsKey = dayKey(tmp);
+
+          const update = {
+            nickname: nick,
+            checkIn: inDate,
+            checkOut: outDate,
+            dayKey: ciKey,
+            weekStart: ciWsKey,
+          };
+
+          if(outDate){
+            update.durationSec = Math.max(0, Math.floor((outMs - inMs)/1000));
+          }else{
+            update.durationSec = null;
+          }
+
+          await updateDoc(doc(db,"workRecords", _workEditId), update);
+
+          toast("근무 기록이 수정되었습니다.","good","관리");
+          showModal("workEditModal", false);
+
+          // 목록 갱신
+          try{ await loadWorkPage(workPage||0); }catch(_){}
+        }catch(e){
+          console.error(e);
+          toast(`저장 실패: ${e?.code||e?.message||"오류"}`,"bad","관리");
+        }
+      }
+
+      // 모듈 스코프 함수가 외부/핸들러에서 보이도록 노출
+      window.openEditWork = openEditWork;
+      window.saveEditWork = saveEditWork;
+
+qs("btnWorkSave").addEventListener("click", saveEditWork);
 
       // admin
       qs("btnAdmin").addEventListener("click", toggleAdminPanel);
