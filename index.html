@@ -2159,21 +2159,47 @@ function renderContentTimeline(){
       setStatus("삭제되었습니다.");
       await loadContentPage(0);
     }
-    async function adminDeleteAllContent(){
+    
+    // ---------- ADMIN UTIL: 전체 삭제(인덱스 없이) ----------
+    async function deleteAllCollectionDocs(colRef, label){
+      // Firestore: orderBy(__name__) + limit 로 반복 삭제 (복합 인덱스 불필요)
+      let deleted = 0;
+      let cursor = null;
+      while(true){
+        const qy = cursor
+          ? query(colRef, orderBy("__name__"), startAfter(cursor), limit(300))
+          : query(colRef, orderBy("__name__"), limit(300));
+        const snap = await getDocs(qy);
+        if(snap.empty) break;
+
+        // 배치 삭제 (최대 500, 여기서는 300)
+        const batch = writeBatch(db);
+        snap.docs.forEach(d=>batch.delete(d.ref));
+        await batch.commit();
+
+        deleted += snap.docs.length;
+        cursor = snap.docs[snap.docs.length-1];
+        try{ setStatus(`${label} 삭제 중... (${deleted})`); }catch(_){}
+      }
+      return deleted;
+    }
+async function adminDeleteAllContent(){
       if(!isAdmin()) return;
       if(!confirm("컨텐츠 기록을 전체 삭제하시겠습니까? (되돌릴 수 없습니다)")) return;
-      // 최근 7일만 보지만, 전체 삭제는 contentRecords 전체를 대상으로 해야 함.
-      // 리드 최소화 목적상, 여기서는 "최근 7일"만 삭제 옵션으로 제한합니다.
-      if(!confirm("최근 7일 기록만 삭제합니다. 진행하시겠습니까?")) return;
-      const { start: wsStart, end: wsEnd } = last7DaysRange();
-      const qy=query(colContent, where("time", ">=", wsStart), where("time","<", wsEnd), orderBy("time","desc"), limit(500));
-      const snap=await getDocs(qy);
-      for(const d of snap.docs){
-        await deleteDoc(doc(db,"contentRecords",d.id));
+      if(!confirm("정말로 진행하시겠습니까? (되돌릴 수 없습니다)")) return;
+      try{
+        setStatus("컨텐츠 기록 삭제 중...");
+        const n = await deleteAllCollectionDocs(colContent, "컨텐츠 기록");
+        setStatus(`컨텐츠 기록 전체 삭제 완료 (${n}건)`);
+      }catch(e){
+        console.error(e);
+        alert("삭제 중 오류가 발생했습니다. 콘솔을 확인해 주세요.");
       }
-      setStatus("최근 7일 기록 삭제 완료");
-      await loadContentPage(0);
+      try{ adminContentCursors=[]; adminContentPage=0; }catch(_){}
+      try{ await loadAdminContentPage(0); }catch(_){}
     }
+
+
 
     // ---------- ADMIN: WORK RECORDS MANAGE (3-A,B,C,D 적용 중 A) ----------
     function workBaseQuery(){
@@ -2254,75 +2280,71 @@ function renderContentTimeline(){
     }
     async function adminDeleteAllWork(){
       if(!isAdmin()) return;
-      if(!confirm("최근 7일 근무 기록을 전체 삭제하시겠습니까?")) return;
-      const { start: wsStart, end: wsEnd } = last7DaysRange();
-      const qy=query(colWork, where("checkIn", ">=", wsStart), where("checkIn","<", wsEnd), orderBy("checkIn","desc"), limit(500));
-      const snap=await getDocs(qy);
-      for(const d of snap.docs){
-        await deleteDoc(doc(db,"workRecords",d.id));
+      if(!confirm("근무 기록을 전체 삭제하시겠습니까? (되돌릴 수 없습니다)")) return;
+      if(!confirm("정말로 진행하시겠습니까? (되돌릴 수 없습니다)")) return;
+      try{
+        setStatus("근무 기록 삭제 중...");
+        const n = await deleteAllCollectionDocs(colWork, "근무 기록");
+        setStatus(`근무 기록 전체 삭제 완료 (${n}건)`);
+      }catch(e){
+        console.error(e);
+        alert("삭제 중 오류가 발생했습니다. 콘솔을 확인해 주세요.");
       }
-      setStatus("최근 7일 근무 기록 삭제 완료");
-      await loadWorkPage(0);
+      try{ workCursors=[]; workPage=0; }catch(_){}
+      try{ await loadWorkPage(0); }catch(_){}
     }
 
-    // edit work record modal: 관리자만
-    let wEditId=null;
-    async function openEditWork(id){
-      if(!isAdmin()) return;
-      const s=await getDoc(doc(db,"workRecords",id));
-      if(!s.exists()) return alert("기록 없음");
-      wEditId=id;
-      const r=s.data();
-      qs("wNick").value=r.nickname||"";
-      qs("wIn").value = toLocalInput(r.checkIn);
-      qs("wOut").value = toLocalInput(r.checkOut);
-      showModal("workEditModal", true);
-    }
-    function toLocalInput(ts){
-      if(!ts) return "";
-      const d=ts.toDate?ts.toDate():null; if(!d) return "";
-      const p=n=>String(n).padStart(2,"0");
-      return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
-    }
-    async function saveEditWork(){
-      if(!isAdmin()||!wEditId) return;
-      const nick=qs("wNick").value.trim();
-      const inV=qs("wIn").value;
-      const outV=qs("wOut").value;
-      if(!nick||!inV) return alert("닉네임/출근은 필수입니다.");
-      const ci=new Date(inV);
-      const co=outV?new Date(outV):null;
-      const dur = co ? Math.max(0, Math.floor((co.getTime()-ci.getTime())/1000)) : null;
-      await updateDoc(doc(db,"workRecords",wEditId),{
-        nickname:nick,
-        checkIn: ci,
-        checkOut: co,
-        durationSec: dur
-      });
-      showModal("workEditModal", false);
-      setStatus("저장되었습니다.");
-      await loadWorkPage(workPage);
-    }
+
 
     // total reset(3-1 confirm): users 요약 리셋
     async function adminResetTotals(){
       if(!isAdmin()) return;
-      if(!confirm("총 출근(접속)시간을 초기화하시겠습니까?")) return;
+      if(!confirm("요약(출근/컨텐츠) 통계를 초기화하시겠습니까?")) return;
       if(!confirm("정말로 진행하시겠습니까? (되돌릴 수 없습니다)")) return;
 
-      // 20~30명 규모이므로 전체 users 문서 업데이트 가능(쓰기 많지만 reads 줄이기 목적)
-      for(const [id,u] of usersCache.entries()){
-        await updateDoc(doc(db,"users",id),{
-          weekSeconds: 0,
-          todaySeconds: 0,
-          todayCheckIns: 0
-        }).catch(()=>{});
+      try{
+        setStatus("요약 초기화 중...");
+        const wsKey = (typeof weekStartKey==="function") ? weekStartKey() : dayKey(weekStartMonday0());
+        const tKey  = (typeof todayKey==="function") ? todayKey() : dayKey(new Date());
+
+        // usersCache가 비어있거나 일부만 있을 수 있어서 서버에서 전체 users를 다시 읽습니다.
+        const snap = await getDocs(colUsers);
+
+        let n=0;
+        for(const d of snap.docs){
+          const id=d.id;
+          // 레거시 필드까지 같이 0 처리
+          await updateDoc(doc(db,"users",id),{
+            weekStart: wsKey,
+            todayKey: tKey,
+
+            weekSeconds: 0,
+            todaySeconds: 0,
+            todayCheckIns: 0,
+
+            // legacy compatibility
+            weekWorkSeconds: 0,
+            todayWorkSeconds: 0,
+
+            // content summary (있을 수 있는 필드들)
+            contentCount: 0,
+            contentCounts: {},
+            lastContentAt: null
+          }).catch(()=>{});
+          n++;
+        }
+
+        setStatus(`요약 초기화 완료 (${n}명)`);
+        await loadUsersOnce({force:true, reason:"admin"});
+        await loadDashKpis();
+        await loadUserTable();
+      }catch(e){
+        console.error(e);
+        alert("요약 초기화 중 오류가 발생했습니다. 콘솔을 확인해 주세요.");
       }
-      setStatus("초기화 완료");
-      await loadUsersOnce({force:true, reason:"admin"});
-      await loadDashKpis();
-      await loadUserTable();
     }
+
+
 
     // ---------- ADMIN: USER MANAGEMENT (화이트리스트/계급/부서/숨김/권한/부서장) ----------
     async function adminAddUser(){
@@ -2704,7 +2726,7 @@ async function maybeShowNoticeOnce(){
 
     // ---------- ADMIN TABS ----------
     let adminActiveTab = "users";
-    function setAdminTab(tab){
+    async function setAdminTab(tab){
       adminActiveTab = tab;
       document.querySelectorAll("[data-adminsection]").forEach(sec=>{
         const on = sec.getAttribute("data-adminsection")===tab;
@@ -2713,9 +2735,39 @@ async function maybeShowNoticeOnce(){
       document.querySelectorAll("[data-admintab]").forEach(b=>{
         b.classList.toggle("active", b.getAttribute("data-admintab")===tab);
       });
-      if(tab==="users"){ renderAdminUserCards(); }
-      if(tab==="work"){ try{ loadWorkPage(0); }catch(e){} try{ renderWorkTable(); }catch(e){} }
-      if(tab==="content"){ try{ adminContentCursors=[]; adminContentPage=0; }catch(e){} try{ loadAdminContentPage(0); }catch(e){} }
+
+      // ✅ 탭 전환 시 "무반응" 방지: 즉시 로딩 문구 표시
+      if(tab==="work"){
+        try{
+          const tb = qs("workTbody");
+          if(tb) tb.innerHTML = `<tr><td colspan="6" class="tiny muted">불러오는 중...</td></tr>`;
+          const info = qs("workPageInfo"); if(info) info.textContent = "불러오는 중...";
+        }catch(_){}
+      }
+      if(tab==="content"){
+        try{
+          const list = qs("adminContentList");
+          if(list) list.innerHTML = `<div class="tiny muted" style="padding:12px;">불러오는 중...</div>`;
+          const info = qs("adminContentPageInfo"); if(info) info.textContent = "불러오는 중...";
+        }catch(_){}
+      }
+
+      if(tab==="users"){
+        try{ renderAdminUserCards(); }catch(e){ console.error(e); }
+        return;
+      }
+
+      if(tab==="work"){
+        try{ workCursors=[]; workPage=0; }catch(_){}
+        try{ await loadWorkPage(0); }catch(e){ console.error(e); }
+        return;
+      }
+
+      if(tab==="content"){
+        try{ adminContentCursors=[]; adminContentPage=0; }catch(_){}
+        try{ await loadAdminContentPage(0); }catch(e){ console.error(e); }
+        return;
+      }
     }
 
     // work table filter (client-side)
