@@ -409,6 +409,11 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
   const colContent = collection(db, "contentRecords");
 
   // ===== 로컬 저장소 (부서 채팅/공지: DB 경로 추가 금지) =====
+  const lsGet = (k, fallback) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback; } catch { return fallback; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
+  const chatKey = (dept) => `deptChat:${dept}`;
+  const noticeKey = (dept) => `deptNotice:${dept}`;
+  const seenKey = (user, dept) => `deptNoticeSeen:${user}:${dept}`;
 // ✅ 앱 시작 시 기본 관리자 계정 시드(가능한 빨리 실행)
     seedDefaultAdmin();
 // ---------- 기본 관리자 계정 자동 생성(1회) ----------
@@ -682,7 +687,7 @@ let usersPage = 0; // 유저 목록 페이지(10명 단위)
       const qy = query(colWork, orderBy("checkIn","desc"), limit(500));
       const snap = await getDocs(qy);
       const raw = snap.docs.map(d=>({id:d.id, ...d.data()}));
-      const { start: wsStart, end: wsEnd } = last7DaysRange();
+      // (removed) no auto range here
       const sMs=wsStart.getTime(), eMs=wsEnd.getTime();
       work7dCache = raw.filter(r=>{
         const d=toDateAny(r.checkIn);
@@ -699,7 +704,7 @@ let usersPage = 0; // 유저 목록 페이지(10명 단위)
       const qy = query(colContent, orderBy("time","desc"), limit(500));
       const snap = await getDocs(qy);
       const raw = snap.docs.map(d=>({id:d.id, ...d.data()}));
-      const { start: wsStart, end: wsEnd } = last7DaysRange();
+      // (removed) no auto range here
       const sMs=wsStart.getTime(), eMs=wsEnd.getTime();
       content7dCache = raw.filter(r=>{
         const d=toDateAny(r.time);
@@ -1308,6 +1313,7 @@ currentUser=id;
         qs("appView").hidden=false;
 
         await refreshAll({silent:true});
+        await maybeShowNoticeOnce();
       }catch(e){
         console.error(e);
         alert("로그인 중 오류가 발생했습니다. (콘솔 확인)");
@@ -1510,6 +1516,7 @@ currentUser=id;
           return alert("이미 출근중입니다.");
         }
 
+        const now = kstNow();
         const tKey = dayKey(todayStart());
         const wsKey = dayKey(weekStartMonday0());
 
@@ -1523,7 +1530,7 @@ currentUser=id;
           weekStart: wsKey
         });
 
-        // 3) users 요약 필드 업데이트 (write)
+        // 3) users 요약 필드 업데이트 (write) — 리드 추가 없음
         const updates={
           isOnline:true,
           openWorkId: wr.id,
@@ -1578,7 +1585,8 @@ currentUser=id;
         const durSec = Math.max(0, Math.floor((co.getTime()-ci.getTime())/1000));
 
         const tKey = dayKey(todayStart());
-        const wsKey = dayKey(weekStartMonday0());
+        // (removed) no auto range here
+
         // workRecords 마감
         await updateDoc(wrRef, {
           checkOut: serverTimestamp(),
@@ -1664,7 +1672,7 @@ currentUser=id;
     function needsOutcome(type){ return type==="보급" || type==="차량수호"; }
 
     function contentBaseQuery(){
-      const { start: wsStart, end: wsEnd } = last7DaysRange();
+      // (removed) no auto range here
       const fetchSize = (contentFilter==="ALL") ? PAGE_SIZE : (PAGE_SIZE*5); // 타입 필터는 클라에서 처리 (인덱스 불필요)
       return query(colContent, where("time", ">=", wsStart), where("time","<", wsEnd), orderBy("time","desc"), limit(fetchSize));
     }
@@ -1794,9 +1802,7 @@ function renderContentTimeline(){
 
     async function openCreate(type){
       if(!currentUser){ toast("로그인 후 이용 가능합니다.","warn","안내"); return; }
-
-      // ✅ (변경) 출근/퇴근 상태와 무관하게 전체 유저를 표시합니다.
-      // (createUsersCache가 null이면 기본 usersCache를 사용합니다.)
+      // 온라인/퇴근 여부와 무관하게 전체 유저를 표시합니다.
       createUsersCache = null;
       createUsersMode = "all";
 
@@ -2131,6 +2137,19 @@ function renderContentTimeline(){
         edited
       });
 
+      // 참여자 변경에 따른 통계 반영 (추가 +1, 제거 -1)
+      try{
+        const t = String(editData.type||"");
+        for(const n of added){
+          await updateDoc(doc(db,"users",n),{ [`contentCounts.${t}`]: increment(1) });
+        }
+        for(const n of removed){
+          await updateDoc(doc(db,"users",n),{ [`contentCounts.${t}`]: increment(-1) });
+        }
+      }catch(e){
+        console.warn("[saveEdit] stats sync failed:", e);
+      }
+
       showModal("editModal", false);
       toast("저장되었습니다.","good","컨텐츠 수정"); setStatus("저장되었습니다.");
       await loadContentPage(0);
@@ -2192,7 +2211,7 @@ async function adminDeleteAllContent(){
 
     // ---------- ADMIN: WORK RECORDS MANAGE (3-A,B,C,D 적용 중 A) ----------
     function workBaseQuery(){
-      const { start: wsStart, end: wsEnd } = last7DaysRange();
+      // (removed) no auto range here
       return query(colWork, where("checkIn", ">=", wsStart), where("checkIn","<", wsEnd), orderBy("checkIn","desc"), limit(PAGE_SIZE));
     }
     async function loadWorkPage(pageIndex){
@@ -2540,6 +2559,191 @@ async function adminDeleteAllContent(){
       try{ if(typeof loadWorkPage==="function") await loadWorkPage(0); }catch(e){}
     }
 
+    // ---------- CHAT/NOTICE (3-D) ----------
+// ※ Firestore에 deptChats/deptNotices 컬렉션을 만들지 않고 로컬스토리지로 처리합니다.
+async function loadChat(){
+  const dept=currentUserData?.department;
+  if(!dept) { qs("chatInfo").textContent="부서가 설정되어야 채팅을 사용할 수 있습니다."; return; }
+  qs("chatDept").textContent = dept;
+
+  const all = lsGet(chatKey(dept), []);
+  const msgs = Array.isArray(all) ? all.slice(-50) : [];
+
+  qs("chatList").innerHTML = msgs.map(m=>{
+    const mine=(m.by===currentUser);
+    return `<div class="event" style="background:${mine?'rgba(185,198,255,0.10)':'rgba(17,21,32,0.50)'}">
+      <div class="head"><span class="badge">${esc(m.by||"-")}</span><span class="spacer"></span><span class="tiny">${esc(fmt(m.time))}</span></div>
+      <div class="p">${esc(m.text||"")}</div>
+    </div>`;
+  }).join("") || `<div class="tiny">메시지가 없습니다.</div>`;
+
+  // 공지(로컬)
+  const n = lsGet(noticeKey(dept), null);
+  if(n && n.text){
+    qs("noticeBox").innerHTML = `
+      <div class="event">
+        <div class="head"><span class="badge role">공지</span><span class="badge">${esc(n.by||"-")}</span><span class="spacer"></span><span class="tiny">${esc(fmt(n.at))}</span></div>
+        <div class="p">${esc(n.text||"")}</div>
+      </div>`;
+  }else{
+    qs("noticeBox").innerHTML = `<div class="tiny">등록된 공지가 없습니다.</div>`;
+  }
+
+  qs("noticeCompose").hidden = !isDeptLeaderOf(dept);
+}
+
+    async function resetAllUsersWorkSummary(){
+      // 근무 기록 전체 삭제 후 요약(users 문서)에 남아있는 누적치를 0으로 맞춥니다.
+      // (weekSeconds/todaySeconds + 레거시 weekWorkSeconds/todayWorkSeconds 모두 커버)
+      try{
+        const tKey = dayKey(todayStart());
+        const wsKey = dayKey(weekStartMonday0());
+        const snap = await getDocs(colUsers); // U reads
+        const docs = snap.docs;
+        let done = 0;
+        const CHUNK = 450; // batch limit(500) 여유
+        for(let i=0;i<docs.length;i+=CHUNK){
+          const batch = writeBatch(db);
+          const part = docs.slice(i, i+CHUNK);
+          for(const d of part){
+            const ref = doc(db, "users", d.id);
+            batch.update(ref, {
+              // 온라인 상태/열려있는 근무 제거
+              isOnline: false,
+              openWorkId: null,
+              openCheckInAt: null,
+              // 오늘/주간 요약 0 처리
+              todayKey: tKey,
+              todaySeconds: 0,
+              todayWorkSeconds: 0,
+              todayCheckIns: 0,
+              weekStart: wsKey,
+              weekSeconds: 0,
+              weekWorkSeconds: 0
+            });
+          }
+          await batch.commit();
+          done += part.length;
+          setStatus(`요약 리셋 중... (${done}/${docs.length})`);
+        }
+        // 로컬 캐시도 재로딩해서 즉시 반영
+        await loadUsersOnce({force:true, reason:"admin"});
+        await loadDashKpis();
+        await loadUserTable();
+        try{ await renderAdminUserCards(); }catch(_){}
+        setStatus("요약 리셋 완료");
+      }catch(e){
+        console.error(e);
+        toast("요약 리셋 중 오류가 발생했습니다. 콘솔을 확인해 주세요.", "bad", "초기화");
+      }
+    }
+
+
+    async function resetAllUsersContentSummary(){
+      // 컨텐츠 기록 전체 삭제 후 users 문서에 남아있는 컨텐츠 누적치를 0으로 맞춥니다.
+      try{
+        const snap = await getDocs(colUsers); // U reads
+        const docs = snap.docs;
+        let done = 0;
+        const CHUNK = 450;
+        for(let i=0;i<docs.length;i+=CHUNK){
+          const batch = writeBatch(db);
+          const part = docs.slice(i, i+CHUNK);
+          for(const d of part){
+            const ref = doc(db, "users", d.id);
+            batch.update(ref, {
+              contentCounts: {supply:0, plant:0, escort:0},
+              lastContentAt: {supply:null, plant:null, escort:null},
+              // 레거시/표시용 7일 카운트 필드들까지 커버
+              cntSupply7d: 0, supply7d: 0,
+              cntPlant7d: 0, plant7d: 0,
+              cntEscort7d: 0, escort7d: 0
+            });
+          }
+          await batch.commit();
+          done += part.length;
+          setStatus(`컨텐츠 요약 리셋 중... (${done}/${docs.length})`);
+        }
+        await loadUsersOnce({force:true, reason:"admin"});
+        await loadDashKpis();
+        await loadUserTable();
+        try{ await renderAdminUserCards(); }catch(_){}
+        setStatus("컨텐츠 요약 리셋 완료");
+      }catch(e){
+        console.error(e);
+        toast("컨텐츠 요약 리셋 중 오류가 발생했습니다. 콘솔을 확인해 주세요.", "bad", "초기화");
+      }
+    }
+
+
+async function sendChat(){
+  const dept=currentUserData?.department;
+  if(!dept) return alert("부서가 없습니다.");
+  const text=qs("chatText").value.trim();
+  if(!text) return;
+
+  const arr = lsGet(chatKey(dept), []);
+  const next = Array.isArray(arr) ? arr : [];
+  next.push({ by: currentUser, text, time: Date.now() });
+  lsSet(chatKey(dept), next);
+
+  qs("chatText").value="";
+  setStatus("전송됨");
+  await loadChat();
+}
+
+async function postNotice(){
+  const dept=currentUserData?.department;
+  if(!dept) return;
+  if(!isDeptLeaderOf(dept)) return toast("부서장 권한이 없습니다.","bad","공지");
+  const text=qs("noticeText").value.trim();
+  if(!text) return toast("공지 내용을 입력해 주세요.","warn","공지");
+
+  const n = { text, by: currentUser, at: Date.now(), id: `${Date.now()}_${Math.random().toString(16).slice(2)}` };
+  lsSet(noticeKey(dept), n);
+
+  qs("noticeText").value="";
+  toast("공지가 등록되었습니다.","good","공지"); setStatus("공지 등록됨");
+  await loadChat();
+}
+
+async function maybeShowNoticeOnce(){
+  const dept=currentUserData?.department;
+  if(!dept) return;
+  const n = lsGet(noticeKey(dept), null);
+  if(!n?.id) return;
+
+  const k = seenKey(currentUser, dept);
+  if(localStorage.getItem(k) === n.id) return;
+
+  qs("nDept").textContent = dept;
+  qs("nBy").textContent = n.by||"-";
+  qs("nAt").textContent = fmt(n.at);
+  qs("nText").textContent = n.text||"";
+  showModal("noticeModal", true);
+
+  qs("btnNoticeOk").onclick = function(){
+    try{ localStorage.setItem(k, n.id); }catch{}
+    showModal("noticeModal", false);
+  };
+}
+
+    // ---------- MODAL CONTROL ----------
+    function showModal(id, on){
+      const el=qs(id);
+      if(!el) return;
+      if(on){
+        lockBody(true);
+        el.hidden=false;
+      }else{
+        // blur focus
+        const active=document.activeElement;
+        if(active && el.contains(active)) active.blur?.();
+        el.hidden=true;
+        lockBody(false);
+      }
+    }
+
     // ---------- GRAPH (3-A 그래프: users 요약 기반) ----------
     let chart=null;
     function renderGraph(){
@@ -2806,7 +3010,8 @@ async function adminDeleteAllContent(){
       closeAdminPanel();
       document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active", t.dataset.tab===name));
       document.querySelectorAll("[data-view]").forEach(v=>v.hidden = v.dataset.view!==name);
-if(name==="graph") renderGraph();
+      if(name==="chat") loadChat();
+      if(name==="graph") renderGraph();
     }
 
     window.addEventListener("DOMContentLoaded", async ()=>{
@@ -3023,6 +3228,11 @@ qs("btnWorkSave").addEventListener("click", saveEditWork);
       qs("btnDelAllWork").addEventListener("click", adminDeleteAllWork);
       qs("btnDelAllContent").addEventListener("click", adminDeleteAllContent);
       qs("btnResetTotals").addEventListener("click", adminResetTotals);
+
+      // chat
+      qs("btnSendChat").addEventListener("click", sendChat);
+      qs("btnPostNotice").addEventListener("click", postNotice);
+
       // tabs
       document.querySelectorAll(".tab[data-tab]").forEach(t=>{
         t.addEventListener("click", ()=>{
@@ -3140,7 +3350,8 @@ window.addEventListener("error", (e)=>{
         <div class="tabs">
           <button class="tab active" data-tab="dashboard">대시보드</button>
           <button class="tab" data-tab="content">컨텐츠 기록</button>
-<button class="tab" data-tab="graph">그래프</button>
+          <button class="tab" data-tab="chat">부서 소통</button>
+          <button class="tab" data-tab="graph">그래프</button>
           <button class="tab" data-tab="admin">관리자</button>
         </div>
         <div class="spacer"></div>
@@ -3426,6 +3637,43 @@ window.addEventListener("error", (e)=>{
             <span id="contentPageInfo" class="tinyStatus"></span>
           </div>
           <div id="contentList" class="timeline" style="margin-top:12px;"></div>
+        </div>
+
+        <!-- CHAT VIEW -->
+        <div class="card" data-view="chat" hidden style="grid-column:1/-1;">
+          <div class="row">
+            <h3 style="margin:0;">부서 소통방</h3>
+            <span class="spacer"></span>
+            <span class="badge dim">부서: <b id="chatDept">-</b></span>
+          </div>
+          <div class="row" style="margin-top:12px; align-items:flex-start;">
+            <div style="flex:1;">
+              <div class="box">
+                <b>공지</b>
+                <div id="noticeBox" style="margin-top:10px;"></div>
+                <div id="noticeCompose" hidden style="margin-top:10px;">
+                  <textarea id="noticeText" placeholder="공지 내용을 입력합니다."></textarea>
+                  <div class="row" style="margin-top:10px;">
+                    <button id="btnPostNotice" class="pill primary">공지 등록</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style="flex:1;">
+              <div class="box">
+                <b>채팅</b>
+                <div id="chatList" class="timeline" style="margin-top:10px;"></div>
+                <div class="row" style="margin-top:10px;">
+                  <input id="chatText" class="w320" placeholder="메시지 입력" />
+                  <button id="btnSendChat" class="pill primary">전송</button>
+                  <span id="chatInfo" class="tinyStatus"></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="tiny" style="margin-top:10px;">
+            • 채팅/공지는 이 탭을 열었을 때만 읽습니다(수동 갱신). • 부서장/관리자만 공지 등록 가능합니다.
+          </div>
         </div>
 
         <!-- GRAPH VIEW -->
