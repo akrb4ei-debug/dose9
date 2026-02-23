@@ -1200,12 +1200,7 @@ async function ensureUserDocDefaultsOnce(userId, userData){
     // (관리자) 주간 초기화: 매주 월요일 00:00 기준으로 1회만 수행
     // - workRecords / contentRecords: 이번주 시작 이전 데이터 삭제
     // - users: 주간 요약필드 리셋
-    async function ensureWeeklyResetIfNeeded(){
-      // ✅ 주간 초기화: "삭제" 방식 제거 (리드/쓰기 폭탄 방지)
-      // 이번 주/오늘 표시 로직은 weekStart/todayKey 비교로 자동 0 처리하며,
-      // 기록 목록은 weekStart 필터로 이번 주만 조회합니다.
-      return;
-    }
+    async function ensureWeeklyResetIfNeeded(){ return; }
 
 
     function fmt(ts){
@@ -1359,8 +1354,8 @@ currentUser=id;
 
     async function refreshAll({silent}={}){
       try{
-        try{ await ensureWeeklyResetIfNeeded(); }catch(e){}
-        // 단계별 실패해도 가능한 만큼 진행
+        // (auto reset removed)
+// 단계별 실패해도 가능한 만큼 진행
         try{ await loadUsersOnce({force:true, reason:"admin"}); }catch(e){ console.warn("[refreshAll] users failed", e); }
         try{ await loadDashKpis(); }catch(e){ console.warn("[refreshAll] kpi failed", e); }
         try{ await loadUserTable(); }catch(e){ console.warn("[refreshAll] userTable failed", e); }
@@ -1587,6 +1582,7 @@ currentUser=id;
         const tKey = dayKey(todayStart());
         // (removed) no auto range here
 
+        const wsKey = dayKey(weekStartMonday0());
         // workRecords 마감
         await updateDoc(wrRef, {
           checkOut: serverTimestamp(),
@@ -1671,15 +1667,18 @@ currentUser=id;
     // ---------- CONTENT (7일 제한 + 페이지네이션 + 작성 모달) ----------
     function needsOutcome(type){ return type==="보급" || type==="차량수호"; }
 
-    function contentBaseQuery(){
-      // (removed) no auto range here
-      const fetchSize = (contentFilter==="ALL") ? PAGE_SIZE : (PAGE_SIZE*5); // 타입 필터는 클라에서 처리 (인덱스 불필요)
-      return query(colContent, where("time", ">=", wsStart), where("time","<", wsEnd), orderBy("time","desc"), limit(fetchSize));
-    }
+    
+function contentBaseQuery(){
+  // 🔧 인덱스/타입혼용/범위필터 오류 방지: 최신순으로만 가져오고(필터는 렌더 단계에서 처리)
+  const fetchSize = (contentFilter==="ALL") ? PAGE_SIZE : (PAGE_SIZE*5); // 타입 필터는 클라에서 처리
+  return query(colContent, orderBy("time","desc"), limit(fetchSize));
+}
 
-    async function loadContentPage(pageIndex){
+async function loadContentPage(pageIndex){
       contentPage = pageIndex;
-      const wsKey = dayKey(weekStartMonday0());
+      
+      const fetchSize = (contentFilter===\"ALL\") ? PAGE_SIZE : (PAGE_SIZE*5);
+const wsKey = dayKey(weekStartMonday0());
 
       let qy;
       if(pageIndex===0){
@@ -2197,7 +2196,8 @@ async function adminDeleteAllContent(){
         setStatus("컨텐츠 기록 삭제 중...");
         const n = await deleteAllCollectionDocs(colContent, "컨텐츠 기록");
         setStatus(`컨텐츠 기록 전체 삭제 완료 (${n}건)`);
-        // 컨텐츠 요약도 0으로 맞추기(레거시/신규 둘 다)
+                 try{ toast(`컨텐츠 기록 삭제 완료 (${'n'}건)`,\"good\",\"삭제\"); }catch(_){} 
+// 컨텐츠 요약도 0으로 맞추기(레거시/신규 둘 다)
         await resetAllUsersContentSummary();
       }catch(e){
         console.error(e);
@@ -2294,7 +2294,8 @@ async function adminDeleteAllContent(){
         setStatus("근무 기록 삭제 중...");
         const n = await deleteAllCollectionDocs(colWork, "근무 기록");
         setStatus(`근무 기록 전체 삭제 완료 (${n}건)`);
-        // 삭제 후 users 요약도 0으로 맞추기
+                 try{ toast(`근무 기록 삭제 완료 (${'n'}건)`,\"good\",\"삭제\"); }catch(_){} 
+// 삭제 후 users 요약도 0으로 맞추기
         await resetAllUsersWorkSummary();
       }catch(e){
         console.error(e);
