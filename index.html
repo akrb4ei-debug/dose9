@@ -723,6 +723,7 @@ let usersPage = 0; // 유저 목록 페이지(10명 단위)
       bd.classList.add("show");
       md.classList.add("show");
       md.setAttribute("aria-hidden","false");
+      try{ md.inert = false; }catch(_){ }
       lockBody(true);
     }
     async function closeModal(){
@@ -730,9 +731,17 @@ let usersPage = 0; // 유저 목록 페이지(10명 단위)
       const bd=document.getElementById("backdrop");
       const md=document.getElementById("userModal");
       if(!bd||!md) return;
+
+      // Avoid aria-hidden focus warning: blur focus inside modal before hiding.
+      try{
+        const active=document.activeElement;
+        if(active && md.contains(active)) active.blur?.();
+      }catch(_){ }
+
       bd.classList.remove("show");
       md.classList.remove("show");
       md.setAttribute("aria-hidden","true");
+      try{ md.inert = true; }catch(_){ }
       lockBody(false);
     }
 
@@ -2956,8 +2965,12 @@ async function maybeShowNoticeOnce(){
       qs("btnPostNotice").addEventListener("click", postNotice);
 
       // tabs
-      document.querySelectorAll(".tab").forEach(t=>{
-        t.addEventListener("click", ()=>setTab(t.dataset.tab));
+      document.querySelectorAll(".tab[data-tab]").forEach(t=>{
+        t.addEventListener("click", ()=>{
+          const name = t.dataset.tab;
+          if(!name) return;
+          setTab(name);
+        });
       });
 
       // default tab
