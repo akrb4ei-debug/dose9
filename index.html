@@ -376,7 +376,8 @@ console.log("BUILD_64b5f0ff 2026-02-20 03:53:44");
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
     import {
       getFirestore, collection, doc, getDoc, getDocs, setDoc, addDoc, updateDoc, deleteDoc,
-      query, where, orderBy, limit, startAfter, serverTimestamp, increment
+      query, where, orderBy, limit, startAfter, serverTimestamp, increment, writeBatch
+    
     } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     // ✅ 사용자 제공 Firebase 설정 반영
@@ -2191,6 +2192,8 @@ async function adminDeleteAllContent(){
         setStatus("컨텐츠 기록 삭제 중...");
         const n = await deleteAllCollectionDocs(colContent, "컨텐츠 기록");
         setStatus(`컨텐츠 기록 전체 삭제 완료 (${n}건)`);
+        // 컨텐츠 요약도 0으로 맞추기(레거시/신규 둘 다)
+        await resetAllUsersContentSummary();
       }catch(e){
         console.error(e);
         alert("삭제 중 오류가 발생했습니다. 콘솔을 확인해 주세요.");
@@ -2286,6 +2289,8 @@ async function adminDeleteAllContent(){
         setStatus("근무 기록 삭제 중...");
         const n = await deleteAllCollectionDocs(colWork, "근무 기록");
         setStatus(`근무 기록 전체 삭제 완료 (${n}건)`);
+        // 삭제 후 users 요약도 0으로 맞추기
+        await resetAllUsersWorkSummary();
       }catch(e){
         console.error(e);
         alert("삭제 중 오류가 발생했습니다. 콘솔을 확인해 주세요.");
@@ -2581,6 +2586,90 @@ async function loadChat(){
 
   qs("noticeCompose").hidden = !isDeptLeaderOf(dept);
 }
+
+    async function resetAllUsersWorkSummary(){
+      // 근무 기록 전체 삭제 후 요약(users 문서)에 남아있는 누적치를 0으로 맞춥니다.
+      // (weekSeconds/todaySeconds + 레거시 weekWorkSeconds/todayWorkSeconds 모두 커버)
+      try{
+        const tKey = dayKey(todayStart());
+        const wsKey = dayKey(weekStartMonday0());
+        const snap = await getDocs(colUsers); // U reads
+        const docs = snap.docs;
+        let done = 0;
+        const CHUNK = 450; // batch limit(500) 여유
+        for(let i=0;i<docs.length;i+=CHUNK){
+          const batch = writeBatch(db);
+          const part = docs.slice(i, i+CHUNK);
+          for(const d of part){
+            const ref = doc(db, "users", d.id);
+            batch.update(ref, {
+              // 온라인 상태/열려있는 근무 제거
+              isOnline: false,
+              openWorkId: null,
+              openCheckInAt: null,
+              // 오늘/주간 요약 0 처리
+              todayKey: tKey,
+              todaySeconds: 0,
+              todayWorkSeconds: 0,
+              todayCheckIns: 0,
+              weekStart: wsKey,
+              weekSeconds: 0,
+              weekWorkSeconds: 0
+            });
+          }
+          await batch.commit();
+          done += part.length;
+          setStatus(`요약 리셋 중... (${done}/${docs.length})`);
+        }
+        // 로컬 캐시도 재로딩해서 즉시 반영
+        await loadUsersOnce({force:true, reason:"admin"});
+        await loadDashKpis();
+        await loadUserTable();
+        try{ await renderAdminUserCards(); }catch(_){}
+        setStatus("요약 리셋 완료");
+      }catch(e){
+        console.error(e);
+        toast("요약 리셋 중 오류가 발생했습니다. 콘솔을 확인해 주세요.", "bad", "초기화");
+      }
+    }
+
+
+    async function resetAllUsersContentSummary(){
+      // 컨텐츠 기록 전체 삭제 후 users 문서에 남아있는 컨텐츠 누적치를 0으로 맞춥니다.
+      try{
+        const snap = await getDocs(colUsers); // U reads
+        const docs = snap.docs;
+        let done = 0;
+        const CHUNK = 450;
+        for(let i=0;i<docs.length;i+=CHUNK){
+          const batch = writeBatch(db);
+          const part = docs.slice(i, i+CHUNK);
+          for(const d of part){
+            const ref = doc(db, "users", d.id);
+            batch.update(ref, {
+              contentCounts: {supply:0, plant:0, escort:0},
+              lastContentAt: {supply:null, plant:null, escort:null},
+              // 레거시/표시용 7일 카운트 필드들까지 커버
+              cntSupply7d: 0, supply7d: 0,
+              cntPlant7d: 0, plant7d: 0,
+              cntEscort7d: 0, escort7d: 0
+            });
+          }
+          await batch.commit();
+          done += part.length;
+          setStatus(`컨텐츠 요약 리셋 중... (${done}/${docs.length})`);
+        }
+        await loadUsersOnce({force:true, reason:"admin"});
+        await loadDashKpis();
+        await loadUserTable();
+        try{ await renderAdminUserCards(); }catch(_){}
+        setStatus("컨텐츠 요약 리셋 완료");
+      }catch(e){
+        console.error(e);
+        toast("컨텐츠 요약 리셋 중 오류가 발생했습니다. 콘솔을 확인해 주세요.", "bad", "초기화");
+      }
+    }
+
 
 async function sendChat(){
   const dept=currentUserData?.department;
