@@ -1578,8 +1578,7 @@ currentUser=id;
         const durSec = Math.max(0, Math.floor((co.getTime()-ci.getTime())/1000));
 
         const tKey = dayKey(todayStart());
-        const { start: wsStart, end: wsEnd } = last7DaysRange();
-
+        const wsKey = dayKey(weekStartMonday0());
         // workRecords 마감
         await updateDoc(wrRef, {
           checkOut: serverTimestamp(),
