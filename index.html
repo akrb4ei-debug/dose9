@@ -1015,7 +1015,7 @@ async function openUserModal(uid){
       await loadDashKpis();
       await loadUserTable();
       await renderAdminUserCards();
-      try{ await loadDashKpis(); await loadUserTable(); }catch(e){}
+      try{ await loadUsersOnce({force:true, reason:"admin"}); await loadDashKpis(); await loadUserTable(); }catch(e){}
       try{ if(typeof loadWorkPage==="function") await loadWorkPage(0); }catch(e){}
     }
 
@@ -1305,8 +1305,7 @@ currentUser=id;
         qs("appView").hidden=false;
 
         await refreshAll({silent:true});
-        await maybeShowNoticeOnce();
-      }catch(e){
+}catch(e){
         console.error(e);
         alert("로그인 중 오류가 발생했습니다. (콘솔 확인)");
       }
@@ -2173,7 +2172,7 @@ await loadUsersOnce({force:true, reason:"admin"});
 
       toast("삭제되었습니다.","good","삭제","content-delete",2200);
       setStatus("삭제되었습니다.");
-      try{ await loadDashKpis(); await loadUserTable(); }catch(e){}
+      try{ await loadUsersOnce({force:true, reason:"admin"}); await loadDashKpis(); await loadUserTable(); }catch(e){}
       await loadContentPage(0);
     }
     
@@ -2405,7 +2404,7 @@ async function adminDeleteAllContent(){
       await loadDashKpis();
       await loadUserTable();
       await renderAdminUserCards();
-      try{ await loadDashKpis(); await loadUserTable(); }catch(e){}
+      try{ await loadUsersOnce({force:true, reason:"admin"}); await loadDashKpis(); await loadUserTable(); }catch(e){}
       try{ if(typeof loadWorkPage==="function") await loadWorkPage(0); }catch(e){}
     }
 
@@ -2548,7 +2547,7 @@ async function adminDeleteAllContent(){
       await loadDashKpis();
       await loadUserTable();
       await renderAdminUserCards();
-      try{ await loadDashKpis(); await loadUserTable(); }catch(e){}
+      try{ await loadUsersOnce({force:true, reason:"admin"}); await loadDashKpis(); await loadUserTable(); }catch(e){}
       try{ if(typeof loadWorkPage==="function") await loadWorkPage(0); }catch(e){}
     }
 
@@ -2568,7 +2567,7 @@ async function adminDeleteAllContent(){
       toast("부서장 권한이 저장되었습니다.","good","관리"); setStatus("부서장 권한 저장");
       await loadUsersOnce({force:true, reason:"admin"});
       await renderAdminUserCards();
-      try{ await loadDashKpis(); await loadUserTable(); }catch(e){}
+      try{ await loadUsersOnce({force:true, reason:"admin"}); await loadDashKpis(); await loadUserTable(); }catch(e){}
       try{ if(typeof loadWorkPage==="function") await loadWorkPage(0); }catch(e){}
     }
 
