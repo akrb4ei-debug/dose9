@@ -1677,7 +1677,7 @@ function contentBaseQuery(){
 async function loadContentPage(pageIndex){
       contentPage = pageIndex;
       
-      const fetchSize = (contentFilter===\"ALL\") ? PAGE_SIZE : (PAGE_SIZE*5);
+      const fetchSize = (contentFilter==="ALL") ? PAGE_SIZE : (PAGE_SIZE*5);
 const wsKey = dayKey(weekStartMonday0());
 
       let qy;
@@ -2196,7 +2196,7 @@ async function adminDeleteAllContent(){
         setStatus("컨텐츠 기록 삭제 중...");
         const n = await deleteAllCollectionDocs(colContent, "컨텐츠 기록");
         setStatus(`컨텐츠 기록 전체 삭제 완료 (${n}건)`);
-                 try{ toast(`컨텐츠 기록 삭제 완료 (${'n'}건)`,\"good\",\"삭제\"); }catch(_){} 
+                 try{ toast(`컨텐츠 기록 삭제 완료 (${n}건)`,"good","삭제"); }catch(_){} 
 // 컨텐츠 요약도 0으로 맞추기(레거시/신규 둘 다)
         await resetAllUsersContentSummary();
       }catch(e){
@@ -2294,7 +2294,7 @@ async function adminDeleteAllContent(){
         setStatus("근무 기록 삭제 중...");
         const n = await deleteAllCollectionDocs(colWork, "근무 기록");
         setStatus(`근무 기록 전체 삭제 완료 (${n}건)`);
-                 try{ toast(`근무 기록 삭제 완료 (${'n'}건)`,\"good\",\"삭제\"); }catch(_){} 
+                 try{ toast(`근무 기록 삭제 완료 (${n}건)`,"good","삭제"); }catch(_){} 
 // 삭제 후 users 요약도 0으로 맞추기
         await resetAllUsersWorkSummary();
       }catch(e){
