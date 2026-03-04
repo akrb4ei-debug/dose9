@@ -366,6 +366,48 @@ body.admin-open{overflow:hidden;}
 .u7Badge.off{border-color: rgba(255,124,154,0.45); background: rgba(255,124,154,0.10); color: rgba(255,124,154,0.98);}
 .u7Empty{padding:14px 12px; border-radius:14px; border:1px dashed rgba(255,255,255,0.14); color:var(--muted); font-size:12px; background: rgba(0,0,0,0.10);}
 
+
+/* === MOBILE CLEAN (light) === */
+@media (max-width: 700px){
+  :root{
+    --bg:#f6f7fb;
+    --panel:#ffffff;
+    --panel2:#ffffff;
+    --panel3:#ffffff;
+    --stroke: rgba(10,12,18,0.10);
+    --stroke2: rgba(10,12,18,0.14);
+    --ink: rgba(10,12,18,0.92);
+    --muted: rgba(10,12,18,0.64);
+    --muted2: rgba(10,12,18,0.48);
+    --shadow: 0 14px 42px rgba(16,24,40,0.10);
+  }
+  body{
+    background: #f6f7fb !important;
+  }
+  body::before{ display:none !important; }
+  .topbar{
+    background: rgba(255,255,255,0.92) !important;
+    border-color: rgba(10,12,18,0.10) !important;
+    box-shadow: 0 10px 26px rgba(16,24,40,0.10) !important;
+  }
+  .chip, .pill{
+    background: rgba(255,255,255,0.92) !important;
+    border-color: rgba(10,12,18,0.12) !important;
+  }
+  .card{
+    background: rgba(255,255,255,0.96) !important;
+    border-color: rgba(10,12,18,0.10) !important;
+  }
+  th{ background: rgba(255,255,255,0.98) !important; }
+  tr:hover td{ background: rgba(10,12,18,0.02) !important; }
+  input,select,textarea{
+    background: rgba(255,255,255,0.98) !important;
+    border-color: rgba(10,12,18,0.12) !important;
+  }
+  .badge{ background: rgba(10,12,18,0.04) !important; border-color: rgba(10,12,18,0.10) !important; }
+  .toast{ background: rgba(255,255,255,0.98) !important; }
+}
+
 </style>
 
   <script type="module">
@@ -407,13 +449,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
   const colUsers   = collection(db, "users");
   const colWork    = collection(db, "workRecords");
   const colContent = collection(db, "contentRecords");
-
-  // ===== 로컬 저장소 (부서 채팅/공지: DB 경로 추가 금지) =====
-  const lsGet = (k, fallback) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fallback; } catch { return fallback; } };
-  const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} };
-  const chatKey = (dept) => `deptChat:${dept}`;
-  const noticeKey = (dept) => `deptNotice:${dept}`;
-  const seenKey = (user, dept) => `deptNoticeSeen:${user}:${dept}`;
+  // ===== 로컬 저장소( 제거됨) =====
 // ✅ 앱 시작 시 기본 관리자 계정 시드(가능한 빨리 실행)
     seedDefaultAdmin();
 // ---------- 기본 관리자 계정 자동 생성(1회) ----------
@@ -465,7 +501,7 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
         console.warn("[seedDefaultAdmin] failed:", e?.code||e);
       }
     }
-const RANKS = ["대장","중장","군의관","하사","중사","상사","원사","소위","중위","대위","소령","중령","대령"];
+const RANKS = ["군의관","하사","중사","상사","원사","소위","중위","대위","소령","중령","대령"];
     const DEPTS = ["참모부","국군 경비사령부","국군 특수전사령부","국군 방첩사령부","제 1경비단","군사경찰단","제1공수특수전여단","제3공수특전여단","제820방첩부대","국군의무사령부"];
 
     const PAGE_SIZE = 20;
@@ -1313,7 +1349,6 @@ currentUser=id;
         qs("appView").hidden=false;
 
         await refreshAll({silent:true});
-        await maybeShowNoticeOnce();
       }catch(e){
         console.error(e);
         alert("로그인 중 오류가 발생했습니다. (콘솔 확인)");
@@ -1511,6 +1546,7 @@ currentUser=id;
         const uSnap=await getDoc(doc(db,"users",currentUser));
         if(!uSnap.exists()) return alert("유저 문서가 없습니다.");
         const u=normalizeUser(uSnap.data());
+
         if(u.isOnline===true && u.openWorkId){
           return alert("이미 출근중입니다.");
         }
@@ -1679,6 +1715,8 @@ currentUser=id;
 
     async function loadContentPage(pageIndex){
       contentPage = pageIndex;
+      const wsKey = dayKey(weekStartMonday0());
+
       let qy;
       if(pageIndex===0){
         qy = contentBaseQuery();
@@ -2023,6 +2061,8 @@ function renderContentTimeline(){
         if(v==="O") outcome=true; else if(v==="X") outcome=false; else outcome=null;
       }
       const tKey = dayKey(todayStart());
+      const wsKey = dayKey(weekStartMonday0());
+
       await addDoc(colContent,{
         type:createType,
         writer: currentUser,
@@ -2057,7 +2097,6 @@ function renderContentTimeline(){
       await loadDashKpis();
       await loadUserTable();
       await loadContentPage(0);
-        toast(\"컨텐츠 등록 완료\",\"good\",\"컨텐츠\",\"create\",2800);
     }
 
     // edit content modal (participants 수정 + outcome 수정, 권한: 작성자 또는 관리자)
@@ -2153,19 +2192,9 @@ function renderContentTimeline(){
       if(!(isAdmin() || r.writer===currentUser)) return alert("삭제 권한이 없습니다.");
       if(!confirm("정말 삭제하시겠습니까?")) return;
       await deleteDoc(doc(db,"contentRecords",id));
-       // 요약 즉시 반영: 참여자 카운트 감소
-       try{
-         const type = r.type || "supply";
-         const parts = Array.isArray(r.participants)? r.participants : [];
-         for(const p of parts){
-           await updateDoc(doc(db,"users",p),{[`contentCounts.${type}`]: increment(-1)});
-         }
-       }catch(_e){}
-
       setStatus("삭제되었습니다.");
       await loadContentPage(0);
-            toast(\"삭제되었습니다.\",\"good\",\"컨텐츠 삭제\",\"del\",2400);
-}
+    }
     
     // ---------- ADMIN UTIL: 전체 삭제(인덱스 없이) ----------
     async function deleteAllCollectionDocs(colRef, label){
@@ -2598,6 +2627,7 @@ async function loadChat(){
       // (weekSeconds/todaySeconds + 레거시 weekWorkSeconds/todayWorkSeconds 모두 커버)
       try{
         const tKey = dayKey(todayStart());
+        const wsKey = dayKey(weekStartMonday0());
         const snap = await getDocs(colUsers); // U reads
         const docs = snap.docs;
         let done = 0;
@@ -2608,6 +2638,7 @@ async function loadChat(){
           for(const d of part){
             const ref = doc(db, "users", d.id);
             batch.update(ref, {
+              // (주의) 근무기록 '초기화'는 요약(시간)만 리셋합니다. 온라인 상태/진행중 근무(openWorkId)는 건드리지 않습니다.
               // 오늘/주간 요약 0 처리
               todayKey: tKey,
               todaySeconds: 0,
@@ -2701,27 +2732,6 @@ async function postNotice(){
   qs("noticeText").value="";
   toast("공지가 등록되었습니다.","good","공지"); setStatus("공지 등록됨");
   await loadChat();
-}
-
-async function maybeShowNoticeOnce(){
-  const dept=currentUserData?.department;
-  if(!dept) return;
-  const n = lsGet(noticeKey(dept), null);
-  if(!n?.id) return;
-
-  const k = seenKey(currentUser, dept);
-  if(localStorage.getItem(k) === n.id) return;
-
-  qs("nDept").textContent = dept;
-  qs("nBy").textContent = n.by||"-";
-  qs("nAt").textContent = fmt(n.at);
-  qs("nText").textContent = n.text||"";
-  showModal("noticeModal", true);
-
-  qs("btnNoticeOk").onclick = function(){
-    try{ localStorage.setItem(k, n.id); }catch{}
-    showModal("noticeModal", false);
-  };
 }
 
     // ---------- MODAL CONTROL ----------
@@ -3346,7 +3356,7 @@ window.addEventListener("error", (e)=>{
         <div class="tabs">
           <button class="tab active" data-tab="dashboard">대시보드</button>
           <button class="tab" data-tab="content">컨텐츠 기록</button>
-          <button class="tab" data-tab="chat">부서 소통</button>
+          <button class="tab" data-tab="chat"></button>
           <button class="tab" data-tab="graph">그래프</button>
           <button class="tab" data-tab="admin">관리자</button>
         </div>
@@ -3638,7 +3648,7 @@ window.addEventListener("error", (e)=>{
         <!-- CHAT VIEW -->
         <div class="card" data-view="chat" hidden style="grid-column:1/-1;">
           <div class="row">
-            <h3 style="margin:0;">부서 소통방</h3>
+            <h3 style="margin:0;">방</h3>
             <span class="spacer"></span>
             <span class="badge dim">부서: <b id="chatDept">-</b></span>
           </div>
