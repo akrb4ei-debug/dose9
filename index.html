@@ -3025,8 +3025,8 @@ async function postNotice(){
       // 초기 로드시 관리자 패널이 자동으로 열리지 않도록 항상 닫힘 상태로 시작합니다.
       try{ closeAdminPanel(); }catch(e){}
 
-      qs("btnLogin").addEventListener("click", login);
-      qs("btnLogout").addEventListener("click", logout);
+      { const _el = qs("btnLogin"); if(_el) _el.addEventListener("click", login); }
+      { const _el = qs("btnLogout"); if(_el) _el.addEventListener("click", logout); }
 
       qs("btnAdminClose")?.addEventListener("click", closeAdminPanel);
 
@@ -3051,17 +3051,17 @@ async function postNotice(){
         }
       });
 
-      qs("btnSummary").addEventListener("click", ()=>refreshSummary({silent:false}));
+      { const _el = qs("btnSummary"); if(_el) _el.addEventListener("click", ()=>refreshSummary({silent:false})); }
 
-      qs("btnRefresh").addEventListener("click", ()=>refreshAll({silent:false}));
+      { const _el = qs("btnRefresh"); if(_el) _el.addEventListener("click", ()=>refreshAll({silent:false})); }
 
-      qs("btnIn").addEventListener("click", checkIn);
-      qs("btnOut").addEventListener("click", checkOut);
+      { const _el = qs("btnIn"); if(_el) _el.addEventListener("click", checkIn); }
+      { const _el = qs("btnOut"); if(_el) _el.addEventListener("click", checkOut); }
 
       // create
-      qs("btnCreateSupply").addEventListener("click", ()=>openCreate("보급"));
-      qs("btnCreatePlant").addEventListener("click", ()=>openCreate("송전소"));
-      qs("btnCreateEscort").addEventListener("click", ()=>openCreate("차량수호"));
+      { const _el = qs("btnCreateSupply"); if(_el) _el.addEventListener("click", ()=>openCreate("보급")); }
+      { const _el = qs("btnCreatePlant"); if(_el) _el.addEventListener("click", ()=>openCreate("송전소")); }
+      { const _el = qs("btnCreateEscort"); if(_el) _el.addEventListener("click", ()=>openCreate("차량수호")); }
 
       qs("contentFilter").addEventListener("change", async function(){
         contentFilter=qs("contentFilter").value;
@@ -3069,36 +3069,36 @@ async function postNotice(){
         contentPageCursors=[];
         await loadContentPage(0);
       });
-      qs("btnPrevContent").addEventListener("click", ()=>loadContentPage(Math.max(0, contentPage-1)));
-      qs("btnNextContent").addEventListener("click", ()=>loadContentPage(contentPage+1));
+      { const _el = qs("btnPrevContent"); if(_el) _el.addEventListener("click", ()=>loadContentPage(Math.max(0, contentPage-1))); }
+      { const _el = qs("btnNextContent"); if(_el) _el.addEventListener("click", ()=>loadContentPage(contentPage+1)); }
 
-      qs("sortUsers").addEventListener("change", ()=>{ usersPage=0; loadUserTable(); });
+      { const _el = qs("sortUsers"); if(_el) _el.addEventListener("change", ()=>{ usersPage=0; loadUserTable(); }); }
 
-      qs("userPrev").addEventListener("click", ()=>{ usersPage=Math.max(0, usersPage-1); loadUserTable(); });
-      qs("userNext").addEventListener("click", ()=>{ usersPage=usersPage+1; loadUserTable(); });
+      { const _el = qs("userPrev"); if(_el) _el.addEventListener("click", ()=>{ usersPage=Math.max(0, usersPage-1); loadUserTable(); }); }
+      { const _el = qs("userNext"); if(_el) _el.addEventListener("click", ()=>{ usersPage=usersPage+1; loadUserTable(); }); }
 
       // modals
-      qs("createModal").addEventListener("click",(e)=>{ if(e.target.id==="createModal") showModal("createModal", false); });
-      qs("btnCreateClose").addEventListener("click", ()=>showModal("createModal", false));
-      qs("btnCreateCancel").addEventListener("click", ()=>showModal("createModal", false));
-      qs("btnCreateAll").addEventListener("click", createSelectAll);
-      qs("btnCreateClear").addEventListener("click", createClearAll);
-      qs("cSearch").addEventListener("input", ()=>{ createSearch=qs("cSearch").value.trim(); renderCreateUsers(); });
-      qs("btnOcr").addEventListener("click", runOcrForCreate);
-      qs("cOcrFile").addEventListener("change", ()=>{ qs("cOcrResult").textContent=""; });
-      qs("btnCreateSave").addEventListener("click", saveCreate);
+      { const _el = qs("createModal"); if(_el) _el.addEventListener("click",(e)=>{ if(e.target.id==="createModal") showModal("createModal", false); }); }
+      { const _el = qs("btnCreateClose"); if(_el) _el.addEventListener("click", ()=>showModal("createModal", false)); }
+      { const _el = qs("btnCreateCancel"); if(_el) _el.addEventListener("click", ()=>showModal("createModal", false)); }
+      { const _el = qs("btnCreateAll"); if(_el) _el.addEventListener("click", createSelectAll); }
+      { const _el = qs("btnCreateClear"); if(_el) _el.addEventListener("click", createClearAll); }
+      { const _el = qs("cSearch"); if(_el) _el.addEventListener("input", ()=>{ createSearch=qs("cSearch").value.trim(); renderCreateUsers(); }); }
+      { const _el = qs("btnOcr"); if(_el) _el.addEventListener("click", runOcrForCreate); }
+      { const _el = qs("cOcrFile"); if(_el) _el.addEventListener("change", ()=>{ qs("cOcrResult").textContent=""; }); }
+      { const _el = qs("btnCreateSave"); if(_el) _el.addEventListener("click", saveCreate); }
 
-      qs("editModal").addEventListener("click",(e)=>{ if(e.target.id==="editModal") showModal("editModal", false); });
-      qs("btnEditClose").addEventListener("click", ()=>showModal("editModal", false));
-      qs("btnEditCancel").addEventListener("click", ()=>showModal("editModal", false));
-      qs("btnEditAll").addEventListener("click", editSelectAll);
-      qs("btnEditClear").addEventListener("click", editClearAll);
-      qs("eSearch").addEventListener("input", ()=>{ editSearch=qs("eSearch").value.trim(); renderEditUsers(); });
-      qs("btnEditSave").addEventListener("click", saveEdit);
+      { const _el = qs("editModal"); if(_el) _el.addEventListener("click",(e)=>{ if(e.target.id==="editModal") showModal("editModal", false); }); }
+      { const _el = qs("btnEditClose"); if(_el) _el.addEventListener("click", ()=>showModal("editModal", false)); }
+      { const _el = qs("btnEditCancel"); if(_el) _el.addEventListener("click", ()=>showModal("editModal", false)); }
+      { const _el = qs("btnEditAll"); if(_el) _el.addEventListener("click", editSelectAll); }
+      { const _el = qs("btnEditClear"); if(_el) _el.addEventListener("click", editClearAll); }
+      { const _el = qs("eSearch"); if(_el) _el.addEventListener("input", ()=>{ editSearch=qs("eSearch").value.trim(); renderEditUsers(); }); }
+      { const _el = qs("btnEditSave"); if(_el) _el.addEventListener("click", saveEdit); }
 
-      qs("workEditModal").addEventListener("click",(e)=>{ if(e.target.id==="workEditModal") showModal("workEditModal", false); });
-      qs("btnWorkClose").addEventListener("click", ()=>showModal("workEditModal", false));
-      qs("btnWorkCancel").addEventListener("click", ()=>showModal("workEditModal", false));
+      { const _el = qs("workEditModal"); if(_el) _el.addEventListener("click",(e)=>{ if(e.target.id==="workEditModal") showModal("workEditModal", false); }); }
+      { const _el = qs("btnWorkClose"); if(_el) _el.addEventListener("click", ()=>showModal("workEditModal", false)); }
+      { const _el = qs("btnWorkCancel"); if(_el) _el.addEventListener("click", ()=>showModal("workEditModal", false)); }
       
       // =============================
       // 근무 기록 수정(관리자) - 누락된 함수 보강
@@ -3222,22 +3222,22 @@ async function postNotice(){
       window.openEditWork = openEditWork;
       window.saveEditWork = saveEditWork;
 
-qs("btnWorkSave").addEventListener("click", saveEditWork);
+{ const _el = qs("btnWorkSave"); if(_el) _el.addEventListener("click", saveEditWork); }
 
       // admin
-      qs("btnAdmin").addEventListener("click", toggleAdminPanel);
-      qs("adminSearch").addEventListener("input", renderAdminUserCards);
-      qs("btnAddUser").addEventListener("click", adminAddUser);
+      { const _el = qs("btnAdmin"); if(_el) _el.addEventListener("click", toggleAdminPanel); }
+      { const _el = qs("adminSearch"); if(_el) _el.addEventListener("input", renderAdminUserCards); }
+      { const _el = qs("btnAddUser"); if(_el) _el.addEventListener("click", adminAddUser); }
 
-      qs("btnPrevWork").addEventListener("click", ()=>loadWorkPage(Math.max(0, workPage-1)));
-      qs("btnNextWork").addEventListener("click", ()=>loadWorkPage(workPage+1));
-      qs("btnDelAllWork").addEventListener("click", adminDeleteAllWork);
-      qs("btnDelAllContent").addEventListener("click", adminDeleteAllContent);
-      qs("btnResetTotals").addEventListener("click", adminResetTotals);
+      { const _el = qs("btnPrevWork"); if(_el) _el.addEventListener("click", ()=>loadWorkPage(Math.max(0, workPage-1))); }
+      { const _el = qs("btnNextWork"); if(_el) _el.addEventListener("click", ()=>loadWorkPage(workPage+1)); }
+      { const _el = qs("btnDelAllWork"); if(_el) _el.addEventListener("click", adminDeleteAllWork); }
+      { const _el = qs("btnDelAllContent"); if(_el) _el.addEventListener("click", adminDeleteAllContent); }
+      { const _el = qs("btnResetTotals"); if(_el) _el.addEventListener("click", adminResetTotals); }
 
       // chat
-      qs("btnSendChat").addEventListener("click", sendChat);
-      qs("btnPostNotice").addEventListener("click", postNotice);
+      { const _el = qs("btnSendChat"); if(_el) _el.addEventListener("click", sendChat); }
+      { const _el = qs("btnPostNotice"); if(_el) _el.addEventListener("click", postNotice); }
 
       // tabs
       document.querySelectorAll(".tab[data-tab]").forEach(t=>{
@@ -3309,8 +3309,224 @@ window.addEventListener("unhandledrejection", (e)=>{
 window.addEventListener("error", (e)=>{
   console.error("Global error:", e.message);
 });
+
+// ===== V8 UX: Timeline / Admin Dashboard / Search / Suggested Participants =====
+const ACTIVITY_LIMIT = 24;
+
+function fmtHM(d){
+  try{
+    const dd = (d instanceof Date) ? d : toDateAny(d);
+    if(!dd) return "";
+    const hh=String(dd.getHours()).padStart(2,"0");
+    const mm=String(dd.getMinutes()).padStart(2,"0");
+    return `${hh}:${mm}`;
+  }catch(_){ return ""; }
+}
+
+async function loadTimeline(){
+  try{
+    const wq = query(collection(db,"workRecords"), orderBy("checkIn","desc"), limit(ACTIVITY_LIMIT));
+    const cq = query(collection(db,"contentRecords"), orderBy("time","desc"), limit(ACTIVITY_LIMIT));
+    const [ws, cs] = await Promise.all([getDocs(wq), getDocs(cq)]);
+    const items = [];
+    ws.forEach(docu=>{
+      const v=docu.data();
+      const name=v.nickname||v.user||v.name||"";
+      const cin=toDateAny(v.checkIn);
+      if(cin) items.push({t:cin, line:`${fmtHM(cin)}  ${esc(name)} 출근`, sort:cin.getTime()});
+      const cout=toDateAny(v.checkOut);
+      if(cout) items.push({t:cout, line:`${fmtHM(cout)}  ${esc(name)} 퇴근`, sort:cout.getTime()});
+    });
+    cs.forEach(docu=>{
+      const v=docu.data();
+      const t=toDateAny(v.time);
+      const typ=v.type||v.kind||"컨텐츠";
+      const ps=Array.isArray(v.participants)?v.participants:[];
+      const n=ps.length;
+      if(t) items.push({t, line:`${fmtHM(t)}  ${esc(typ)} 컨텐츠 (${n}명)`, sort:t.getTime()});
+    });
+    items.sort((a,b)=>b.sort-a.sort);
+    const top = items.slice(0, ACTIVITY_LIMIT);
+    const box = document.getElementById("timelineList");
+    if(!box) return;
+    box.innerHTML = top.map(it=>`<div class="card" style="padding:10px 12px;background:rgba(255,255,255,0.02);border-color:rgba(232,239,230,0.08)">${it.line}</div>`).join("");
+    const dashAct=document.getElementById("dashActivityCount");
+    if(dashAct) dashAct.textContent = String(top.length);
+  }catch(e){
+    console.warn("[timeline]", e);
+  }
+}
+
+function isRanked(u){
+  return ((u.rank||"").trim()!=="");
+}
+
+function isTodayCheckedIn(u){
+  const tKey = dayKey(todayStart());
+  const hasToday = (u.todayKey === tKey);
+  const hasWork = (!!u.isOnline) || (!!u.openWorkId) || (Number(u.todaySeconds||0) > 0);
+  return hasToday && hasWork;
+}
+
+function calcWeekHoursRanked(){
+  const wsKey = dayKey(weekStartMonday0());
+  let sec=0;
+  usersCache.forEach(v=>{
+    const u=normalizeUser(v);
+    if(!isRanked(u)) return;
+    if(u.weekStart !== wsKey) return;
+    sec += Number(u.weekSeconds||0);
+  });
+  return sec;
+}
+
+function refreshAdminDashboard(){
+  const dash = document.getElementById("dashTodayRanked");
+  if(!dash) return;
+  let ranked=0, today=0;
+  usersCache.forEach(v=>{
+    const u=normalizeUser(v);
+    if(!isRanked(u)) return;
+    ranked++;
+    if(isTodayCheckedIn(u)) today++;
+  });
+  dash.textContent = `${today} / ${ranked}`;
+  const sec = calcWeekHoursRanked();
+  const wh = document.getElementById("dashWeekHours");
+  if(wh) wh.textContent = fmtHMS(sec);
+}
+
+function bindGlobalSearch(){
+  const inp=document.getElementById("globalSearch");
+  const btn=document.getElementById("globalSearchBtn");
+  if(!inp||!btn) return;
+  const doSearch=()=>{
+    const q=(inp.value||"").trim().toLowerCase();
+    // Users: filter summary/admin lists if render functions exist
+    window.__globalSearchQuery = q;
+    if(typeof renderUserTable==="function") renderUserTable();
+    if(typeof renderAdminUserCards==="function") renderAdminUserCards();
+    toast(q?`검색 적용: ${q}`:"검색 해제","good","검색","search",1400);
+  };
+  btn.onclick=doSearch;
+  inp.onkeydown=(e)=>{ if(e.key==="Enter") doSearch(); };
+}
+
+function getSuggestedNames(){
+  try{
+    const raw=localStorage.getItem("lastParticipants")||"[]";
+    const arr=JSON.parse(raw);
+    if(!Array.isArray(arr)) return [];
+    return arr.filter(x=>typeof x==="string").slice(0,12);
+  }catch(_){ return []; }
+}
+function saveSuggestedFromParticipants(arr){
+  try{
+    localStorage.setItem("lastParticipants", JSON.stringify((arr||[]).slice(0,20)));
+  }catch(_){}
+}
+function renderSuggested(){
+  const box=document.getElementById("suggestedParticipants");
+  if(!box) return;
+  const names=getSuggestedNames().filter(n=>usersCache.has(n));
+  if(names.length===0){ box.innerHTML = `<span class="muted">추천 없음</span>`; return; }
+  box.innerHTML = names.map(n=>`<span class="badge" data-sug="${esc(n)}" style="cursor:pointer">${esc(n)}</span>`).join("");
+  box.querySelectorAll("[data-sug]").forEach(el=>{
+    el.onclick=()=>{
+      const n=el.getAttribute("data-sug");
+      if(!n) return;
+      // toggle checkbox if exists in create modal
+      const cb=document.querySelector(`#createUserList input[data-pick="${cssEsc(n)}"]`);
+      if(cb){ cb.checked=!cb.checked; cb.dispatchEvent(new Event("change")); }
+    };
+  });
+}
+function bindSuggestedApply(){
+  const btn=document.getElementById("applySuggested");
+  if(!btn) return;
+  btn.onclick=()=>{
+    const names=getSuggestedNames().filter(n=>usersCache.has(n));
+    names.forEach(n=>{
+      const cb=document.querySelector(`#createUserList input[data-pick="${cssEsc(n)}"]`);
+      if(cb && !cb.checked){ cb.checked=true; cb.dispatchEvent(new Event("change")); }
+    });
+    toast("추천 참여자 적용","good","컨텐츠","sug",1400);
+  };
+}
+
+// Hook points after refresh/load
+const __oldAfterUsersLoaded = window.afterUsersLoaded;
+window.afterUsersLoaded = async function(){
+  if(typeof __oldAfterUsersLoaded==="function") await __oldAfterUsersLoaded();
+  try{ refreshAdminDashboard(); }catch(_){}
+  try{ renderSuggested(); }catch(_){}
+};
+
+// Ensure content create is not blocked by check-in: remove gating if present
+// (UI already shows all users)
+
+document.addEventListener("DOMContentLoaded", ()=>{
+  bindGlobalSearch();
+  const r=document.getElementById("timelineRefresh");
+  if(r) r.onclick=loadTimeline;
+  bindSuggestedApply();
+  // initial paint
+  setTimeout(loadTimeline, 600);
+});
+
+// If saveCreate exists, capture participants for suggestions
+if(typeof window.saveCreate==="function"){
+  const __origSaveCreate = window.saveCreate;
+  window.saveCreate = async function(){
+    const beforeSelected = Array.from((window.createSelected||new Set()).values());
+    const res = await __origSaveCreate.apply(this, arguments);
+    try{ saveSuggestedFromParticipants(beforeSelected); }catch(_){}
+    try{ renderSuggested(); }catch(_){}
+    try{ loadTimeline(); }catch(_){}
+    return res;
+  };
+}
+
 </script>
   <!-- BUILD_STAMP 2026-02-20 04:12:27 -->
+
+<style id="adminPanelWidePatch">
+.admin-panel,.adminModal,.admin-container{
+max-width:1200px !important;
+width:95% !important;
+}
+</style>
+
+
+<style id="elegantMilitaryTheme">
+:root{
+  --bg:#0f1412;
+  --panel:#151c18;
+  --panel2:#121816;
+  --stroke: rgba(232,239,230,0.10);
+  --stroke2: rgba(232,239,230,0.16);
+  --ink: rgba(232,239,230,0.92);
+  --muted: rgba(232,239,230,0.66);
+  --accent:#7c8f6a;
+  --accent2:#aebc9c;
+  --shadow: 0 18px 48px rgba(0,0,0,0.42);
+}
+body{background:radial-gradient(1200px 600px at 18% 6%, rgba(124,143,106,0.16), transparent 60%), var(--bg); color:var(--ink);}
+.topbar{background:rgba(21,28,24,0.92); border-color:var(--stroke); box-shadow: 0 12px 30px rgba(0,0,0,0.35);}
+.card{background:rgba(21,28,24,0.86); border-color:var(--stroke); box-shadow: var(--shadow);}
+.badge,.chip,.pill{background:rgba(124,143,106,0.10); border-color:rgba(124,143,106,0.32);}
+input,select,textarea{background:rgba(15,20,18,0.72); border-color:var(--stroke2); color:var(--ink);}
+.btn{background:rgba(124,143,106,0.22); border:1px solid rgba(124,143,106,0.45); color:var(--ink);}
+.btn:hover{background:rgba(124,143,106,0.30);}
+.btn.primary{background:rgba(124,143,106,0.55); border-color:rgba(124,143,106,0.85); color:#0b0f0c;}
+.muted{color:var(--muted);}
+.kpi{color:var(--accent2);}
+@media (max-width: 700px){
+  .searchWrap{width:52% !important;}
+  .card{border-radius:16px;}
+}
+</style>
+
 </head>
 
 <body>
