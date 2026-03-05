@@ -2191,7 +2191,13 @@ function renderContentTimeline(){
       const r=s.data();
       if(!(isAdmin() || r.writer===currentUser)) return alert("삭제 권한이 없습니다.");
       if(!confirm("정말 삭제하시겠습니까?")) return;
-      await deleteDoc(doc(db,"contentRecords",id));
+              const __ref = doc(db,"contentRecords", id);
+        const __snap = await getDoc(__ref);
+        await deleteDoc(__ref);
+        if(__snap.exists()) await __syncCountsForDeletedContent(__snap);
+        if(typeof loadUsersOnce==='function') await loadUsersOnce(true);
+        if(typeof refreshSummary==='function') await refreshSummary({silent:true});
+
       setStatus("삭제되었습니다.");
       await loadContentPage(0);
     }
@@ -2386,56 +2392,7 @@ async function adminDeleteAllContent(){
 
 
 
-    // ---------- ADMIN: USER MANAGEMENT (화이트리스트/계급/부서/숨김/권한/부서장) ----------
-    async function adminAddUser(){
-      if(!isAdmin()) return;
-      const id=qs("addNick").value.trim();
-      const pw=qs("addPw").value.trim();
-      if(!id||!pw) return alert("닉네임/비밀번호를 입력해 주세요.");
-      const s=await getDoc(doc(db,"users",id));
-      if(s.exists()) return alert("이미 존재합니다.");
-      await setDoc(doc(db,"users",id),{
-        password: pw,
-        isAdmin:false,
-        hidden:false,
-        isHidden:false,
-        rank:"",
-        department:"",
-        deptLeaderOf: [],
-        // 요약필드 기본값
-        isOnline:false,
-        openWorkId:null,
-        lastCheckIn:null,
-        lastCheckOut:null,
-        weekStart: dayKey(weekStartMonday0()),
-        weekSeconds: 0,
-        todayKey: dayKey(todayStart()),
-        todaySeconds: 0,
-        todayCheckIns: 0,
-        contentCounts: {supply:0, plant:0, escort:0},
-        contentLast: {supply:null, plant:null, escort:null},
-        lastContentAt: null
-      });
-      qs("addNick").value=""; qs("addPw").value="";
-      setStatus("유저 추가 완료");
-      await loadUsersOnce({force:true, reason:"admin"});
-      await loadDashKpis();
-      await loadUserTable();
-      await renderAdminUserCards();
-      try{ await loadDashKpis(); await loadUserTable(); }catch(e){}
-      try{ if(typeof loadWorkPage==="function") await loadWorkPage(0); }catch(e){}
-    }
-
-    function renderAdminUserCards(){
-      if(!isAdmin()) return;
-      const wrap = qs("adminUserCards");
-      if(!wrap) return;
-
-      const sortSel=qs("adminSort");
-      if(sortSel && !sortSel._init){
-        sortSel._init=true;
-        sortSel.innerHTML = `
-          <option value="rankDesc">계급 높은순</option>
+    // ---------- ADMIN: USER MANAGEMENT (화이트리스트/계급/부서/숨김/권한/<option value="rankDesc">계급 높은순</option>
           <option value="rankAsc">계급 낮은순</option>
           <option value="onlineFirst">접속자 우선</option>
           <option value="onlineOnly">온라인만</option>
@@ -2480,7 +2437,7 @@ async function adminDeleteAllContent(){
         const hidden = u.isHidden ? "checked" : "";
         const leadArr = Array.isArray(u.deptLeaderOf)?u.deptLeaderOf:[];
         const lead = leadArr.join(", ");
-        const leaderBadge = leadArr.length ? `<span class="badge">부서장</span>` : ``;
+        const leaderBadge = leadArr.length ? `<span class="badge"></span>` : ``;
 
         const rankOpts = `<option value="">(계급)</option>` + rankOptsTpl(u.rank||"");
         const deptOpts = `<option value="">(부서)</option>` + deptOptsTpl(u.department||"");
@@ -2512,8 +2469,7 @@ async function adminDeleteAllContent(){
             </div>
 
             <div class="row" style="margin-top:10px; flex-wrap:wrap;">
-              <input class="w320" placeholder="부서장 권한 (쉼표로 부서명)" data-lead="${esc(id)}" value="${esc(lead)}"/>
-              <button class="pill" data-savelead="${esc(id)}">부서장 저장</button>
+              <input class="w320" placeholder="<button class="pill" data-savelead="${esc(id)}"></button>
               <span class="spacer"></span>
               <button class="pill" data-view7d="${esc(id)}">최근 7일 기록</button>
             </div>
@@ -2579,29 +2535,7 @@ async function adminDeleteAllContent(){
         await updateDoc(doc(db,"users",id), { deptLeaderOf: arr });
       }catch(e){
         console.error("[adminSaveLeader] update failed", e);
-        toast(`부서장 저장 실패: ${e?.code||e?.message||e}`,"bad","관리");
-        return;
-      }
-      toast("부서장 권한이 저장되었습니다.","good","관리"); setStatus("부서장 권한 저장");
-      await loadUsersOnce({force:true, reason:"admin"});
-      await renderAdminUserCards();
-      try{ await loadDashKpis(); await loadUserTable(); }catch(e){}
-      try{ if(typeof loadWorkPage==="function") await loadWorkPage(0); }catch(e){}
-    }
-
-    // ---------- CHAT/NOTICE (3-D) ----------
-// ※ Firestore에 deptChats/deptNotices 컬렉션을 만들지 않고 로컬스토리지로 처리합니다.
-async function loadChat(){
-  const dept=currentUserData?.department;
-  if(!dept) { qs("chatInfo").textContent="부서가 설정되어야 채팅을 사용할 수 있습니다."; return; }
-  qs("chatDept").textContent = dept;
-
-  const all = lsGet(chatKey(dept), []);
-  const msgs = Array.isArray(all) ? all.slice(-50) : [];
-
-  qs("chatList").innerHTML = msgs.map(m=>{
-    const mine=(m.by===currentUser);
-    return `<div class="event" style="background:${mine?'rgba(185,198,255,0.10)':'rgba(17,21,32,0.50)'}">
+        toast(`<div class="event" style="background:${mine?'rgba(185,198,255,0.10)':'rgba(17,21,32,0.50)'}">
       <div class="head"><span class="badge">${esc(m.by||"-")}</span><span class="spacer"></span><span class="tiny">${esc(fmt(m.time))}</span></div>
       <div class="p">${esc(m.text||"")}</div>
     </div>`;
@@ -2722,125 +2656,7 @@ async function sendChat(){
 async function postNotice(){
   const dept=currentUserData?.department;
   if(!dept) return;
-  if(!isDeptLeaderOf(dept)) return toast("부서장 권한이 없습니다.","bad","공지");
-  const text=qs("noticeText").value.trim();
-  if(!text) return toast("공지 내용을 입력해 주세요.","warn","공지");
-
-  const n = { text, by: currentUser, at: Date.now(), id: `${Date.now()}_${Math.random().toString(16).slice(2)}` };
-  lsSet(noticeKey(dept), n);
-
-  qs("noticeText").value="";
-  toast("공지가 등록되었습니다.","good","공지"); setStatus("공지 등록됨");
-  await loadChat();
-}
-
-    // ---------- MODAL CONTROL ----------
-    function showModal(id, on){
-      const el=qs(id);
-      if(!el) return;
-      if(on){
-        lockBody(true);
-        el.hidden=false;
-      }else{
-        // blur focus
-        const active=document.activeElement;
-        if(active && el.contains(active)) active.blur?.();
-        el.hidden=true;
-        lockBody(false);
-      }
-    }
-
-    // ---------- GRAPH (3-A 그래프: users 요약 기반) ----------
-    let chart=null;
-    function renderGraph(){
-      // 평균 주간/오늘/온라인 등 간단 그래프
-      const wsKey=dayKey(weekStartMonday0());
-      const tKey=dayKey(todayStart());
-      const rows=Array.from(usersCache.entries()).filter(([id,u])=>isAdmin()||!u.isHidden);
-
-      const labels=rows.map(([id])=>id);
-      const week=rows.map(([id,u])=> (u.weekStart===wsKey)?(u.weekSeconds||0)/3600:0);
-      const today=rows.map(([id,u])=> (u.todayKey===tKey)?(u.todaySeconds||0)/3600:0);
-
-      const ctx=qs("chart")?.getContext("2d");
-      if(!ctx) return;
-      if(chart) chart.destroy();
-      chart = new Chart(ctx,{
-        type:"bar",
-        data:{
-          labels,
-          datasets:[
-            { label:"이번주 시간(시간)", data:week },
-            { label:"오늘 시간(시간)", data:today }
-          ]
-        },
-        options:{
-          responsive:true,
-          plugins:{ legend:{ labels:{ color:"rgba(255,255,255,0.75)" } } },
-          scales:{
-            x:{ ticks:{ color:"rgba(255,255,255,0.65)" }, grid:{ color:"rgba(255,255,255,0.06)" } },
-            y:{ ticks:{ color:"rgba(255,255,255,0.65)" }, grid:{ color:"rgba(255,255,255,0.06)" } }
-          }
-        }
-      });
-    }
-
-    // ---------- EVENTS ----------
-
-    let lastNonAdminTab = "dashboard";
-    function closeAdminPanel(){
-      document.body.classList.remove("admin-open");
-      const admin=qs("adminCol");
-      if(admin){
-        // 포커스가 패널 안에 있으면 먼저 해제합니다.
-        const active=document.activeElement;
-        if(active && admin.contains(active)) active.blur?.();
-        admin.hidden=true;
-        admin.setAttribute("aria-hidden","true");
-        const bd=qs("adminBackdrop"); if(bd){ bd.classList.remove("show"); bd.hidden=true; }
-        lockBody(false);
-      }
-    }
-    function openAdminPanel(){
-      setAdminTab("users");
-      if(!isAdmin()) return;
-      document.body.classList.add("admin-open");
-      const admin=qs("adminCol");
-      if(admin){
-        admin.hidden=false;
-        admin.setAttribute("aria-hidden","false");
-        const bd=qs("adminBackdrop"); if(bd){ bd.hidden=false; bd.classList.add("show"); }
-        lockBody(true);
-        // 관리자 카드 렌더는 열릴 때만 수행하여 렉을 줄입니다.
-        renderAdminUserCards();
-        loadWorkPage(0);
-        admin.scrollTop=0;
-      }
-    }
-    function toggleAdminPanel(){
-      if(!isAdmin()) return;
-      const open = document.body.classList.contains("admin-open");
-      if(open) closeAdminPanel();
-      else openAdminPanel();
-    }
-
-    // ---------- ADMIN TABS ----------
-    let adminActiveTab = "users";
-    async function setAdminTab(tab){
-      adminActiveTab = tab;
-      document.querySelectorAll("[data-adminsection]").forEach(sec=>{
-        const on = sec.getAttribute("data-adminsection")===tab;
-        sec.hidden = !on;
-      });
-      document.querySelectorAll("[data-admintab]").forEach(b=>{
-        b.classList.toggle("active", b.getAttribute("data-admintab")===tab);
-      });
-
-      // ✅ 탭 전환 시 "무반응" 방지: 즉시 로딩 문구 표시
-      if(tab==="work"){
-        try{
-          const tb = qs("workTbody");
-          if(tb) tb.innerHTML = `<tr><td colspan="6" class="tiny muted">불러오는 중...</td></tr>`;
+  if(!isDeptLeaderOf(dept)) return toast("<tr><td colspan="6" class="tiny muted">불러오는 중...</td></tr>`;
           const info = qs("workPageInfo"); if(info) info.textContent = "불러오는 중...";
         }catch(_){}
       }
@@ -3487,6 +3303,22 @@ if(typeof window.saveCreate==="function"){
   };
 }
 
+
+// === Summary sync on single content delete ===
+async function __syncCountsForDeletedContent(docSnap){
+  try{
+    const v = docSnap && docSnap.data ? docSnap.data() : null;
+    if(!v) return;
+    const typ = v.type || v.kind || "default";
+    const ps = Array.isArray(v.participants) ? v.participants : [];
+    for(const name of ps){
+      try{
+        await updateDoc(doc(db,"users",name), { [`contentCounts.${typ}`]: increment(-1) });
+      }catch(e){}
+    }
+  }catch(e){}
+}
+
 </script>
   <!-- BUILD_STAMP 2026-02-20 04:12:27 -->
 
@@ -3525,6 +3357,23 @@ input,select,textarea{background:rgba(15,20,18,0.72); border-color:var(--stroke2
   .searchWrap{width:52% !important;}
   .card{border-radius:16px;}
 }
+</style>
+
+
+<style id="adminReadablePatch">
+#adminPanel .adminBody{display:grid;grid-template-columns:1fr;gap:14px;}
+@media (min-width: 900px){
+  #adminPanel .adminBody{grid-template-columns: 360px 1fr;}
+}
+#adminPanel .card{padding:14px 14px;}
+#adminPanel .card h3{font-size:18px;margin:0 0 8px 0;}
+#adminPanel .badge{font-size:13px;padding:8px 10px;border-radius:999px;}
+#adminPanel input,#adminPanel select{height:38px;font-size:14px;}
+#adminPanel .btn{height:38px;font-size:14px;}
+#adminPanel table{font-size:13px;}
+#adminPanel th{position:sticky;top:0;z-index:1;}
+#adminPanel .muted{font-size:13px;line-height:1.35;}
+#adminPanel .btn.primary{font-weight:800;}
 </style>
 
 </head>
@@ -3894,8 +3743,7 @@ input,select,textarea{background:rgba(15,20,18,0.72); border-color:var(--stroke2
             </div>
           </div>
           <div class="tiny" style="margin-top:10px;">
-            • 채팅/공지는 이 탭을 열었을 때만 읽습니다(수동 갱신). • 부서장/관리자만 공지 등록 가능합니다.
-          </div>
+            • 채팅/공지는 이 탭을 열었을 때만 읽습니다(수동 갱신). • </div>
         </div>
 
         <!-- GRAPH VIEW -->
