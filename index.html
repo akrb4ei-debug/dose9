@@ -3031,6 +3031,7 @@ async function postNotice(){
 
       // tabs
       document.querySelectorAll(".tab[data-tab]").forEach(t=>{
+        if(!t) return;
         t.addEventListener("click", ()=>{
           const name = t.dataset.tab;
           if(!name) return;
@@ -3044,7 +3045,7 @@ async function postNotice(){
       // esc close modals
       document.addEventListener("keydown",(e)=>{
         if(e.key==="Escape"){
-          ["createModal","editModal","workEditModal","noticeModal"].forEach(id=>qs(id).hidden=true);
+          ["createModal","editModal","workEditModal","noticeModal"].forEach(id=>{ const el=qs(id); if(el) el.hidden=true; });
           lockBody(false);
         }
       });
