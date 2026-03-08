@@ -2387,110 +2387,110 @@ async function adminDeleteAllContent(){
 
 
     // ---------- ADMIN: USER MANAGEMENT (화이트리스트/계급/부서/숨김/권한)
-    const ADMIN_SORT_OPTIONS_HTML = `
-          <option value="rankDesc">계급 높은순</option>
-          <option value="rankAsc">계급 낮은순</option>
-          <option value="onlineFirst">접속자 우선</option>
-          <option value="onlineOnly">온라인만</option>
-          <option value="nameAsc">이름 A→Z</option>
-          <option value="nameDesc">이름 Z→A</option>
-        `;
-        sortSel.value = localStorage.getItem("dose_admin_sort") || "rankDesc";
-        sortSel.onchange=()=>{ localStorage.setItem("dose_admin_sort", sortSel.value); adminPage=0; renderAdminUserCards(); };
-      }
+const ADMIN_SORT_OPTIONS_HTML = `
+  <option value="rankDesc">계급 높은순</option>
+  <option value="rankAsc">계급 낮은순</option>
+  <option value="onlineFirst">접속자 우선</option>
+  <option value="onlineOnly">온라인만</option>
+  <option value="nameAsc">이름 A→Z</option>
+  <option value="nameDesc">이름 Z→A</option>
+`;
+async function renderAdminUserCards(){
+  const wrap = qs("adminUserCards");
+  if(!wrap) return;
+  let sortSel = qs("adminSort");
+  if(sortSel){
+    sortSel.innerHTML = ADMIN_SORT_OPTIONS_HTML;
+    sortSel.value = localStorage.getItem("dose_admin_sort") || "rankDesc";
+    sortSel.onchange = ()=>{
+      localStorage.setItem("dose_admin_sort", sortSel.value);
+      adminPage = 0;
+      renderAdminUserCards();
+    };
+  }
 
-      const q = (qs("adminSearch")?.value||"").trim().toLowerCase();
-      const mode = sortSel?.value || "rankDesc";
+  const q = (qs("adminSearch")?.value || "").trim().toLowerCase();
+  const mode = sortSel?.value || "rankDesc";
 
-      let arr = Array.from(usersCache.entries()).map(([id,u])=>[id, u||{}]);
-      if(q){
-        arr = arr.filter(([id,u])=>{
-          const hay = `${id} ${u.rank||""} ${u.department||""}`.toLowerCase();
-          return hay.includes(q);
-        });
-      }
+  let arr = Array.from(usersCache.entries()).map(([id,u])=>[id, u||{}]);
+  if(q){
+    arr = arr.filter(([id,u])=>{
+      const hay = `${id} ${u.rank||""} ${u.department||""}`.toLowerCase();
+      return hay.includes(q);
+    });
+  }
 
-      const rankOrder = {"군의관":100,"하사":10,"중사":20,"상사":30,"원사":40,"소위":50,"중위":60,"대위":70,"소령":80,"중령":90,"대령":110};
-      const getRank=(u)=>rankOrder[String(u.rank||"")]||0;
+  const rankOrder = {"군의관":100,"하사":10,"중사":20,"상사":30,"원사":40,"소위":50,"중위":60,"대위":70,"소령":80,"중령":90,"대령":110};
+  const getRank = (u)=>rankOrder[String(u.rank||"")] || 0;
 
-      if(mode==="rankDesc") arr.sort((a,b)=>getRank(b[1])-getRank(a[1]));
-      if(mode==="rankAsc") arr.sort((a,b)=>getRank(a[1])-getRank(b[1]));
-      if(mode==="onlineFirst") arr.sort((a,b)=>Number(!!b[1].isOnline)-Number(!!a[1].isOnline) || getRank(b[1])-getRank(a[1]));
-      if(mode==="onlineOnly") arr = arr.filter(([id,u])=>!!u.isOnline);
-      if(mode==="nameAsc") arr.sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
-      if(mode==="nameDesc") arr.sort((a,b)=>String(b[0]).localeCompare(String(a[0])));
+  if(mode==="rankDesc") arr.sort((a,b)=>getRank(b[1])-getRank(a[1]));
+  if(mode==="rankAsc") arr.sort((a,b)=>getRank(a[1])-getRank(b[1]));
+  if(mode==="onlineFirst") arr.sort((a,b)=>Number(!!b[1].isOnline)-Number(!!a[1].isOnline) || getRank(b[1])-getRank(a[1]));
+  if(mode==="onlineOnly") arr = arr.filter(([id,u])=>!!u.isOnline);
+  if(mode==="nameAsc") arr.sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
+  if(mode==="nameDesc") arr.sort((a,b)=>String(b[0]).localeCompare(String(a[0])));
 
-      const total = arr.length;
-      const maxPage = Math.max(1, Math.ceil(total/ADMIN_PAGE_SIZE));
-      adminPage = Math.max(0, Math.min(adminPage, maxPage-1));
-      const slice = arr.slice(adminPage*ADMIN_PAGE_SIZE, (adminPage+1)*ADMIN_PAGE_SIZE);
+  const total = arr.length;
+  const maxPage = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
+  adminPage = Math.max(0, Math.min(adminPage, maxPage-1));
+  const slice = arr.slice(adminPage*ADMIN_PAGE_SIZE, (adminPage+1)*ADMIN_PAGE_SIZE);
 
-      const rankOptsTpl=(val)=>RANKS.map(r=>`<option value="${esc(r)}" ${String(val)===String(r)?"selected":""}>${esc(r)}</option>`).join("");
-      const deptOptsTpl=(val)=>DEPTS.map(d=>`<option value="${esc(d)}" ${String(val)===String(d)?"selected":""}>${esc(d)}</option>`).join("");
+  const rankOptsTpl = (val)=>RANKS.map(r=>`<option value="${esc(r)}" ${String(val)===String(r)?"selected":""}>${esc(r)}</option>`).join("");
+  const deptOptsTpl = (val)=>DEPTS.map(d=>`<option value="${esc(d)}" ${String(val)===String(d)?"selected":""}>${esc(d)}</option>`).join("");
 
-      wrap.innerHTML = slice.map(([id,u])=>{
-        const admin = u.isAdmin ? "checked" : "";
-        const hidden = u.isHidden ? "checked" : "";
-        const leadArr = Array.isArray(u.deptLeaderOf)?u.deptLeaderOf:[];
-        const lead = leadArr.join(", ");
-        const leaderBadge = leadArr.length ? `<span class="badge"></span>` : ``;
+  wrap.innerHTML = slice.map(([id,u])=>{
+    const admin = u.isAdmin ? "checked" : "";
+    const hidden = u.isHidden ? "checked" : "";
+    const rankOpts = `<option value="">(계급)</option>` + rankOptsTpl(u.rank||"");
+    const deptOpts = `<option value="">(부서)</option>` + deptOptsTpl(u.department||"");
 
-        const rankOpts = `<option value="">(계급)</option>` + rankOptsTpl(u.rank||"");
-        const deptOpts = `<option value="">(부서)</option>` + deptOptsTpl(u.department||"");
+    return `<details class="admItem" data-adm="${esc(id)}">
+      <summary>
+        <span class="badge">${esc(id)}</span>
+        <span class="badge role">${esc(u.rank||"-")}</span>
+        <span class="badge dim">${esc(u.department||"-")}</span>
+        <span class="spacer"></span>
+        <span class="tiny">${u.isAdmin?"관리자":"일반"}</span>
+      </summary>
+      <div class="admBody">
+        <div class="row">
+          <label class="tiny"><input type="checkbox" data-admin="${esc(id)}" ${admin}/> 관리자</label>
+          <label class="tiny"><input type="checkbox" data-hidden="${esc(id)}" ${hidden}/> 숨김</label>
+          <span class="spacer"></span>
+          <button class="pill" data-forcein="${esc(id)}">강제 출근</button>
+          <button class="pill" data-forceout="${esc(id)}">강제 퇴근</button>
+          <button class="pill danger" data-deluser="${esc(id)}">유저 삭제</button>
+        </div>
 
-        return `<details class="admItem" data-adm="${esc(id)}">
-          <summary>
-            <span class="badge">${esc(id)}</span>
-            ${leaderBadge}
-            <span class="badge role">${esc(u.rank||"-")}</span>
-            <span class="badge dim">${esc(u.department||"-")}</span>
-            <span class="spacer"></span>
-            <span class="tiny">${u.isAdmin?"관리자":"일반"}</span>
-          </summary>
-          <div class="admBody">
-            <div class="row">
-              <label class="tiny"><input type="checkbox" data-admin="${esc(id)}" ${admin}/> 관리자</label>
-              <label class="tiny"><input type="checkbox" data-hidden="${esc(id)}" ${hidden}/> 숨김</label>
-              <span class="spacer"></span>
-              <button class="pill" data-forcein="${esc(id)}">강제 출근</button>
-              <button class="pill" data-forceout="${esc(id)}">강제 퇴근</button>
-              <button class="pill danger" data-deluser="${esc(id)}">유저 삭제</button>
-            </div>
+        <div class="row" style="margin-top:10px; flex-wrap:wrap;">
+          <select class="w220" data-rank="${esc(id)}">${rankOpts}</select>
+          <select class="w320" data-dept="${esc(id)}">${deptOpts}</select>
+          <input class="w220" placeholder="비밀번호 변경" data-pw="${esc(id)}"/>
+          <button class="pill" data-save="${esc(id)}">저장</button>
+          <span class="spacer"></span>
+          <button class="pill" data-view7d="${esc(id)}">최근 7일 기록</button>
+        </div>
+      </div>
+    </details>`;
+  }).join("") || `<div class="tiny muted">표시할 유저가 없습니다.</div>`;
 
-            <div class="row" style="margin-top:10px; flex-wrap:wrap;">
-              <select class="w220" data-rank="${esc(id)}">${rankOpts}</select>
-              <select class="w320" data-dept="${esc(id)}">${deptOpts}</select>
-              <input class="w220" placeholder="비밀번호 변경" data-pw="${esc(id)}"/>
-              <button class="pill" data-save="${esc(id)}">저장</button>
-            </div>
+  const pi = qs("adminPageInfo");
+  if(pi) pi.textContent = `${adminPage+1} / ${maxPage} · ${total}명`;
 
-            <div class="row" style="margin-top:10px; flex-wrap:wrap;">
-              <input class="w320" placeholder="<button class="pill" data-savelead="${esc(id)}"></button>
-              <span class="spacer"></span>
-              <button class="pill" data-view7d="${esc(id)}">최근 7일 기록</button>
-            </div>
-          </div>
-        </details>`;
-      }).join("") || `<div class="tiny muted">표시할 유저가 없습니다.</div>`;
+  qs("adminPrev")?.toggleAttribute("disabled", adminPage<=0);
+  qs("adminNext")?.toggleAttribute("disabled", adminPage>=maxPage-1);
 
-      const pi=qs("adminPageInfo");
-      if(pi) pi.textContent = `${adminPage+1} / ${maxPage} · ${total}명`;
+  if(qs("adminPrev")) qs("adminPrev").onclick = ()=>{ adminPage=Math.max(0, adminPage-1); renderAdminUserCards(); };
+  if(qs("adminNext")) qs("adminNext").onclick = ()=>{ adminPage=Math.min(maxPage-1, adminPage+1); renderAdminUserCards(); };
 
-      qs("adminPrev")?.toggleAttribute("disabled", adminPage<=0);
-      qs("adminNext")?.toggleAttribute("disabled", adminPage>=maxPage-1);
+  wrap.querySelectorAll("[data-save]").forEach(b=>{ b.onclick=()=>adminSaveUser(b.getAttribute("data-save")); });
+  wrap.querySelectorAll("[data-forcein]").forEach(b=>{ b.onclick=()=>adminForceIn(b.getAttribute("data-forcein")); });
+  wrap.querySelectorAll("[data-forceout]").forEach(b=>{ b.onclick=()=>adminForceOut(b.getAttribute("data-forceout")); });
+  wrap.querySelectorAll("[data-deluser]").forEach(b=>{ b.onclick=()=>adminDeleteUser(b.getAttribute("data-deluser")); });
+  wrap.querySelectorAll("[data-view7d]").forEach(b=>{ b.onclick=()=>openUserModal(b.getAttribute("data-view7d")); });
+}
 
-      if(qs("adminPrev")) qs("adminPrev").onclick=()=>{ adminPage=Math.max(0, adminPage-1); renderAdminUserCards(); };
-      if(qs("adminNext")) qs("adminNext").onclick=()=>{ adminPage=Math.min(maxPage-1, adminPage+1); renderAdminUserCards(); };
-
-      wrap.querySelectorAll("[data-save]").forEach(b=>{ b.onclick=()=>adminSaveUser(b.getAttribute("data-save")); });
-      wrap.querySelectorAll("[data-savelead]").forEach(b=>{ b.onclick=()=>adminSaveLeader(b.getAttribute("data-savelead")); });
-      wrap.querySelectorAll("[data-forcein]").forEach(b=>{ b.onclick=()=>adminForceIn(b.getAttribute("data-forcein")); });
-      wrap.querySelectorAll("[data-forceout]").forEach(b=>{ b.onclick=()=>adminForceOut(b.getAttribute("data-forceout")); });
-      wrap.querySelectorAll("[data-deluser]").forEach(b=>{ b.onclick=()=>adminDeleteUser(b.getAttribute("data-deluser")); });
-      wrap.querySelectorAll("[data-view7d]").forEach(b=>{ b.onclick=()=>openUserModal(b.getAttribute("data-view7d")); });
-    }
-
-    async function adminSaveUser(id){
+async function adminSaveUser(id){
       if(!isAdmin()) return;
       const isA = qs("adminUserCards").querySelector(`input[data-admin="${cssEsc(id)}"]`)?.checked || false;
       const isH = qs("adminUserCards").querySelector(`input[data-hidden="${cssEsc(id)}"]`)?.checked || false;
@@ -2522,37 +2522,13 @@ async function adminDeleteAllContent(){
     }
 
     async function adminSaveLeader(id){
-      if(!isAdmin()) return;
-      const el = qs("adminUserCards").querySelector(`input[data-lead="${cssEsc(id)}"]`);
-      const raw=(el?.value||"").trim();
-      const arr=raw?raw.split(",").map(s=>s.trim()).filter(Boolean):[];
-      // 없는 부서 입력도 허용(자유), 대신 표준 부서만 쓰길 권장
-      try{
-        await updateDoc(doc(db,"users",id), { deptLeaderOf: arr });
-      }catch(e){
-        console.error("[adminSaveLeader] update failed", e);
-        toast(`<div class="event" style="background:${mine?'rgba(185,198,255,0.10)':'rgba(17,21,32,0.50)'}">
-      <div class="head"><span class="badge">${esc(m.by||"-")}</span><span class="spacer"></span><span class="tiny">${esc(fmt(m.time))}</span></div>
-      <div class="p">${esc(m.text||"")}</div>
-    </div>`;
-  }).join("") || `<div class="tiny">메시지가 없습니다.</div>`;
-
-  // 공지(로컬)
-  const n = lsGet(noticeKey(dept), null);
-  if(n && n.text){
-    qs("noticeBox").innerHTML = `
-      <div class="event">
-        <div class="head"><span class="badge role">공지</span><span class="badge">${esc(n.by||"-")}</span><span class="spacer"></span><span class="tiny">${esc(fmt(n.at))}</span></div>
-        <div class="p">${esc(n.text||"")}</div>
-      </div>`;
-  }else{
-    qs("noticeBox").innerHTML = `<div class="tiny">등록된 공지가 없습니다.</div>`;
-  }
-
-  qs("noticeCompose").hidden = !isDeptLeaderOf(dept);
+  try{
+    toast(" 기능은 제거되었습니다.","warn","관리");
+  }catch(_){}
+  return;
 }
 
-    async function resetAllUsersWorkSummary(){
+async function resetAllUsersWorkSummary(){
       // 근무 기록 전체 삭제 후 요약(users 문서)에 남아있는 누적치를 0으로 맞춥니다.
       // (weekSeconds/todaySeconds + 레거시 weekWorkSeconds/todayWorkSeconds 모두 커버)
       try{
@@ -3600,7 +3576,7 @@ function __applyAdvancedUserFilter(){
 // === Prevent removed-feature crashes ===
 if(typeof window.sendChat!=="function"){ window.sendChat = function(){}; }
 if(typeof window.postNotice!=="function"){ window.postNotice = function(){}; }
-if(typeof window.adminSaveLeader!=="function"){ window.adminSaveLeader = function(){ try{ toast("부서장 권한 기능은 제거되었습니다.","warn","관리자"); }catch(_){ } }; }
+if(typeof window.adminSaveLeader!=="function"){ window.adminSaveLeader = function(){ try{ toast(" 기능은 제거되었습니다.","warn","관리자"); }catch(_){ } }; }
 
 </script>
   <!-- BUILD_STAMP 2026-02-20 04:12:27 -->
