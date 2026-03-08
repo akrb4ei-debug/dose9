@@ -1508,7 +1508,7 @@ currentUser=id;
         const sup=u.contentCounts?.supply||0;
         const pl=u.contentCounts?.plant||0;
         const es=u.contentCounts?.escort||0;
-        return `<tr class="uRow" data-user="${esc(id)}">
+        return `<tr class="uRow" data-user="${esc(id)}" data-username="${esc(id)}" data-rank="${esc(u.rank||"-")}">
           <td><b>${esc(id)}</b></td>
           <td>${rank}</td>
           <td>${dept}</td>
@@ -1708,14 +1708,13 @@ currentUser=id;
     function needsOutcome(type){ return type==="보급" || type==="차량수호"; }
 
     function contentBaseQuery(){
-      const { start: wsStart, end: wsEnd } = last7DaysRange();
-      const fetchSize = (contentFilter==="ALL") ? PAGE_SIZE : (PAGE_SIZE*5); // 타입 필터는 클라에서 처리 (인덱스 불필요)
-      return query(colContent, where("time", ">=", wsStart), where("time","<", wsEnd), orderBy("time","desc"), limit(fetchSize));
+      const fetchSize = (contentFilter==="ALL") ? PAGE_SIZE : (PAGE_SIZE*5);
+      return query(colContent, orderBy("time","desc"), limit(fetchSize));
     }
 
     async function loadContentPage(pageIndex){
       contentPage = pageIndex;
-      const wsKey = dayKey(weekStartMonday0());
+      const fetchSize = (contentFilter==="ALL") ? PAGE_SIZE : (PAGE_SIZE*5);
 
       let qy;
       if(pageIndex===0){
@@ -1726,12 +1725,7 @@ currentUser=id;
           // 커서가 없으면 이전 페이지부터 다시 계산
           return loadContentPage(0);
         }
-        if(contentFilter==="ALL"){
-          qy = query(colContent, where("time", ">=", wsStart), where("time","<", wsEnd), orderBy("time","desc"), startAfter(cursor), limit(fetchSize));
-        }else{
-          // 타입 필터는 렌더링 단계에서 필터링(인덱스 불필요)
-          qy = query(colContent, where("time", ">=", wsStart), where("time","<", wsEnd), orderBy("time","desc"), startAfter(cursor), limit(fetchSize));
-        }
+        qy = query(colContent, orderBy("time","desc"), startAfter(cursor), limit(fetchSize));
       }
 
       const snap = await getDocs(qy);
@@ -2392,7 +2386,9 @@ async function adminDeleteAllContent(){
 
 
 
-    // ---------- ADMIN: USER MANAGEMENT (화이트리스트/계급/부서/숨김/권한/<option value="rankDesc">계급 높은순</option>
+    // ---------- ADMIN: USER MANAGEMENT (화이트리스트/계급/부서/숨김/권한)
+    const ADMIN_SORT_OPTIONS_HTML = `
+          <option value="rankDesc">계급 높은순</option>
           <option value="rankAsc">계급 낮은순</option>
           <option value="onlineFirst">접속자 우선</option>
           <option value="onlineOnly">온라인만</option>
@@ -3043,6 +3039,8 @@ async function postNotice(){
       // admin
       { const _el = qs("btnAdmin"); if(_el) _el.addEventListener("click", toggleAdminPanel); }
       { const _el = qs("adminSearch"); if(_el) _el.addEventListener("input", renderAdminUserCards); }
+{ const _el = qs("adminSort"); if(_el){ _el.innerHTML = ADMIN_SORT_OPTIONS_HTML; _el.addEventListener("change", ()=>{ adminPage=0; renderAdminUserCards(); }); } }
+
       { const _el = qs("btnAddUser"); if(_el) _el.addEventListener("click", adminAddUser); }
 
       { const _el = qs("btnPrevWork"); if(_el) _el.addEventListener("click", ()=>loadWorkPage(Math.max(0, workPage-1))); }
@@ -3319,6 +3317,291 @@ async function __syncCountsForDeletedContent(docSnap){
   }catch(e){}
 }
 
+
+
+// ===== V10 COMPLETE: Timeline / Search / Suggested / UserCard Admin =====
+const ACTIVITY_LIMIT = 28;
+function _qs(id){ return document.getElementById(id); }
+
+function fmtHM(d){
+  try{
+    const dd = (d instanceof Date) ? d : toDateAny(d);
+    if(!dd) return "";
+    const hh=String(dd.getHours()).padStart(2,"0");
+    const mm=String(dd.getMinutes()).padStart(2,"0");
+    return `${hh}:${mm}`;
+  }catch(_){ return ""; }
+}
+
+async function loadTimeline(){
+  try{
+    const wq = query(collection(db,"workRecords"), orderBy("checkIn","desc"), limit(ACTIVITY_LIMIT));
+    const cq = query(collection(db,"contentRecords"), orderBy("time","desc"), limit(ACTIVITY_LIMIT));
+    const [ws, cs] = await Promise.all([getDocs(wq), getDocs(cq)]);
+    const items = [];
+    ws.forEach(docu=>{
+      const v=docu.data();
+      const name=v.nickname||v.user||v.name||"";
+      const cin=toDateAny(v.checkIn);
+      if(cin) items.push({t:cin, line:`${fmtHM(cin)}  <b>${esc(name)}</b> 출근`, sort:cin.getTime()});
+      const cout=toDateAny(v.checkOut);
+      if(cout) items.push({t:cout, line:`${fmtHM(cout)}  <b>${esc(name)}</b> 퇴근`, sort:cout.getTime()});
+    });
+    cs.forEach(docu=>{
+      const v=docu.data();
+      const t=toDateAny(v.time);
+      const typ=v.type||v.kind||"컨텐츠";
+      const ps=Array.isArray(v.participants)?v.participants:[];
+      const n=ps.length;
+      if(t) items.push({t, line:`${fmtHM(t)}  <b>${esc(typ)}</b> 컨텐츠 <span class="muted">(${n}명)</span>`, sort:t.getTime()});
+    });
+    items.sort((a,b)=>b.sort-a.sort);
+    const top = items.slice(0, ACTIVITY_LIMIT);
+    const box = _qs("timelineList");
+    if(box){
+      box.innerHTML = top.map(it=>`<div class="card" style="padding:10px 12px;background:rgba(235,241,236,0.02);border-color:rgba(235,241,236,0.08)">${it.line}</div>`).join("");
+    }
+    const dashAct=_qs("dashActivityCount");
+    if(dashAct) dashAct.textContent = String(top.length);
+  }catch(e){
+    console.warn("[timeline]", e);
+  }
+}
+
+function isRanked(u){ return ((u.rank||"").trim()!==""); }
+function isTodayCheckedIn(u){
+  const tKey = dayKey(todayStart());
+  const hasToday = (u.todayKey === tKey);
+  const hasWork = (!!u.isOnline) || (!!u.openWorkId) || (Number(u.todaySeconds||0) > 0);
+  return hasToday && hasWork;
+}
+function calcWeekSecRanked(){
+  const wsKey = dayKey(weekStartMonday0());
+  let sec=0;
+  usersCache.forEach(v=>{
+    const u=normalizeUser(v);
+    if(!isRanked(u)) return;
+    if(u.weekStart !== wsKey) return;
+    sec += Number(u.weekSeconds||0);
+  });
+  return sec;
+}
+function refreshAdminDashboard(){
+  const dash=_qs("dashTodayRanked");
+  if(!dash) return;
+  let ranked=0,today=0;
+  usersCache.forEach(v=>{
+    const u=normalizeUser(v);
+    if(!isRanked(u)) return;
+    ranked++;
+    if(isTodayCheckedIn(u)) today++;
+  });
+  dash.textContent = `${today} / ${ranked}`;
+  const wh=_qs("dashWeekHours");
+  if(wh) wh.textContent = fmtHMS(calcWeekSecRanked());
+}
+
+function openRecordSearch(q=""){
+  const m=_qs("recordSearchModal");
+  if(!m) return;
+  m.style.display="block";
+  m.setAttribute("aria-hidden","false");
+  const i=_qs("recordSearchQuery");
+  if(i){ i.value=q; i.focus(); }
+}
+function closeRecordSearch(){
+  const m=_qs("recordSearchModal");
+  if(!m) return;
+  m.style.display="none";
+  m.setAttribute("aria-hidden","true");
+}
+async function runRecordSearch(){
+  const q=(_qs("recordSearchQuery")?.value||"").trim().toLowerCase();
+  const out=_qs("recordSearchResult");
+  if(out) out.innerHTML = `<div class="muted">검색중…</div>`;
+  try{
+    const wq = query(collection(db,"workRecords"), orderBy("checkIn","desc"), limit(120));
+    const cq = query(collection(db,"contentRecords"), orderBy("time","desc"), limit(180));
+    const [ws, cs] = await Promise.all([getDocs(wq), getDocs(cq)]);
+    const hits=[];
+    ws.forEach(d=>{
+      const v=d.data();
+      const name=(v.nickname||"").toLowerCase();
+      if(!q || name.includes(q)){
+        const cin=toDateAny(v.checkIn);
+        const cout=toDateAny(v.checkOut);
+        hits.push({t:(cout||cin||new Date(0)), html:`<div class="card" style="padding:10px 12px">
+          <div><b>${esc(v.nickname||"")}</b> 근무</div>
+          <div class="muted">${cin?fmtHM(cin):""} 출근 · ${cout?fmtHM(cout):"—"} 퇴근</div>
+        </div>`});
+      }
+    });
+    cs.forEach(d=>{
+      const v=d.data();
+      const typ=(v.type||"").toLowerCase();
+      const ps=Array.isArray(v.participants)?v.participants:[];
+      const joined=ps.join(" ").toLowerCase();
+      if(!q || typ.includes(q) || joined.includes(q)){
+        const t=toDateAny(v.time);
+        hits.push({t:(t||new Date(0)), html:`<div class="card" style="padding:10px 12px">
+          <div><b>${esc(v.type||"컨텐츠")}</b> <span class="muted">(${ps.length}명)</span></div>
+          <div class="muted">${t?fmtHM(t):""} · ${esc(ps.slice(0,8).join(", "))}${ps.length>8?"…":""}</div>
+        </div>`});
+      }
+    });
+    hits.sort((a,b)=> (b.t?.getTime?.()||0) - (a.t?.getTime?.()||0));
+    if(out) out.innerHTML = hits.slice(0,80).map(x=>x.html).join("") || `<div class="muted">검색 결과 없음</div>`;
+  }catch(e){
+    console.warn("[recordSearch]", e);
+    if(out) out.innerHTML = `<div class="muted">검색 실패: 콘솔 확인</div>`;
+  }
+}
+
+// Suggested participants
+function getSuggestedNames(){
+  try{
+    const raw=localStorage.getItem("lastParticipants")||"[]";
+    const arr=JSON.parse(raw);
+    if(!Array.isArray(arr)) return [];
+    return arr.filter(x=>typeof x==="string").slice(0,12);
+  }catch(_){ return []; }
+}
+function saveSuggestedFromParticipants(arr){
+  try{ localStorage.setItem("lastParticipants", JSON.stringify((arr||[]).slice(0,20))); }catch(_){}
+}
+function renderSuggested(){
+  const box=_qs("suggestedParticipants");
+  if(!box) return;
+  const names=getSuggestedNames().filter(n=>usersCache.has(n));
+  if(names.length===0){ box.innerHTML = `<span class="muted">추천 없음</span>`; return; }
+  box.innerHTML = names.map(n=>`<span class="badge" data-sug="${esc(n)}" style="cursor:pointer">${esc(n)}</span>`).join("");
+  box.querySelectorAll("[data-sug]").forEach(el=>{
+    el.onclick=()=>{
+      const n=el.getAttribute("data-sug");
+      if(!n) return;
+      const cb=document.querySelector(`#createUserList input[data-pick="${cssEsc(n)}"]`);
+      if(cb){ cb.checked=!cb.checked; cb.dispatchEvent(new Event("change")); }
+    };
+  });
+}
+function bindSuggestedApply(){
+  const btn=_qs("applySuggested");
+  if(!btn) return;
+  btn.onclick=()=>{
+    const names=getSuggestedNames().filter(n=>usersCache.has(n));
+    names.forEach(n=>{
+      const cb=document.querySelector(`#createUserList input[data-pick="${cssEsc(n)}"]`);
+      if(cb && !cb.checked){ cb.checked=true; cb.dispatchEvent(new Event("change")); }
+    });
+    try{ toast("추천 참여자 적용","good","컨텐츠","sug",1200); }catch(_){}
+  };
+}
+
+// Global search: normal filters; if startswith '/' open record search
+function bindGlobalSearch(){
+  const inp=_qs("globalSearch");
+  const btn=_qs("globalSearchBtn");
+  if(!inp||!btn) return;
+  const run=()=>{
+    const q=(inp.value||"").trim();
+    if(q.startsWith("/")){ openRecordSearch(q.slice(1)); return; }
+    window.__globalSearchQuery=(q||"").toLowerCase();
+    if(typeof renderUserTable==="function") renderUserTable();
+    if(typeof renderAdminUserCards==="function") renderAdminUserCards();
+    try{ toast(q?`검색: ${q}`:"검색 해제","good","검색","search",1200); }catch(_){}
+  };
+  btn.onclick=run;
+  inp.onkeydown=(e)=>{ if(e.key==="Enter") run(); };
+}
+
+document.addEventListener("DOMContentLoaded", ()=>{
+  bindGlobalSearch();
+  bindSuggestedApply();
+  const tr=_qs("timelineRefresh");
+  if(tr) tr.onclick=loadTimeline;
+  const rc=_qs("recordSearchClose");
+  if(rc) rc.onclick=closeRecordSearch;
+  const rr=_qs("recordSearchRun");
+  if(rr) rr.onclick=runRecordSearch;
+  setTimeout(()=>{ try{ loadTimeline(); }catch(_){} }, 650);
+});
+
+// Hook after user cache loaded
+const __oldAfterUsersLoadedV10 = window.afterUsersLoaded;
+window.afterUsersLoaded = async function(){
+  if(typeof __oldAfterUsersLoadedV10==="function") await __oldAfterUsersLoadedV10();
+  try{ refreshAdminDashboard(); }catch(_){}
+  try{ renderSuggested(); }catch(_){}
+};
+
+// Capture suggested participants on create
+if(typeof window.saveCreate==="function"){
+  const __origV10 = window.saveCreate;
+  window.saveCreate = async function(){
+    const before = Array.from((window.createSelected||new Set()).values());
+    const res = await __origV10.apply(this, arguments);
+    try{ saveSuggestedFromParticipants(before); }catch(_){}
+    try{ renderSuggested(); }catch(_){}
+    try{ loadTimeline(); }catch(_){}
+    return res;
+  };
+}
+
+
+// ===== Advanced Search (nickname or rank) =====
+function __applyAdvancedUserFilter(){
+  const q = (window.__globalSearchQuery||"").toLowerCase();
+  const mode = window.__globalSearchMode || "name";
+  if(!q){
+    document.querySelectorAll("[data-username], .uRow[data-user]").forEach(el=>el.style.display="");
+    return;
+  }
+  document.querySelectorAll("[data-username], .uRow[data-user]").forEach(el=>{
+    const name=((el.getAttribute("data-username")||el.getAttribute("data-user")||"")).toLowerCase();
+    const rank=(el.getAttribute("data-rank")||"").toLowerCase();
+    if(mode==="rank"){
+      el.style.display = rank.includes(q) ? "" : "none";
+    }else{
+      el.style.display = name.includes(q) ? "" : "none";
+    }
+  });
+}
+
+(function(){
+  const oldBind = window.bindGlobalSearch;
+  window.bindGlobalSearch = function(){
+    if(oldBind) oldBind();
+    const inp=document.getElementById("globalSearch");
+    const btn=document.getElementById("globalSearchBtn");
+    if(!inp||!btn) return;
+
+    const run=()=>{
+      const q=(inp.value||"").trim().toLowerCase();
+      window.__globalSearchQuery=q;
+
+      let isRank=false;
+      try{
+        usersCache.forEach(v=>{
+          const r=(v.rank||"").toLowerCase();
+          if(r && r.includes(q)) isRank=true;
+        });
+      }catch(_){}
+      window.__globalSearchMode = isRank ? "rank" : "name";
+
+      __applyAdvancedUserFilter();
+    };
+
+    btn.onclick=run;
+    inp.onkeydown=(e)=>{ if(e.key==="Enter") run(); };
+  };
+})();
+
+
+// === Prevent removed-feature crashes ===
+if(typeof window.sendChat!=="function"){ window.sendChat = function(){}; }
+if(typeof window.postNotice!=="function"){ window.postNotice = function(){}; }
+if(typeof window.adminSaveLeader!=="function"){ window.adminSaveLeader = function(){ try{ toast("부서장 권한 기능은 제거되었습니다.","warn","관리자"); }catch(_){ } }; }
+
 </script>
   <!-- BUILD_STAMP 2026-02-20 04:12:27 -->
 
@@ -3326,36 +3609,6 @@ async function __syncCountsForDeletedContent(docSnap){
 .admin-panel,.adminModal,.admin-container{
 max-width:1200px !important;
 width:95% !important;
-}
-</style>
-
-
-<style id="elegantMilitaryTheme">
-:root{
-  --bg:#0f1412;
-  --panel:#151c18;
-  --panel2:#121816;
-  --stroke: rgba(232,239,230,0.10);
-  --stroke2: rgba(232,239,230,0.16);
-  --ink: rgba(232,239,230,0.92);
-  --muted: rgba(232,239,230,0.66);
-  --accent:#7c8f6a;
-  --accent2:#aebc9c;
-  --shadow: 0 18px 48px rgba(0,0,0,0.42);
-}
-body{background:radial-gradient(1200px 600px at 18% 6%, rgba(124,143,106,0.16), transparent 60%), var(--bg); color:var(--ink);}
-.topbar{background:rgba(21,28,24,0.92); border-color:var(--stroke); box-shadow: 0 12px 30px rgba(0,0,0,0.35);}
-.card{background:rgba(21,28,24,0.86); border-color:var(--stroke); box-shadow: var(--shadow);}
-.badge,.chip,.pill{background:rgba(124,143,106,0.10); border-color:rgba(124,143,106,0.32);}
-input,select,textarea{background:rgba(15,20,18,0.72); border-color:var(--stroke2); color:var(--ink);}
-.btn{background:rgba(124,143,106,0.22); border:1px solid rgba(124,143,106,0.45); color:var(--ink);}
-.btn:hover{background:rgba(124,143,106,0.30);}
-.btn.primary{background:rgba(124,143,106,0.55); border-color:rgba(124,143,106,0.85); color:#0b0f0c;}
-.muted{color:var(--muted);}
-.kpi{color:var(--accent2);}
-@media (max-width: 700px){
-  .searchWrap{width:52% !important;}
-  .card{border-radius:16px;}
 }
 </style>
 
@@ -3374,6 +3627,83 @@ input,select,textarea{background:rgba(15,20,18,0.72); border-color:var(--stroke2
 #adminPanel th{position:sticky;top:0;z-index:1;}
 #adminPanel .muted{font-size:13px;line-height:1.35;}
 #adminPanel .btn.primary{font-weight:800;}
+</style>
+
+
+<style id="elegantMilitaryV2">
+:root{
+  --bg:#0b0f0c;
+  --panel:#111814;
+  --panel2:#0f1512;
+  --stroke: rgba(235,241,236,0.10);
+  --stroke2: rgba(235,241,236,0.16);
+  --ink: rgba(235,241,236,0.92);
+  --muted: rgba(235,241,236,0.62);
+  --accent:#7f946b;
+  --accent2:#b7c6a4;
+  --brass:#c3b07a;
+  --danger:#d16a5d;
+  --shadow: 0 18px 54px rgba(0,0,0,0.52);
+  --radius:18px;
+}
+body{
+  background:
+    radial-gradient(900px 520px at 18% 6%, rgba(127,148,107,0.20), transparent 60%),
+    radial-gradient(820px 520px at 78% 14%, rgba(195,176,122,0.12), transparent 62%),
+    var(--bg);
+  color:var(--ink);
+}
+.topbar{
+  background: rgba(17,24,20,0.86);
+  border: 1px solid var(--stroke);
+  box-shadow: 0 14px 34px rgba(0,0,0,0.42);
+  backdrop-filter: blur(10px);
+}
+.card{
+  background: rgba(17,24,20,0.76);
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.badge,.chip,.pill{
+  background: rgba(127,148,107,0.10);
+  border: 1px solid rgba(127,148,107,0.30);
+  border-radius: 999px;
+}
+.muted{ color: var(--muted) !important; }
+input,select,textarea{
+  background: rgba(11,15,12,0.72);
+  border: 1px solid var(--stroke2);
+  color: var(--ink);
+  border-radius: 14px;
+}
+.btn{
+  background: rgba(127,148,107,0.20);
+  border: 1px solid rgba(127,148,107,0.42);
+  color: var(--ink);
+  border-radius: 14px;
+}
+.btn:hover{ background: rgba(127,148,107,0.28); }
+.btn.primary{
+  background: rgba(195,176,122,0.22);
+  border-color: rgba(195,176,122,0.55);
+}
+.btn.danger{
+  background: rgba(209,106,93,0.18);
+  border-color: rgba(209,106,93,0.48);
+}
+th{
+  background: rgba(17,24,20,0.92);
+  border-bottom: 1px solid var(--stroke);
+}
+tr:hover td{ background: rgba(235,241,236,0.02); }
+.modal .modal-content{
+  border-radius: calc(var(--radius) + 4px);
+  background: rgba(17,24,20,0.94);
+  border: 1px solid rgba(235,241,236,0.14);
+  box-shadow: 0 22px 70px rgba(0,0,0,0.62);
+}
+.kpi{ color: var(--accent2); }
 </style>
 
 </head>
@@ -3888,6 +4218,22 @@ input,select,textarea{background:rgba(15,20,18,0.72); border-color:var(--stroke2
       <div id="profileBody" class="modalBody"></div>
     </div>
   </div>
+
+
+<div id="recordSearchModal" class="modal" aria-hidden="true">
+  <div class="modal-content" style="max-width:720px;width:94%">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <h3 style="margin:0">기록 검색</h3>
+      <button class="btn small" id="recordSearchClose">닫기</button>
+    </div>
+    <div class="muted" style="margin-top:6px">유저/컨텐츠 타입으로 최근 기록을 검색합니다. (검색창에 / 를 붙이면 바로 열립니다)</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+      <input id="recordSearchQuery" placeholder="예) Onyu / 보급" style="flex:1;min-width:200px"/>
+      <button class="btn primary" id="recordSearchRun">검색</button>
+    </div>
+    <div id="recordSearchResult" style="margin-top:12px;display:flex;flex-direction:column;gap:10px"></div>
+  </div>
+</div>
 
 </body>
 </html>
