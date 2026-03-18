@@ -430,6 +430,112 @@ body.admin-open{overflow:hidden;}
     .kpis{grid-template-columns:1fr !important;}
   }
 
+
+  /* OAI admin UI upgrade */
+  .adminUserGrid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+    gap:14px;
+  }
+  .adminUserCard{
+    background:linear-gradient(180deg,#ffffff,#f6f9ff);
+    border:1px solid #dfe7f5;
+    border-radius:18px;
+    padding:16px;
+    box-shadow:0 10px 25px rgba(30,55,90,.08);
+  }
+  .adminUserTop{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:12px;
+  }
+  .adminUserTitle{
+    font-size:17px;
+    font-weight:800;
+    color:#1f2d3d;
+  }
+  .adminUserSub{
+    font-size:12px;
+    color:#66758a;
+    margin-top:4px;
+  }
+  .adminUserBadges{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+  }
+  .adminStatus{
+    display:inline-flex;
+    align-items:center;
+    padding:6px 10px;
+    border-radius:999px;
+    font-size:12px;
+    font-weight:700;
+  }
+  .adminStatus.online{ background:#e8fff0; color:#127a3e; border:1px solid #b8e8c8; }
+  .adminStatus.offline{ background:#eef2f8; color:#596579; border:1px solid #d8e0ea; }
+  .adminStatus.role{ background:#f5f0ff; color:#6848b8; border:1px solid #ddd0ff; }
+  .adminUserMeta{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:8px;
+    margin-bottom:12px;
+  }
+  .adminMetaItem{
+    background:#f8fbff;
+    border:1px solid #e5ecf6;
+    border-radius:12px;
+    padding:10px 12px;
+  }
+  .adminMetaItem .k{
+    display:block;
+    font-size:11px;
+    color:#73839a;
+    margin-bottom:4px;
+  }
+  .adminMetaItem .v.small{
+    font-size:12px;
+    color:#243447;
+    font-weight:700;
+  }
+  .adminUserControls{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-bottom:12px;
+  }
+  .checkLine{
+    display:inline-flex;
+    align-items:center;
+    gap:8px;
+    font-size:13px;
+    color:#314154;
+  }
+  .adminUserRow{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-bottom:12px;
+  }
+  .adminUserActions{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+  }
+  .pill.primary{
+    background:#3f6fff;
+    color:#fff;
+    border-color:#3f6fff;
+  }
+  @media (max-width:900px){
+    .adminUserMeta{ grid-template-columns:1fr; }
+    .adminUserRow>*,
+    .adminUserActions>*{ width:100%; }
+  }
+
 </style>
 
   <script type="module">
@@ -2292,54 +2398,121 @@ function renderContentTimeline(){
       if(!isAdmin()) return;
       const wrap = qs("adminUserCards");
       if(!wrap) return;
-      const sortSel=qs("adminSort");
+
+      const sortSel = qs("adminSort");
       if(sortSel && !sortSel._init){
-        sortSel._init=true;
+        sortSel._init = true;
         sortSel.innerHTML = `
           <option value="rankDesc">계급 높은순</option>
           <option value="rankAsc">계급 낮은순</option>
           <option value="onlineFirst">접속자 우선</option>
-          <option value="onlineOnly">온라인만</option>
+          <option value="onlineOnly">접속자만</option>
           <option value="nameAsc">이름 A→Z</option>
           <option value="nameDesc">이름 Z→A</option>`;
         sortSel.value = localStorage.getItem("dose_admin_sort") || "rankDesc";
-        sortSel.onchange=()=>{ localStorage.setItem("dose_admin_sort", sortSel.value); adminPage=0; renderAdminUserCards(); };
+        sortSel.onchange = ()=>{
+          localStorage.setItem("dose_admin_sort", sortSel.value);
+          adminPage = 0;
+          renderAdminUserCards();
+        };
       }
-      const q = (qs("adminSearch")?.value||"").trim().toLowerCase();
+
+      const keyword = (qs("adminSearch")?.value || "").trim().toLowerCase();
       const mode = sortSel?.value || "rankDesc";
-      let arr = Array.from(usersCache.entries()).map(([id,u])=>[id, u||{}]);
-      if(q){
-        arr = arr.filter(([id,u])=>`${id} ${u.rank||""} ${u.displayName||""}`.toLowerCase().includes(q));
+      let arr = Array.from(usersCache.entries()).map(([id,u])=>[id, u || {}]);
+
+      if(keyword){
+        arr = arr.filter(([id,u])=>{
+          return `${id} ${u.rank||""} ${u.displayName||""}`.toLowerCase().includes(keyword);
+        });
       }
+
       const rankOrder = {"군의관":100,"하사":10,"중사":20,"상사":30,"원사":40,"소위":50,"중위":60,"대위":70,"소령":80,"중령":90,"대령":110};
-      const getRank=(u)=>rankOrder[String(u.rank||"")]||0;
-      if(mode==="rankDesc") arr.sort((a,b)=>getRank(b[1])-getRank(a[1]));
-      if(mode==="rankAsc") arr.sort((a,b)=>getRank(a[1])-getRank(b[1]));
-      if(mode==="onlineFirst") arr.sort((a,b)=>Number(!!b[1].isOnline)-Number(!!a[1].isOnline) || getRank(b[1])-getRank(a[1]));
-      if(mode==="onlineOnly") arr = arr.filter(([id,u])=>!!u.isOnline);
+      const getRank = (u)=>rankOrder[String(u.rank||"")] || 0;
+
+      if(mode==="rankDesc") arr.sort((a,b)=>getRank(b[1]) - getRank(a[1]));
+      if(mode==="rankAsc") arr.sort((a,b)=>getRank(a[1]) - getRank(b[1]));
+      if(mode==="onlineFirst") arr.sort((a,b)=>Number(!!b[1].isOnline) - Number(!!a[1].isOnline) || getRank(b[1]) - getRank(a[1]));
+      if(mode==="onlineOnly") arr = arr.filter(([_,u])=>!!u.isOnline);
       if(mode==="nameAsc") arr.sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
       if(mode==="nameDesc") arr.sort((a,b)=>String(b[0]).localeCompare(String(a[0])));
+
       const total = arr.length;
-      const maxPage = Math.max(1, Math.ceil(total/ADMIN_PAGE_SIZE));
-      adminPage = Math.max(0, Math.min(adminPage, maxPage-1));
-      const slice = arr.slice(adminPage*ADMIN_PAGE_SIZE, (adminPage+1)*ADMIN_PAGE_SIZE);
-      const rankOptsTpl=(val)=>RANKS.map(r=>`<option value="${esc(r)}" ${String(val)===String(r)?"selected":""}>${esc(r)}</option>`).join("");
-      wrap.innerHTML = slice.map(([id,u])=>{
-        const admin = u.isAdmin ? "checked" : "";
-        const hidden = u.isHidden ? "checked" : "";
-        const rankOpts = `<option value="">(계급)</option>` + rankOptsTpl(u.rank||"");
-        return `<details class="admItem" data-adm="${esc(id)}"><summary><span class="badge">${esc(id)}</span><span class="badge role">${esc(u.rank||"-")}</span><span class="spacer"></span><span class="tiny">${u.isAdmin?"관리자":"일반"}</span></summary><div class="admBody"><div class="row"><label class="tiny"><input type="checkbox" data-admin="${esc(id)}" ${admin}/> 관리자</label><label class="tiny"><input type="checkbox" data-hidden="${esc(id)}" ${hidden}/> 숨김</label><span class="spacer"></span><button class="pill" data-forcein="${esc(id)}">강제 출근</button><button class="pill" data-forceout="${esc(id)}">강제 퇴근</button><button class="pill danger" data-deluser="${esc(id)}">유저 삭제</button></div><div class="row" style="margin-top:10px; flex-wrap:wrap;"><select class="w220" data-rank="${esc(id)}">${rankOpts}</select><input class="w220" placeholder="비밀번호 변경" data-pw="${esc(id)}"/><button class="pill" data-save="${esc(id)}">저장</button></div><div class="row" style="margin-top:10px; flex-wrap:wrap;"><span class="tiny">최근 7일 기록과 강제 근무 기능을 사용할 수 있습니다.</span><span class="spacer"></span><button class="pill" data-view7d="${esc(id)}">최근 7일 기록</button></div></div></details>`;
-      }).join("") || `<div class="tiny muted">표시할 유저가 없습니다.</div>`;
-      const pi=qs("adminPageInfo"); if(pi) pi.textContent = `${adminPage+1} / ${maxPage} · ${total}명`;
-      qs("adminPrev")?.toggleAttribute("disabled", adminPage<=0);
-      qs("adminNext")?.toggleAttribute("disabled", adminPage>=maxPage-1);
-      if(qs("adminPrev")) qs("adminPrev").onclick=()=>{ adminPage=Math.max(0, adminPage-1); renderAdminUserCards(); };
-      if(qs("adminNext")) qs("adminNext").onclick=()=>{ adminPage=Math.min(maxPage-1, adminPage+1); renderAdminUserCards(); };
-      wrap.querySelectorAll("[data-save]").forEach(b=>{ b.onclick=()=>adminSaveUser(b.getAttribute("data-save")); });
-      wrap.querySelectorAll("[data-forcein]").forEach(b=>{ b.onclick=()=>adminForceIn(b.getAttribute("data-forcein")); });
-      wrap.querySelectorAll("[data-forceout]").forEach(b=>{ b.onclick=()=>adminForceOut(b.getAttribute("data-forceout")); });
-      wrap.querySelectorAll("[data-deluser]").forEach(b=>{ b.onclick=()=>adminDeleteUser(b.getAttribute("data-deluser")); });
-      wrap.querySelectorAll("[data-view7d]").forEach(b=>{ b.onclick=()=>openUserModal(b.getAttribute("data-view7d")); });
+      const maxPage = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
+      adminPage = Math.max(0, Math.min(adminPage, maxPage - 1));
+      const slice = arr.slice(adminPage * ADMIN_PAGE_SIZE, (adminPage + 1) * ADMIN_PAGE_SIZE);
+
+      const rankOptsTpl = (val)=>RANKS.map(r=>`<option value="${esc(r)}" ${String(val)===String(r)?"selected":""}>${esc(r)}</option>`).join("");
+
+      wrap.innerHTML = `
+        <div class="adminUserGrid">
+          ${slice.map(([id,u])=>{
+            const admin = u.isAdmin ? "checked" : "";
+            const hidden = u.isHidden ? "checked" : "";
+            const rankOpts = `<option value="">(계급)</option>` + rankOptsTpl(u.rank||"");
+            const status = u.isOnline ? '<span class="adminStatus online">출근중</span>' : '<span class="adminStatus offline">오프라인</span>';
+            const title = `${esc(u.rank||"-")} ${esc(u.displayName || id)}`;
+            const sub = esc(id);
+
+            return `
+              <div class="adminUserCard" data-adm="${esc(id)}">
+                <div class="adminUserTop">
+                  <div class="adminUserIdentity">
+                    <div class="adminUserTitle">${title}</div>
+                    <div class="adminUserSub mono">${sub}</div>
+                  </div>
+                  <div class="adminUserBadges">
+                    ${status}
+                    <span class="adminStatus role">${u.isAdmin ? "관리자" : "일반"}</span>
+                  </div>
+                </div>
+
+                <div class="adminUserMeta">
+                  <div class="adminMetaItem"><span class="k">최근 안내</span><span class="v small">${u.lastCheckIn ? fmt(u.lastCheckIn) : "-"}</span></div>
+                  <div class="adminMetaItem"><span class="k">숨김</span><span class="v small">${u.isHidden ? "예" : "아니오"}</span></div>
+                </div>
+
+                <div class="adminUserControls">
+                  <label class="checkLine"><input type="checkbox" data-admin="${esc(id)}" ${admin}/> 관리자</label>
+                  <label class="checkLine"><input type="checkbox" data-hidden="${esc(id)}" ${hidden}/> 숨김</label>
+                </div>
+
+                <div class="adminUserRow">
+                  <select class="w220" data-rank="${esc(id)}">${rankOpts}</select>
+                  <input class="w220" placeholder="비밀번호 변경" data-pw="${esc(id)}"/>
+                  <button class="pill primary" data-save="${esc(id)}">저장</button>
+                </div>
+
+                <div class="adminUserActions">
+                  <button class="pill" data-forcein="${esc(id)}">강제 출근</button>
+                  <button class="pill" data-forceout="${esc(id)}">강제 퇴근</button>
+                  <button class="pill" data-view7d="${esc(id)}">최근 7일 기록</button>
+                  <button class="pill danger" data-deluser="${esc(id)}">유저 삭제</button>
+                </div>
+              </div>
+            `;
+          }).join("")}
+        </div>
+      `;
+
+      if(!slice.length){
+        wrap.innerHTML = `<div class="tiny muted">표시할 유저가 없습니다.</div>`;
+      }
+
+      const pi = qs("adminPageInfo");
+      if(pi) pi.textContent = `${adminPage + 1} / ${maxPage} · ${total}명`;
+
+      qs("adminPrev")?.toggleAttribute("disabled", adminPage <= 0);
+      qs("adminNext")?.toggleAttribute("disabled", adminPage >= maxPage - 1);
+
+      if(qs("adminPrev")) qs("adminPrev").onclick = ()=>{ adminPage = Math.max(0, adminPage - 1); renderAdminUserCards(); };
+      if(qs("adminNext")) qs("adminNext").onclick = ()=>{ adminPage = Math.min(maxPage - 1, adminPage + 1); renderAdminUserCards(); };
+
+      wrap.querySelectorAll("[data-save]").forEach(b=>{ b.onclick = ()=>adminSaveUser(b.getAttribute("data-save")); });
+      wrap.querySelectorAll("[data-forcein]").forEach(b=>{ b.onclick = ()=>adminForceIn(b.getAttribute("data-forcein")); });
+      wrap.querySelectorAll("[data-forceout]").forEach(b=>{ b.onclick = ()=>adminForceOut(b.getAttribute("data-forceout")); });
+      wrap.querySelectorAll("[data-deluser]").forEach(b=>{ b.onclick = ()=>adminDeleteUser(b.getAttribute("data-deluser")); });
+      wrap.querySelectorAll("[data-view7d]").forEach(b=>{ b.onclick = ()=>openUserModal(b.getAttribute("data-view7d")); });
     }
 
     async function adminSaveUser(id){
@@ -2764,9 +2937,6 @@ document.addEventListener("click", (e)=>{
 
 
 // ===== OAI FULL FIX PATCH START =====
-async function maybeShowNoticeOnce(){
-  return;
-}
 
 async function loadOnlineUsersForCreate(){
   // 더 이상 출근한 유저만 표시하지 않고 전체 유저를 사용
