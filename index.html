@@ -338,7 +338,25 @@ body.admin-open{overflow:hidden;}
   .adminCol{ width: calc(100% - 36px) !important; }
 }
 
-</style>
+
+    /* OAI CLEAN FIX */
+    .card h3{letter-spacing:-.01em}
+    .pill{transition:.18s ease; min-height:38px}
+    .pill:hover{filter:brightness(1.06)}
+    .pill:disabled{opacity:.55; cursor:not-allowed}
+    .grid{gap:16px !important}
+    .toolbar,.row{gap:10px !important}
+    #status{max-width:420px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+    .admItem summary{display:flex; align-items:center; gap:8px; flex-wrap:wrap}
+    .admBody .row{align-items:center}
+    #userTbody tr:hover,#workTbody tr:hover{background:rgba(255,255,255,.035)}
+    @media (max-width:900px){
+      .row{flex-wrap:wrap}
+      .pill{width:100%}
+      .topbar .right{width:100%; display:grid; grid-template-columns:1fr}
+    }
+
+  </style>
 
   <script type="module">
     
@@ -414,9 +432,6 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/fireba
           ishidden:false,
           // 표시 정보
           rank:"대령",
-          department:"",
-          dept:"",
-          deptLeaderOf:[],
           // 통계/접속 기본값
           isOnline:false,
           openWorkId:null,
@@ -447,7 +462,7 @@ const RANKS = ["군의관","하사","중사","상사","원사","소위","중위"
     let lastSummaryAt=0;
     const USERS_COOLDOWN_MS = 5*60*1000;
     const SUMMARY_COOLDOWN_MS = 3*60*1000; // 요약 갱신 쿨타임(3분) // 5분
-const USER_PAGE_SIZE = 10;
+const USER_PAGE_SIZE = 20;
     
     const ADMIN_PAGE_SIZE = 12; // 관리자 카드/목록 페이지 크기(화면 절반 패널 기준)
 let usersPage = 0; // 유저 목록 페이지(10명 단위)
@@ -711,8 +726,7 @@ let usersPage = 0; // 유저 목록 페이지(10명 단위)
           <div class="card">
             <div class="k">닉네임</div><div class="v"><b>${esc(userId)}</b></div>
             <div class="k">계급</div><div class="v">${esc(u.rank||"-")}</div>
-            <div class="k">부서</div><div class="v">${esc(u.department||"-")}</div>
-            <div class="k">온라인</div><div class="v">${u.isOnline?"O":"X"}</div>
+                        <div class="k">온라인</div><div class="v">${u.isOnline?"O":"X"}</div>
           </div>
           <div class="card">
             <div class="k">최근 7일 근무</div><div class="v">${esc(weekH)}</div>
@@ -913,7 +927,6 @@ async function openUserModal(uid){
       if(u.ishidden!==undefined && u.isHidden===undefined) u.isHidden=u.ishidden;
       if(u.ishidden!==undefined && u.isHidden===undefined) u.isHidden=u.ishidden;
       if(u.hidden!==undefined && u.isHidden===undefined) u.isHidden=u.hidden;
-      if(u.dept!==undefined && u.department===undefined) u.department=u.dept;
       if(u.rankname!==undefined && u.rank===undefined) u.rank=u.rankname;
       if(!Array.isArray(u.deptLeaderOf)) u.deptLeaderOf = Array.isArray(u.deptLeads)?u.deptLeads:(u.deptLeaderOf||[]);
       return u;
@@ -1086,7 +1099,6 @@ currentUser=id;
         qs("who").innerHTML = `
           <span class="chip">ID <b class="link" data-profile="${esc(id)}">${esc(id)}</b></span>
           <span class="chip">계급 <b>${esc(u.rank||"-")}</b></span>
-          <span class="chip">부서 <b>${esc(u.department||"-")}</b></span>
           <span class="chip">관리자 <b>${u.isAdmin?"O":"X"}</b></span>
         `;
         qs("btnAdmin").hidden = !u.isAdmin;
@@ -1119,7 +1131,7 @@ currentUser=id;
         const now=Date.now();
         if(!isAdmin() && lastSummaryAt && (now-lastSummaryAt)<SUMMARY_COOLDOWN_MS){
           const remain=Math.ceil((SUMMARY_COOLDOWN_MS-(now-lastSummaryAt))/1000);
-          toast(`요약 갱신 쿨타임: ${remain}초 남았습니다.`,"warn","요약 갱신");
+          toast(`잠시 후 다시 시도해주세요.`,"warn","요약 갱신");
           if(!silent) setStatus(`요약 갱신 쿨타임: ${remain}초`);
           return;
         }
@@ -1158,8 +1170,8 @@ currentUser=id;
       const bypass = (isAdmin() && reason==="admin");
       if(!bypass && !force && lastUsersLoadAt && (now-lastUsersLoadAt)<USERS_COOLDOWN_MS){
         const remain=Math.ceil((USERS_COOLDOWN_MS-(now-lastUsersLoadAt))/1000);
-        setStatus(`유저 목록 갱신 쿨타임: ${remain}초 남았습니다.`);
-        toast(`유저 목록 갱신 쿨타임: ${remain}초 남았습니다.`, "warn", "쿨타임");
+        setStatus(`잠시 후 다시 시도해주세요.`);
+        toast(`잠시 후 다시 시도해주세요.`, "warn", "쿨타임");
         return;
       }
       const s=await getDocs(colUsers);
@@ -1208,46 +1220,30 @@ currentUser=id;
       }
 
       const sort=qs("sortUsers").value;
+      let filtered = rows.slice();
+      if(sort==="onlineOnly") filtered = filtered.filter(x=>!!x.u.isOnline);
 
-      // "온라인만" 옵션은 목록 자체를 필터링합니다.
-      if(sort==="onlineOnly"){
-        for(let i=rows.length-1;i>=0;i--){
-          if(!rows[i].u.isOnline) rows.splice(i,1);
-        }
-      }
-
-      rows.sort((a,b)=>{
+      filtered.sort((a,b)=>{
         const ra=RANKS.indexOf(a.u.rank||"");
         const rb=RANKS.indexOf(b.u.rank||"");
         const onlineA=!!a.u.isOnline, onlineB=!!b.u.isOnline;
-
-        if(sort==="onlineFirst"){
-          if(onlineA!==onlineB) return onlineB-onlineA;
-        }
-
-        if(sort==="rankHigh"){
-          if(ra!==rb) return rb-ra; // 대령(높음)이 먼저
-        }else if(sort==="rankLow"){
-          if(ra!==rb) return ra-rb;
-        }
-
+        if(sort==="onlineFirst" && onlineA!==onlineB) return onlineB-onlineA;
+        if(sort==="rankHigh" && ra!==rb) return rb-ra;
+        if(sort==="rankLow" && ra!==rb) return ra-rb;
         return a.id.localeCompare(b.id,"ko");
       });
 
-      // ✅ 10명 단위 페이지네이션
-      const total = rows.length;
-      const totalPages = Math.max(1, Math.ceil(total / USER_PAGE_SIZE));
+      const total = filtered.length;
+      const totalPages = Math.max(1, Math.ceil(total / 20));
       usersPage = Math.min(usersPage, totalPages-1);
-      const start = usersPage * USER_PAGE_SIZE;
-      const pageRows = rows.slice(start, start + USER_PAGE_SIZE);
-
+      const start = usersPage * 20;
+      const pageRows = filtered.slice(start, start + 20);
       const tKey=dayKey(todayStart());
       const wsKey=dayKey(weekStartMonday0());
 
       const tb = pageRows.map(({id,u})=>{
         const on = u.isOnline ? `<span class="badge on">접속 O</span>` : `<span class="badge off">접속 X</span>`;
         const rank = `<span class="badge role">${esc(u.rank||"-")}</span>`;
-        const dept = `<span class="badge dim">${esc(u.department||"-")}</span>`;
         const last = `<span class="tiny">${esc(fmt(u.isOnline?u.lastCheckIn:u.lastCheckOut))}</span>`;
         const week = (u.weekStart===wsKey) ? secsToHMS(u.weekSeconds||0) : "0시간 0분";
         const today = (u.todayKey===tKey) ? secsToHMS(u.todaySeconds||0) : "0시간 0분";
@@ -1257,7 +1253,6 @@ currentUser=id;
         return `<tr class="uRow" data-user="${esc(id)}">
           <td><b>${esc(id)}</b></td>
           <td>${rank}</td>
-          <td>${dept}</td>
           <td>${on}</td>
           <td>${last}</td>
           <td>${week}</td>
@@ -1268,16 +1263,12 @@ currentUser=id;
         </tr>`;
       }).join("");
 
-      qs("userTbody").innerHTML = tb || `<tr><td colspan="10" class="tiny">표시할 유저가 없습니다.</td></tr>`;
-
-      // 페이지 UI
+      qs("userTbody").innerHTML = tb || `<tr><td colspan="9" class="tiny">표시할 유저가 없습니다.</td></tr>`;
       const pInfo=qs("userPageInfo");
       if(pInfo) pInfo.textContent = `${usersPage+1} / ${totalPages} (총 ${total}명)`;
       const prev=qs("userPrev"), next=qs("userNext");
       if(prev) prev.disabled = usersPage<=0;
       if(next) next.disabled = usersPage>=totalPages-1;
-
-      // 쿨타임 표시(유저 목록 읽기 쿨타임)
       const now=Date.now();
       const remain=Math.max(0, USERS_COOLDOWN_MS-(now-lastUsersLoadAt));
       const cd=qs("userCooldown");
@@ -1894,61 +1885,50 @@ function renderContentTimeline(){
       if(!editId||!editData) return;
       const parts=Array.from(editSelected).map(s=>s.trim()).filter(Boolean);
       if(parts.length===0) return alert("0명은 저장하지 않습니다.");
-
       let outcome=editData.outcome ?? null;
       if(needsOutcome(editData.type)){
         const v=qs("eOutcome").value;
         if(v==="O") outcome=true; else if(v==="X") outcome=false; else outcome=null;
       }
-
-      // 변경 사항(추가/삭제)을 계산합니다.
       const oldPartsArr = Array.isArray(editData.participants)?editData.participants:[];
-      const oldSet = new Set(oldPartsArr.map(x=>String(x||"").trim()).filter(Boolean));
-      if(editData.writer) oldSet.add(String(editData.writer));
-      const newSet = new Set(parts.map(x=>String(x||"").trim()).filter(Boolean));
-
-      const added = Array.from(newSet).filter(x=>!oldSet.has(x));
-      const removed = Array.from(oldSet).filter(x=>!newSet.has(x));
-
       const edited = (isAdmin() && editData.writer!==currentUser)
-        ? {mode:"admin", by: currentUser, at: serverTimestamp(), added, removed}
-        : {mode:"self", by: editData.writer||currentUser, at: serverTimestamp(), added, removed};
-
-      await updateDoc(doc(db,"contentRecords",editId),{
-        participants: parts,
-        outcome,
-        edited
-      });
-
+        ? {mode:"admin", by: currentUser, at: serverTimestamp()}
+        : {mode:"self", by: editData.writer||currentUser, at: serverTimestamp()};
+      await updateDoc(doc(db,"contentRecords",editId),{participants: parts,outcome,edited});
+      const affected = new Set([...(oldPartsArr||[]), ...parts, editData.writer].filter(Boolean));
+      for(const nick of affected) await recomputeContentSummaryForUser(nick);
       showModal("editModal", false);
-      toast("저장되었습니다.","good","컨텐츠 수정"); setStatus("저장되었습니다.");
-      await loadContentPage(0);
+      toast("컨텐츠 수정이 저장되었습니다.","good","컨텐츠 수정");
+      setStatus("컨텐츠 수정 저장");
+      await refreshAllViews();
     }
 
     async function deleteContent(id){
       const s=await getDoc(doc(db,"contentRecords",id));
       if(!s.exists()) return;
-      const r=s.data();
+      const r=s.data() || {};
       if(!(isAdmin() || r.writer===currentUser)) return alert("삭제 권한이 없습니다.");
       if(!confirm("정말 삭제하시겠습니까?")) return;
+      const affected = new Set([...(Array.isArray(r.participants)?r.participants:[]), r.writer].filter(Boolean));
       await deleteDoc(doc(db,"contentRecords",id));
-      setStatus("삭제되었습니다.");
-      await loadContentPage(0);
+      for(const nick of affected) await recomputeContentSummaryForUser(nick);
+      setStatus("컨텐츠 기록이 삭제되었습니다.");
+      toast("컨텐츠 기록이 삭제되었습니다.","good","컨텐츠");
+      await refreshAllViews();
     }
     async function adminDeleteAllContent(){
       if(!isAdmin()) return;
       if(!confirm("컨텐츠 기록을 전체 삭제하시겠습니까? (되돌릴 수 없습니다)")) return;
-      // 최근 7일만 보지만, 전체 삭제는 contentRecords 전체를 대상으로 해야 함.
-      // 리드 최소화 목적상, 여기서는 "최근 7일"만 삭제 옵션으로 제한합니다.
-      if(!confirm("최근 7일 기록만 삭제합니다. 진행하시겠습니까?")) return;
-      const since=new Date(kstNow().getTime()); since.setDate(since.getDate()-7);
-      const qy=query(colContent, where("time",">=",since), orderBy("time","desc"), limit(500));
-      const snap=await getDocs(qy);
-      for(const d of snap.docs){
-        await deleteDoc(doc(db,"contentRecords",d.id));
+      if(!confirm("정말 전체 컨텐츠 기록을 모두 삭제합니다. 계속하시겠습니까?")) return;
+      while(true){
+        const snap = await getDocs(query(colContent, limit(300)));
+        if(snap.empty) break;
+        for(const d of snap.docs) await deleteDoc(doc(db,"contentRecords",d.id));
       }
-      setStatus("최근 7일 기록 삭제 완료");
-      await loadContentPage(0);
+      await recomputeAllContentSummaries();
+      setStatus("컨텐츠 기록 전체 삭제 완료");
+      toast("컨텐츠 기록 전체 삭제 완료","good","관리");
+      await refreshAllViews();
     }
 
     // ---------- ADMIN: WORK RECORDS MANAGE (3-A,B,C,D 적용 중 A) ----------
@@ -2010,24 +1990,146 @@ function renderContentTimeline(){
       });
     }
 
+    
+    async function recomputeWorkSummaryForUser(nick){
+      if(!nick) return;
+      const now = (typeof kstNow==="function") ? kstNow() : new Date();
+      const tKey = dayKey(todayStart());
+      const wsKey = dayKey(weekStartMonday0());
+
+      let todaySeconds = 0;
+      let weekSeconds = 0;
+      let todayCheckIns = 0;
+      let openWorkId = null;
+      let openCheckInAt = null;
+      let isOnline = false;
+      let lastCheckIn = null;
+      let lastCheckOut = null;
+
+      const snap = await getDocs(collection(db, "workRecords"));
+      for(const d of snap.docs){
+        const r = d.data() || {};
+        const rowNick = String(r.nickname || r.userId || "").trim();
+        if(rowNick !== String(nick)) continue;
+
+        const ci = r.checkIn && r.checkIn.toDate ? r.checkIn.toDate() : (r.checkIn ? new Date(r.checkIn) : null);
+        const co = r.checkOut && r.checkOut.toDate ? r.checkOut.toDate() : (r.checkOut ? new Date(r.checkOut) : null);
+
+        if(ci){
+          if(dayKey(ci) === tKey) todayCheckIns += 1;
+          if(co){
+            const diff = Math.max(0, Math.floor((co.getTime() - ci.getTime()) / 1000));
+            if(dayKey(ci) === tKey) todaySeconds += diff;
+            if(dayKey(ci) >= wsKey) weekSeconds += diff;
+            if(!lastCheckOut || co > lastCheckOut) lastCheckOut = co;
+          }else{
+            isOnline = true;
+            openWorkId = d.id;
+            openCheckInAt = ci;
+            const diffOpen = Math.max(0, Math.floor((now.getTime() - ci.getTime()) / 1000));
+            if(dayKey(ci) === tKey) todaySeconds += diffOpen;
+            if(dayKey(ci) >= wsKey) weekSeconds += diffOpen;
+          }
+          if(!lastCheckIn || ci > lastCheckIn) lastCheckIn = ci;
+        }
+      }
+
+      await updateDoc(doc(db, "users", nick), {
+        isOnline,
+        openWorkId,
+        openCheckInAt: openCheckInAt || null,
+        todayKey: tKey,
+        todaySeconds,
+        todayCheckIns,
+        weekStart: wsKey,
+        weekSeconds,
+        lastCheckIn: lastCheckIn || null,
+        lastCheckOut: lastCheckOut || null
+      }).catch(()=>{});
+    }
+
+    async function recomputeAllWorkSummaries(){
+      const usersSnap = await getDocs(collection(db, "users"));
+      for(const u of usersSnap.docs){
+        await recomputeWorkSummaryForUser(u.id);
+      }
+    }
+
+    async function recomputeContentSummaryForUser(nick){
+      if(!nick) return;
+      let supply = 0, plant = 0, escort = 0;
+      let lastSupply = null, lastPlant = null, lastEscort = null;
+      let lastContentAt = null;
+
+      const snap = await getDocs(collection(db, "contentRecords"));
+      for(const d of snap.docs){
+        const r = d.data() || {};
+        const parts = Array.isArray(r.participants) ? r.participants : [];
+        if(!parts.includes(nick)) continue;
+        const dt = r.time && r.time.toDate ? r.time.toDate() : (r.time ? new Date(r.time) : null);
+        const type = String(r.type || "");
+
+        if(type === "보급"){
+          supply++;
+          if(!lastSupply || (dt && dt > lastSupply)) lastSupply = dt;
+        }else if(type === "송전소"){
+          plant++;
+          if(!lastPlant || (dt && dt > lastPlant)) lastPlant = dt;
+        }else if(type === "차량수호"){
+          escort++;
+          if(!lastEscort || (dt && dt > lastEscort)) lastEscort = dt;
+        }
+        if(!lastContentAt || (dt && dt > lastContentAt)) lastContentAt = dt;
+      }
+
+      await updateDoc(doc(db, "users", nick), {
+        contentCounts: { supply, plant, escort },
+        contentLast: { supply: lastSupply || null, plant: lastPlant || null, escort: lastEscort || null },
+        lastContentAt: lastContentAt || null
+      }).catch(()=>{});
+    }
+
+    async function recomputeAllContentSummaries(){
+      const usersSnap = await getDocs(collection(db, "users"));
+      for(const u of usersSnap.docs){
+        await recomputeContentSummaryForUser(u.id);
+      }
+    }
+
+    async function refreshAllViews(){
+      try{ await loadUsersOnce({force:true, reason:"patch"}); }catch(_){}
+      try{ await loadDashKpis(); }catch(_){}
+      try{ await loadUserTable(); }catch(_){}
+      try{ await renderAdminUserCards(); }catch(_){}
+      try{ await loadContentPage(0); }catch(_){}
+      try{ await loadWorkPage(0); }catch(_){}
+    }
+
+
     async function adminDeleteWork(id){
       if(!isAdmin()) return;
       if(!confirm("이 근무 기록을 삭제하시겠습니까?")) return;
+      const s = await getDoc(doc(db,"workRecords",id));
+      const nick = s.exists() ? String((s.data()||{}).nickname || (s.data()||{}).userId || "").trim() : "";
       await deleteDoc(doc(db,"workRecords",id));
-      setStatus("삭제되었습니다.");
-      await loadWorkPage(workPage);
+      if(nick) await recomputeWorkSummaryForUser(nick);
+      setStatus("근무 기록이 삭제되었습니다.");
+      toast("근무 기록이 삭제되었습니다.","good","근무");
+      await refreshAllViews();
     }
     async function adminDeleteAllWork(){
       if(!isAdmin()) return;
-      if(!confirm("최근 7일 근무 기록을 전체 삭제하시겠습니까?")) return;
-      const since=new Date(kstNow().getTime()); since.setDate(since.getDate()-7);
-      const qy=query(colWork, where("checkIn",">=",since), orderBy("checkIn","desc"), limit(500));
-      const snap=await getDocs(qy);
-      for(const d of snap.docs){
-        await deleteDoc(doc(db,"workRecords",d.id));
+      if(!confirm("근무 기록을 전체 삭제하시겠습니까? (되돌릴 수 없습니다)")) return;
+      if(!confirm("정말 전체 근무 기록을 모두 삭제합니다. 계속하시겠습니까?")) return;
+      while(true){
+        const snap = await getDocs(query(colWork, limit(300)));
+        if(snap.empty) break;
+        for(const d of snap.docs) await deleteDoc(doc(db,"workRecords",d.id));
       }
-      setStatus("최근 7일 근무 기록 삭제 완료");
-      await loadWorkPage(0);
+      await recomputeAllWorkSummaries();
+      setStatus("근무 기록 전체 삭제 완료");
+      toast("근무 기록 전체 삭제 완료","good","관리");
+      await refreshAllViews();
     }
 
     // edit work record modal: 관리자만
@@ -2058,35 +2160,19 @@ function renderContentTimeline(){
       const ci=new Date(inV);
       const co=outV?new Date(outV):null;
       const dur = co ? Math.max(0, Math.floor((co.getTime()-ci.getTime())/1000)) : null;
-      await updateDoc(doc(db,"workRecords",wEditId),{
-        nickname:nick,
-        checkIn: ci,
-        checkOut: co,
-        durationSec: dur
-      });
+      await updateDoc(doc(db,"workRecords",wEditId),{nickname:nick,checkIn: ci,checkOut: co,durationSec: dur});
+      await recomputeWorkSummaryForUser(nick);
       showModal("workEditModal", false);
-      setStatus("저장되었습니다.");
-      await loadWorkPage(workPage);
+      setStatus("근무 기록이 저장되었습니다.");
+      toast("근무 기록이 저장되었습니다.","good","근무");
+      await refreshAllViews();
     }
 
     // total reset(3-1 confirm): users 요약 리셋
     async function adminResetTotals(){
-      if(!isAdmin()) return;
-      if(!confirm("총 출근(접속)시간을 초기화하시겠습니까?")) return;
-      if(!confirm("정말로 진행하시겠습니까? (되돌릴 수 없습니다)")) return;
-
-      // 20~30명 규모이므로 전체 users 문서 업데이트 가능(쓰기 많지만 reads 줄이기 목적)
-      for(const [id,u] of usersCache.entries()){
-        await updateDoc(doc(db,"users",id),{
-          weekSeconds: 0,
-          todaySeconds: 0,
-          todayCheckIns: 0
-        }).catch(()=>{});
-      }
-      setStatus("초기화 완료");
-      await loadUsersOnce({force:true, reason:"admin"});
-      await loadDashKpis();
-      await loadUserTable();
+      toast("주간 초기화 기능은 제거되었습니다.","warn","관리");
+      setStatus("주간 초기화 기능 제거됨");
+      return;
     }
 
     // ---------- ADMIN: USER MANAGEMENT (화이트리스트/계급/부서/숨김/권한/부서장) ----------
@@ -2103,7 +2189,6 @@ function renderContentTimeline(){
         hidden:false,
         isHidden:false,
         rank:"",
-        department:"",
         deptLeaderOf: [],
         // 요약필드 기본값
         isOnline:false,
@@ -2133,7 +2218,6 @@ function renderContentTimeline(){
       if(!isAdmin()) return;
       const wrap = qs("adminUserCards");
       if(!wrap) return;
-
       const sortSel=qs("adminSort");
       if(sortSel && !sortSel._init){
         sortSel._init=true;
@@ -2143,98 +2227,41 @@ function renderContentTimeline(){
           <option value="onlineFirst">접속자 우선</option>
           <option value="onlineOnly">온라인만</option>
           <option value="nameAsc">이름 A→Z</option>
-          <option value="nameDesc">이름 Z→A</option>
-        `;
+          <option value="nameDesc">이름 Z→A</option>`;
         sortSel.value = localStorage.getItem("dose_admin_sort") || "rankDesc";
         sortSel.onchange=()=>{ localStorage.setItem("dose_admin_sort", sortSel.value); adminPage=0; renderAdminUserCards(); };
       }
-
       const q = (qs("adminSearch")?.value||"").trim().toLowerCase();
       const mode = sortSel?.value || "rankDesc";
-
       let arr = Array.from(usersCache.entries()).map(([id,u])=>[id, u||{}]);
       if(q){
-        arr = arr.filter(([id,u])=>{
-          const hay = `${id} ${u.rank||""} ${u.department||""}`.toLowerCase();
-          return hay.includes(q);
-        });
+        arr = arr.filter(([id,u])=>`${id} ${u.rank||""} ${u.displayName||""}`.toLowerCase().includes(q));
       }
-
       const rankOrder = {"군의관":100,"하사":10,"중사":20,"상사":30,"원사":40,"소위":50,"중위":60,"대위":70,"소령":80,"중령":90,"대령":110};
       const getRank=(u)=>rankOrder[String(u.rank||"")]||0;
-
       if(mode==="rankDesc") arr.sort((a,b)=>getRank(b[1])-getRank(a[1]));
       if(mode==="rankAsc") arr.sort((a,b)=>getRank(a[1])-getRank(b[1]));
       if(mode==="onlineFirst") arr.sort((a,b)=>Number(!!b[1].isOnline)-Number(!!a[1].isOnline) || getRank(b[1])-getRank(a[1]));
       if(mode==="onlineOnly") arr = arr.filter(([id,u])=>!!u.isOnline);
       if(mode==="nameAsc") arr.sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
       if(mode==="nameDesc") arr.sort((a,b)=>String(b[0]).localeCompare(String(a[0])));
-
       const total = arr.length;
       const maxPage = Math.max(1, Math.ceil(total/ADMIN_PAGE_SIZE));
       adminPage = Math.max(0, Math.min(adminPage, maxPage-1));
       const slice = arr.slice(adminPage*ADMIN_PAGE_SIZE, (adminPage+1)*ADMIN_PAGE_SIZE);
-
       const rankOptsTpl=(val)=>RANKS.map(r=>`<option value="${esc(r)}" ${String(val)===String(r)?"selected":""}>${esc(r)}</option>`).join("");
-      const deptOptsTpl=(val)=>DEPTS.map(d=>`<option value="${esc(d)}" ${String(val)===String(d)?"selected":""}>${esc(d)}</option>`).join("");
-
       wrap.innerHTML = slice.map(([id,u])=>{
         const admin = u.isAdmin ? "checked" : "";
         const hidden = u.isHidden ? "checked" : "";
-        const leadArr = Array.isArray(u.deptLeaderOf)?u.deptLeaderOf:[];
-        const lead = leadArr.join(", ");
-        const leaderBadge = leadArr.length ? `<span class="badge">부서장</span>` : ``;
-
         const rankOpts = `<option value="">(계급)</option>` + rankOptsTpl(u.rank||"");
-        const deptOpts = `<option value="">(부서)</option>` + deptOptsTpl(u.department||"");
-
-        return `<details class="admItem" data-adm="${esc(id)}">
-          <summary>
-            <span class="badge">${esc(id)}</span>
-            ${leaderBadge}
-            <span class="badge role">${esc(u.rank||"-")}</span>
-            <span class="badge dim">${esc(u.department||"-")}</span>
-            <span class="spacer"></span>
-            <span class="tiny">${u.isAdmin?"관리자":"일반"}</span>
-          </summary>
-          <div class="admBody">
-            <div class="row">
-              <label class="tiny"><input type="checkbox" data-admin="${esc(id)}" ${admin}/> 관리자</label>
-              <label class="tiny"><input type="checkbox" data-hidden="${esc(id)}" ${hidden}/> 숨김</label>
-              <span class="spacer"></span>
-              <button class="pill" data-forcein="${esc(id)}">강제 출근</button>
-              <button class="pill" data-forceout="${esc(id)}">강제 퇴근</button>
-              <button class="pill danger" data-deluser="${esc(id)}">유저 삭제</button>
-            </div>
-
-            <div class="row" style="margin-top:10px; flex-wrap:wrap;">
-              <select class="w220" data-rank="${esc(id)}">${rankOpts}</select>
-              <select class="w320" data-dept="${esc(id)}">${deptOpts}</select>
-              <input class="w220" placeholder="비밀번호 변경" data-pw="${esc(id)}"/>
-              <button class="pill" data-save="${esc(id)}">저장</button>
-            </div>
-
-            <div class="row" style="margin-top:10px; flex-wrap:wrap;">
-              <input class="w320" placeholder="부서장 권한 (쉼표로 부서명)" data-lead="${esc(id)}" value="${esc(lead)}"/>
-              <button class="pill" data-savelead="${esc(id)}">부서장 저장</button>
-              <span class="spacer"></span>
-              <button class="pill" data-view7d="${esc(id)}">최근 7일 기록</button>
-            </div>
-          </div>
-        </details>`;
+        return `<details class="admItem" data-adm="${esc(id)}"><summary><span class="badge">${esc(id)}</span><span class="badge role">${esc(u.rank||"-")}</span><span class="spacer"></span><span class="tiny">${u.isAdmin?"관리자":"일반"}</span></summary><div class="admBody"><div class="row"><label class="tiny"><input type="checkbox" data-admin="${esc(id)}" ${admin}/> 관리자</label><label class="tiny"><input type="checkbox" data-hidden="${esc(id)}" ${hidden}/> 숨김</label><span class="spacer"></span><button class="pill" data-forcein="${esc(id)}">강제 출근</button><button class="pill" data-forceout="${esc(id)}">강제 퇴근</button><button class="pill danger" data-deluser="${esc(id)}">유저 삭제</button></div><div class="row" style="margin-top:10px; flex-wrap:wrap;"><select class="w220" data-rank="${esc(id)}">${rankOpts}</select><input class="w220" placeholder="비밀번호 변경" data-pw="${esc(id)}"/><button class="pill" data-save="${esc(id)}">저장</button></div><div class="row" style="margin-top:10px; flex-wrap:wrap;"><span class="tiny">최근 7일 기록과 강제 근무 기능을 사용할 수 있습니다.</span><span class="spacer"></span><button class="pill" data-view7d="${esc(id)}">최근 7일 기록</button></div></div></details>`;
       }).join("") || `<div class="tiny muted">표시할 유저가 없습니다.</div>`;
-
-      const pi=qs("adminPageInfo");
-      if(pi) pi.textContent = `${adminPage+1} / ${maxPage} · ${total}명`;
-
+      const pi=qs("adminPageInfo"); if(pi) pi.textContent = `${adminPage+1} / ${maxPage} · ${total}명`;
       qs("adminPrev")?.toggleAttribute("disabled", adminPage<=0);
       qs("adminNext")?.toggleAttribute("disabled", adminPage>=maxPage-1);
-
       if(qs("adminPrev")) qs("adminPrev").onclick=()=>{ adminPage=Math.max(0, adminPage-1); renderAdminUserCards(); };
       if(qs("adminNext")) qs("adminNext").onclick=()=>{ adminPage=Math.min(maxPage-1, adminPage+1); renderAdminUserCards(); };
-
       wrap.querySelectorAll("[data-save]").forEach(b=>{ b.onclick=()=>adminSaveUser(b.getAttribute("data-save")); });
-      wrap.querySelectorAll("[data-savelead]").forEach(b=>{ b.onclick=()=>adminSaveLeader(b.getAttribute("data-savelead")); });
       wrap.querySelectorAll("[data-forcein]").forEach(b=>{ b.onclick=()=>adminForceIn(b.getAttribute("data-forcein")); });
       wrap.querySelectorAll("[data-forceout]").forEach(b=>{ b.onclick=()=>adminForceOut(b.getAttribute("data-forceout")); });
       wrap.querySelectorAll("[data-deluser]").forEach(b=>{ b.onclick=()=>adminDeleteUser(b.getAttribute("data-deluser")); });
@@ -2246,118 +2273,36 @@ function renderContentTimeline(){
       const isA = qs("adminUserCards").querySelector(`input[data-admin="${cssEsc(id)}"]`)?.checked || false;
       const isH = qs("adminUserCards").querySelector(`input[data-hidden="${cssEsc(id)}"]`)?.checked || false;
       const rank = qs("adminUserCards").querySelector(`select[data-rank="${cssEsc(id)}"]`)?.value || "";
-      const dept = qs("adminUserCards").querySelector(`select[data-dept="${cssEsc(id)}"]`)?.value || "";
       const pwEl = qs("adminUserCards").querySelector(`input[data-pw="${cssEsc(id)}"]`);
       const pw = (pwEl?.value||"").trim();
-
-      const updates={ isAdmin:isA, hidden:isH, isHidden:isH, rank, department:dept };
+      const updates={ isAdmin:isA, hidden:isH, isHidden:isH, rank };
       if(pw) updates.password=pw;
-
-      try{
-        await updateDoc(doc(db,"users",id), updates);
-      }catch(e){
-        console.error("[adminSaveUser] update failed", e);
-        toast(`저장 실패: ${e?.code||e?.message||e}`,"bad","관리");
-        return;
-      }
+      try{ await updateDoc(doc(db,"users",id), updates); }
+      catch(e){ console.error("[adminSaveUser] update failed", e); toast(`저장 실패: ${e?.code||e?.message||e}`,"bad","관리"); return; }
       if(pwEl) pwEl.value="";
-      toast("저장 완료","good","관리",1800,"admin_saved"); toast("유저 설정이 저장되었습니다.","good","관리"); setStatus("저장 완료");
+      toast("유저 설정이 저장되었습니다.","good","관리"); setStatus("저장 완료");
       await loadUsersOnce({force:true, reason:"admin"});
-      // 내가 수정된 경우(계급/부서 변경 등) 즉시 반영
       try{ if(id===currentUser){ currentUserData = normalizeUser(usersCache.get(currentUser)||currentUserData||{}); } }catch(e){}
       await loadDashKpis();
       await loadUserTable();
       await renderAdminUserCards();
-      try{ await loadDashKpis(); await loadUserTable(); }catch(e){}
       try{ if(typeof loadWorkPage==="function") await loadWorkPage(0); }catch(e){}
     }
 
-    async function adminSaveLeader(id){
-      if(!isAdmin()) return;
-      const el = qs("adminUserCards").querySelector(`input[data-lead="${cssEsc(id)}"]`);
-      const raw=(el?.value||"").trim();
-      const arr=raw?raw.split(",").map(s=>s.trim()).filter(Boolean):[];
-      // 없는 부서 입력도 허용(자유), 대신 표준 부서만 쓰길 권장
-      try{
-        await updateDoc(doc(db,"users",id), { deptLeaderOf: arr });
-      }catch(e){
-        console.error("[adminSaveLeader] update failed", e);
-        toast(`부서장 저장 실패: ${e?.code||e?.message||e}`,"bad","관리");
-        return;
-      }
-      toast("부서장 권한이 저장되었습니다.","good","관리"); setStatus("부서장 권한 저장");
-      await loadUsersOnce({force:true, reason:"admin"});
-      await renderAdminUserCards();
-      try{ await loadDashKpis(); await loadUserTable(); }catch(e){}
-      try{ if(typeof loadWorkPage==="function") await loadWorkPage(0); }catch(e){}
-    }
+    async function adminSaveLeader(id){ toast("부서장 기능은 제거되었습니다.","warn","관리"); setStatus("부서장 기능 제거됨"); return; }
 
     // ---------- CHAT/NOTICE (3-D) ----------
 // ※ Firestore에 deptChats/deptNotices 컬렉션을 만들지 않고 로컬스토리지로 처리합니다.
 async function loadChat(){
-  const dept=currentUserData?.department;
-  if(!dept) { qs("chatInfo").textContent="부서가 설정되어야 채팅을 사용할 수 있습니다."; return; }
-  qs("chatDept").textContent = dept;
+      setStatus("부서소통 기능은 제거되었습니다.");
+      return;
+    }
 
-  const all = lsGet(chatKey(dept), []);
-  const msgs = Array.isArray(all) ? all.slice(-50) : [];
+async function sendChat(){ toast("부서소통 기능은 제거되었습니다.","warn","관리"); setStatus("부서소통 기능 제거됨"); return; }
 
-  qs("chatList").innerHTML = msgs.map(m=>{
-    const mine=(m.by===currentUser);
-    return `<div class="event" style="background:${mine?'rgba(185,198,255,0.10)':'rgba(17,21,32,0.50)'}">
-      <div class="head"><span class="badge">${esc(m.by||"-")}</span><span class="spacer"></span><span class="tiny">${esc(fmt(m.time))}</span></div>
-      <div class="p">${esc(m.text||"")}</div>
-    </div>`;
-  }).join("") || `<div class="tiny">메시지가 없습니다.</div>`;
-
-  // 공지(로컬)
-  const n = lsGet(noticeKey(dept), null);
-  if(n && n.text){
-    qs("noticeBox").innerHTML = `
-      <div class="event">
-        <div class="head"><span class="badge role">공지</span><span class="badge">${esc(n.by||"-")}</span><span class="spacer"></span><span class="tiny">${esc(fmt(n.at))}</span></div>
-        <div class="p">${esc(n.text||"")}</div>
-      </div>`;
-  }else{
-    qs("noticeBox").innerHTML = `<div class="tiny">등록된 공지가 없습니다.</div>`;
-  }
-
-  qs("noticeCompose").hidden = !isDeptLeaderOf(dept);
-}
-
-async function sendChat(){
-  const dept=currentUserData?.department;
-  if(!dept) return alert("부서가 없습니다.");
-  const text=qs("chatText").value.trim();
-  if(!text) return;
-
-  const arr = lsGet(chatKey(dept), []);
-  const next = Array.isArray(arr) ? arr : [];
-  next.push({ by: currentUser, text, time: Date.now() });
-  lsSet(chatKey(dept), next);
-
-  qs("chatText").value="";
-  setStatus("전송됨");
-  await loadChat();
-}
-
-async function postNotice(){
-  const dept=currentUserData?.department;
-  if(!dept) return;
-  if(!isDeptLeaderOf(dept)) return toast("부서장 권한이 없습니다.","bad","공지");
-  const text=qs("noticeText").value.trim();
-  if(!text) return toast("공지 내용을 입력해 주세요.","warn","공지");
-
-  const n = { text, by: currentUser, at: Date.now(), id: `${Date.now()}_${Math.random().toString(16).slice(2)}` };
-  lsSet(noticeKey(dept), n);
-
-  qs("noticeText").value="";
-  toast("공지가 등록되었습니다.","good","공지"); setStatus("공지 등록됨");
-  await loadChat();
-}
+async function postNotice(){ toast("부서 공지 기능은 제거되었습니다.","warn","관리"); setStatus("부서 공지 기능 제거됨"); return; }
 
 async function maybeShowNoticeOnce(){
-  const dept=currentUserData?.department;
   if(!dept) return;
   const n = lsGet(noticeKey(dept), null);
   if(!n?.id) return;
@@ -2592,10 +2537,9 @@ async function maybeShowNoticeOnce(){
     }
 
     function setTab(name){
+      if(name==="chat") name="dashboard";
       if(name==="admin"){
-        // 관리자 탭은 "대시보드 유지 + 우측 패널 토글" 방식입니다.
         toggleAdminPanel();
-        // 탭 표시 상태는 마지막 일반 탭을 유지합니다.
         document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active", t.dataset.tab===lastNonAdminTab));
         return;
       }
@@ -2603,7 +2547,6 @@ async function maybeShowNoticeOnce(){
       closeAdminPanel();
       document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active", t.dataset.tab===name));
       document.querySelectorAll("[data-view]").forEach(v=>v.hidden = v.dataset.view!==name);
-      if(name==="chat") loadChat();
       if(name==="graph") renderGraph();
     }
 
@@ -2693,12 +2636,7 @@ async function maybeShowNoticeOnce(){
       qs("btnNextWork").addEventListener("click", ()=>loadWorkPage(workPage+1));
       qs("btnDelAllWork").addEventListener("click", adminDeleteAllWork);
       qs("btnDelAllContent").addEventListener("click", adminDeleteAllContent);
-      qs("btnResetTotals").addEventListener("click", adminResetTotals);
-
-      // chat
-      qs("btnSendChat").addEventListener("click", sendChat);
-      qs("btnPostNotice").addEventListener("click", postNotice);
-
+      
       // tabs
       document.querySelectorAll(".tab").forEach(t=>{
         t.addEventListener("click", ()=>setTab(t.dataset.tab));
@@ -2706,65 +2644,50 @@ async function maybeShowNoticeOnce(){
 
       // default tab
       setTab("dashboard");
+      document.querySelectorAll('.tab[data-tab="chat"], [data-tab="chat"], [data-view="chat"]').forEach(el=>{ try{ el.remove(); }catch(_){} });
+      ["btnSendChat","btnPostNotice","btnResetTotals"].forEach(id=>{ const el=qs(id); if(el) try{el.remove();}catch(_){} });
+      document.querySelectorAll("th,td,.tiny,.muted,.badge").forEach(el=>{ const t=(el.textContent||"").trim(); if(t==="부서"||t.includes("부서장")||t.includes("부서 소통")) try{ (el.closest("tr")||el).remove(); }catch(_){} });
 
       // esc close modals
       document.addEventListener("keydown",(e)=>{
         if(e.key==="Escape"){
-          ["createModal","editModal","workEditModal","noticeModal"].forEach(id=>qs(id).hidden=true);
+          ["createModal","editModal","workEditModal","noticeModal"].forEach(id=>{ const el=qs(id); if(el) el.hidden=true; });
           lockBody(false);
         }
       });
     });
   
-/* =========================
-   🔒 STABILITY PATCH LAYER
-   - 기능 제거 없음
-   - 런타임 크래시 방어 + 에러 안내 강화
-========================= */
 
-const safeEl = (id)=>{
-  try{ return document.getElementById(id) || null; }
-  catch(e){ return null; }
-};
 
-function safeToDate(ts){
-  try{
-    if(!ts) return null;
-    if(typeof ts.toDate==="function") return ts.toDate();
-    if(ts instanceof Date) return ts;
-    return null;
-  }catch(e){ return null; }
-}
 
-function safeArray(arr){
-  return Array.isArray(arr) ? arr : [];
-}
-
-function isFirestoreIndexError(e){
-  const msg = String(e?.message || e || "");
-  return msg.includes("requires an index") || msg.includes("FAILED_PRECONDITION") && msg.includes("index");
-}
-
-function handleFirestoreError(e){
-  if(!e) return;
-  const msg = String(e.message || e);
-  if(isFirestoreIndexError(e)){
-    // Firestore가 콘솔에 인덱스 생성 링크를 같이 출력합니다.
-    try{ toast("Firestore 인덱스가 필요합니다. 콘솔의 링크를 눌러 인덱스를 생성해 주세요.","warn","인덱스 필요"); }catch(_){}
-    try{ console.warn("Index required error:", e); }catch(_){}
-    return;
+// ===== OAI FINAL CLEAN PATCH =====
+const __cooldowns = new Map();
+function withCooldown(key, ms=3000){
+  const now = Date.now();
+  const until = __cooldowns.get(key) || 0;
+  if(now < until){
+    toast("잠시 후 다시 시도해주세요.", "warn", "쿨타임");
+    return false;
   }
-  try{ toast(msg, "bad", "오류"); }catch(_){ try{ alert("오류: " + msg); }catch(__){} }
+  __cooldowns.set(key, now + ms);
+  return true;
 }
+document.addEventListener("click", (e)=>{
+  const t = e.target;
+  if(!(t instanceof HTMLElement)) return;
+  const id = t.id || "";
+  const text = (t.textContent||"").trim();
+  const key = id || text;
+  if(!key) return;
+  if(["btnLogin","btnLogout","btnRefresh","btnSummary","btnIn","btnOut","btnAddUser","btnDelAllWork","btnDelAllContent","btnWorkSave","btnEditSave","btnCreateSave"].includes(id)){
+    if(!withCooldown(key, 3000)){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+    }
+  }
+}, true);
+// ===== /OAI FINAL CLEAN PATCH =====
 
-window.addEventListener("unhandledrejection", (e)=>{
-  console.error("Unhandled rejection:", e.reason);
-  handleFirestoreError(e.reason);
-});
-
-window.addEventListener("error", (e)=>{
-  console.error("Global error:", e.message);
-});
 </script>
   <!-- BUILD_STAMP 2026-02-20 04:12:27 -->
 </head>
@@ -2812,8 +2735,7 @@ window.addEventListener("error", (e)=>{
         <div class="tabs">
           <button class="tab active" data-tab="dashboard">대시보드</button>
           <button class="tab" data-tab="content">컨텐츠 기록</button>
-          <button class="tab" data-tab="chat">부서 소통</button>
-          <button class="tab" data-tab="graph">그래프</button>
+                    <button class="tab" data-tab="graph">그래프</button>
           <button class="tab" data-tab="admin">관리자</button>
         </div>
         <div class="spacer"></div>
@@ -2881,8 +2803,7 @@ window.addEventListener("error", (e)=>{
                     <tr>
                       <th>닉네임</th>
                       <th>계급</th>
-                      <th>부서</th>
-                      <th>접속</th>
+                                            <th>접속</th>
                       <th>마지막</th>
                       <th>주간</th>
                       <th>오늘</th>
@@ -2951,7 +2872,7 @@ window.addEventListener("error", (e)=>{
 
             <div class="box" data-adminsection="work" hidden>
               <div class="row">
-                <b>근무 기록 관리(최근 7일)</b>
+                <b>근무 기록 관리</b>
                 <span class="spacer"></span>
                 <select id="workStatusFilter" class="w220">
                   <option value="ALL">전체</option>
@@ -2983,18 +2904,16 @@ window.addEventListener("error", (e)=>{
               </div>
 
               <div class="row" style="margin-top:10px;">
-                <button id="btnResetTotals" class="pill danger">총 접속시간 초기화</button>
-              </div>
+                              </div>
 
               <div class="muted" style="margin-top:10px;">
-                • “전체 삭제”는 리드 최소화를 위해 최근 7일만 대상으로 합니다.<br>
-                • 강제출근/강제퇴근은 users 요약필드와 workRecords를 함께 갱신합니다.
+                                • 강제출근/강제퇴근은 users 요약필드와 workRecords를 함께 갱신합니다.
               </div>
             </div>
 
             <div class="box" data-adminsection="content" hidden>
               <div class="row">
-                <b>컨텐츠 기록 관리(최근 7일)</b>
+                <b>컨텐츠 기록 관리</b>
                 <span class="spacer"></span>
                 <select id="adminContentType" class="w220">
                   <option value="ALL">전체</option>
@@ -3002,7 +2921,7 @@ window.addEventListener("error", (e)=>{
                   <option value="송전소">송전소만</option>
                   <option value="차량수호">차량수호만</option>
                 </select>
-                <button id="btnDelAllContent" class="pill danger">최근 7일 전체삭제</button>
+                <button id="btnDelAllContent" class="pill danger">전체삭제</button>
               </div>
               <div class="row" style="margin-top:10px;">
                 <button id="adminContentPrev" class="pill">이전</button>
@@ -3011,7 +2930,7 @@ window.addEventListener("error", (e)=>{
               </div>
               <div id="adminContentList" style="margin-top:10px;"></div>
               <div class="muted" style="margin-top:10px;">
-                • 목록은 최근 7일 기준이며, 삭제 권한은 관리자/작성자에게 있습니다.
+                • 전체 기록 기준이며, 삭제 권한은 관리자/작성자에게 있습니다.
               </div>
             </div>
           </div>
@@ -3099,43 +3018,6 @@ window.addEventListener("error", (e)=>{
             <span id="contentPageInfo" class="tinyStatus"></span>
           </div>
           <div id="contentList" class="timeline" style="margin-top:12px;"></div>
-        </div>
-
-        <!-- CHAT VIEW -->
-        <div class="card" data-view="chat" hidden style="grid-column:1/-1;">
-          <div class="row">
-            <h3 style="margin:0;">부서 소통방</h3>
-            <span class="spacer"></span>
-            <span class="badge dim">부서: <b id="chatDept">-</b></span>
-          </div>
-          <div class="row" style="margin-top:12px; align-items:flex-start;">
-            <div style="flex:1;">
-              <div class="box">
-                <b>공지</b>
-                <div id="noticeBox" style="margin-top:10px;"></div>
-                <div id="noticeCompose" hidden style="margin-top:10px;">
-                  <textarea id="noticeText" placeholder="공지 내용을 입력합니다."></textarea>
-                  <div class="row" style="margin-top:10px;">
-                    <button id="btnPostNotice" class="pill primary">공지 등록</button>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div style="flex:1;">
-              <div class="box">
-                <b>채팅</b>
-                <div id="chatList" class="timeline" style="margin-top:10px;"></div>
-                <div class="row" style="margin-top:10px;">
-                  <input id="chatText" class="w320" placeholder="메시지 입력" />
-                  <button id="btnSendChat" class="pill primary">전송</button>
-                  <span id="chatInfo" class="tinyStatus"></span>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="tiny" style="margin-top:10px;">
-            • 채팅/공지는 이 탭을 열었을 때만 읽습니다(수동 갱신). • 부서장/관리자만 공지 등록 가능합니다.
-          </div>
         </div>
 
         <!-- GRAPH VIEW -->
@@ -3227,30 +3109,6 @@ window.addEventListener("error", (e)=>{
     </div>
   </div>
 
-  <!-- Notice Modal -->
-  <div id="noticeModal" class="overlay" hidden>
-    <div class="modal" role="dialog" aria-modal="true">
-      <div class="mTop">
-        <div class="mTitle">부서 공지</div>
-        <span class="spacer"></span>
-        <button class="pill" onclick="document.getElementById('noticeModal').hidden=true; document.body.classList.remove('noscroll');">닫기</button>
-      </div>
-      <div class="mBody">
-        <div class="box">
-          <div class="row">
-            <span class="badge dim">부서 <b id="nDept">-</b></span>
-            <span class="badge">작성 <b id="nBy">-</b></span>
-            <span class="badge dim" id="nAt">-</span>
-          </div>
-          <div class="p" style="margin-top:10px;" id="nText"></div>
-        </div>
-      </div>
-      <div class="mFoot">
-        <button id="btnNoticeOk" class="pill primary">확인</button>
-      </div>
-    </div>
-  </div>
-
   <div id="toastWrap" class="toastWrap"></div>
 
   <!-- 사용자 상세 모달 -->
@@ -3280,317 +3138,6 @@ window.addEventListener("error", (e)=>{
       <div id="profileBody" class="modalBody"></div>
     </div>
   </div>
-
-
-<script>
-(function(){
-  const oldSetStatus = typeof setStatus === 'function' ? setStatus : null;
-  const safeToast = (msg, type='good', cat='패치') => { try{ if(typeof toast==='function') toast(msg, type, cat); }catch(_){ } try{ if(oldSetStatus) oldSetStatus(msg); }catch(_){ } };
-
-  function hideDepartmentUI(){
-    try{
-      const chatTab = document.querySelector('[data-tab="chat"]');
-      if(chatTab) chatTab.remove();
-      document.querySelectorAll('[data-view="chat"]').forEach(el=>el.remove());
-      const noticeModal = document.getElementById('noticeModal');
-      if(noticeModal) noticeModal.remove();
-
-      const resetBtn = document.getElementById('btnResetTotals');
-      if(resetBtn) resetBtn.remove();
-
-      // dashboard/user table: hide department column
-      const headRows = document.querySelectorAll('#appView table thead tr');
-      headRows.forEach(tr=>{
-        const ths = Array.from(tr.children);
-        ths.forEach(th=>{
-          const t = (th.textContent||'').trim();
-          if(t === '부서'){ th.remove(); }
-        });
-      });
-      document.querySelectorAll('#userTbody tr').forEach(tr=>{
-        const cells = tr.children;
-        if(cells && cells.length >= 10){ cells[2].remove(); }
-      });
-
-      // remove department chips/badges/inputs in admin area
-      document.querySelectorAll('#adminUserCards .badge.dim').forEach(el=>{
-        const txt = (el.textContent||'').trim();
-        if(txt === '-' || txt.includes('부서') || txt === '') el.remove();
-      });
-      document.querySelectorAll('#adminUserCards select[data-dept], #adminUserCards input[data-lead], #adminUserCards [data-savelead]').forEach(el=>{
-        const row = el.closest('.row');
-        if(row) row.style.display='none';
-        else el.remove();
-      });
-    }catch(e){ console.warn('hideDepartmentUI failed', e); }
-  }
-
-  async function recomputeWorkSummaryForUser(nick){
-    if(!nick || !window.db || !window.doc || !window.updateDoc || !window.collection || !window.getDocs) return;
-    const usersRef = doc(db,'users',nick);
-    const now = typeof kstNow==='function' ? kstNow() : new Date();
-    const tKey = typeof dayKey==='function' && typeof todayStart==='function' ? dayKey(todayStart()) : '';
-    const wsKey = typeof dayKey==='function' && typeof weekStartMonday0==='function' ? dayKey(weekStartMonday0()) : '';
-
-    let todaySeconds = 0, weekSeconds = 0, todayCheckIns = 0;
-    let openWorkId = null, openCheckInAt = null, isOnline = false;
-    let lastCheckIn = null, lastCheckOut = null;
-
-    const snap = await getDocs(collection(db,'workRecords'));
-    snap.forEach(d=>{
-      const r = d.data() || {};
-      if(String(r.nickname||'') !== String(nick)) return;
-      const ci = r.checkIn && r.checkIn.toDate ? r.checkIn.toDate() : (r.checkIn ? new Date(r.checkIn) : null);
-      const co = r.checkOut && r.checkOut.toDate ? r.checkOut.toDate() : (r.checkOut ? new Date(r.checkOut) : null);
-      if(ci){
-        if(typeof dayKey==='function' && dayKey(ci) === tKey){
-          todayCheckIns += 1;
-          if(co){
-            todaySeconds += Math.max(0, Math.floor((co-ci)/1000));
-          }else{
-            todaySeconds += Math.max(0, Math.floor((now-ci)/1000));
-          }
-        }
-        const weekStart = typeof weekStartMonday0==='function' ? weekStartMonday0() : null;
-        if(weekStart && ci >= weekStart){
-          if(co){
-            weekSeconds += Math.max(0, Math.floor((co-ci)/1000));
-          }else{
-            weekSeconds += Math.max(0, Math.floor((now-ci)/1000));
-          }
-        }
-        if(!lastCheckIn || ci > lastCheckIn) lastCheckIn = ci;
-      }
-      if(co && (!lastCheckOut || co > lastCheckOut)) lastCheckOut = co;
-      if(!co){
-        isOnline = true;
-        openWorkId = d.id;
-        openCheckInAt = r.checkIn || null;
-      }
-    });
-
-    await updateDoc(usersRef, {
-      isOnline,
-      openWorkId,
-      openCheckInAt,
-      todayKey: tKey,
-      todaySeconds,
-      todayCheckIns,
-      weekStart: wsKey,
-      weekSeconds,
-      lastCheckIn: lastCheckIn || null,
-      lastCheckOut: lastCheckOut || null
-    }).catch(()=>{});
-  }
-
-  async function recomputeAllWorkSummaries(){
-    if(!window.usersCache) return;
-    for(const [id] of usersCache.entries()){
-      await recomputeWorkSummaryForUser(id);
-    }
-  }
-
-  async function recomputeContentSummaryForUser(nick){
-    if(!nick || !window.db || !window.doc || !window.updateDoc || !window.collection || !window.getDocs) return;
-    let supply=0, plant=0, escort=0;
-    let lSupply=null, lPlant=null, lEscort=null, lastContentAt=null;
-    const snap = await getDocs(collection(db,'contentRecords'));
-    snap.forEach(d=>{
-      const r = d.data() || {};
-      const ps = Array.isArray(r.participants) ? r.participants : [];
-      if(!ps.includes(nick)) return;
-      const tm = r.time || null;
-      const dt = tm && tm.toDate ? tm.toDate() : null;
-      if(r.type === '보급'){
-        supply++;
-        if(!lSupply || (dt && dt > lSupply)) lSupply = dt;
-      }else if(r.type === '송전소'){
-        plant++;
-        if(!lPlant || (dt && dt > lPlant)) lPlant = dt;
-      }else if(r.type === '차량수호'){
-        escort++;
-        if(!lEscort || (dt && dt > lEscort)) lEscort = dt;
-      }
-      if(!lastContentAt || (dt && dt > lastContentAt)) lastContentAt = dt;
-    });
-    await updateDoc(doc(db,'users',nick), {
-      contentCounts: { supply, plant, escort },
-      contentLast: { supply: lSupply || null, plant: lPlant || null, escort: lEscort || null },
-      lastContentAt: lastContentAt || null
-    }).catch(()=>{});
-  }
-
-  async function recomputeAllContentSummaries(){
-    if(!window.usersCache) return;
-    for(const [id] of usersCache.entries()){
-      await recomputeContentSummaryForUser(id);
-    }
-  }
-
-  // remove weekly reset function
-  window.adminResetTotals = async function(){
-    safeToast('주간 초기화 기능은 제거되었습니다.','warn','관리');
-    return;
-  };
-
-  // override content edit save to fully sync summaries
-  window.saveEdit = async function(){
-    if(!window.editId || !window.editData) return;
-    const parts = Array.from(window.editSelected).map(s=>String(s||'').trim()).filter(Boolean);
-    if(parts.length===0) return alert("0명은 저장하지 않습니다.");
-
-    let outcome = window.editData.outcome ?? null;
-    if(typeof needsOutcome==='function' && needsOutcome(window.editData.type)){
-      const v = qs("eOutcome").value;
-      if(v==="O") outcome = true; else if(v==="X") outcome = false; else outcome = null;
-    }
-
-    const oldPartsArr = Array.isArray(window.editData.participants)?window.editData.participants:[];
-    const affected = new Set([...oldPartsArr, ...parts, window.editData.writer].filter(Boolean));
-
-    await updateDoc(doc(db,"contentRecords",window.editId),{
-      participants: parts,
-      outcome,
-      edited: {
-        mode:(typeof isAdmin==='function' && isAdmin() && window.editData.writer!==window.currentUser)?'admin':'self',
-        by: window.currentUser,
-        at: serverTimestamp()
-      }
-    });
-
-    for(const nick of affected){
-      await recomputeContentSummaryForUser(nick);
-    }
-
-    if(typeof showModal==='function') showModal("editModal", false);
-    safeToast("수정되었습니다.","good","컨텐츠");
-    if(typeof loadUsersOnce==='function') await loadUsersOnce({force:true, reason:"admin"});
-    if(typeof loadDashKpis==='function') await loadDashKpis();
-    if(typeof loadUserTable==='function') await loadUserTable();
-    if(typeof loadContentPage==='function') await loadContentPage(0);
-  };
-
-  // override delete single content
-  window.deleteContent = async function(id){
-    const s = await getDoc(doc(db,"contentRecords",id));
-    if(!s.exists()) return;
-    const r = s.data() || {};
-    if(!(typeof isAdmin==='function' && isAdmin()) && String(r.writer||'') !== String(window.currentUser||'')) return alert("삭제 권한이 없습니다.");
-    if(!confirm("정말 삭제하시겠습니까?")) return;
-    const affected = new Set([...(Array.isArray(r.participants)?r.participants:[]), r.writer].filter(Boolean));
-    await deleteDoc(doc(db,"contentRecords",id));
-    for(const nick of affected){
-      await recomputeContentSummaryForUser(nick);
-    }
-    safeToast("컨텐츠 기록이 삭제되었습니다.","good","컨텐츠");
-    if(typeof loadUsersOnce==='function') await loadUsersOnce({force:true, reason:"admin"});
-    if(typeof loadDashKpis==='function') await loadDashKpis();
-    if(typeof loadUserTable==='function') await loadUserTable();
-    if(typeof loadContentPage==='function') await loadContentPage(0);
-  };
-
-  window.adminDeleteAllContent = async function(){
-    if(!(typeof isAdmin==='function' && isAdmin())) return;
-    if(!confirm("컨텐츠 기록을 전체 삭제하시겠습니까? (되돌릴 수 없습니다)")) return;
-    if(!confirm("정말 전체 컨텐츠 기록을 모두 삭제합니다. 계속하시겠습니까?")) return;
-    const snap = await getDocs(collection(db,'contentRecords'));
-    for(const d of snap.docs){
-      await deleteDoc(doc(db,'contentRecords', d.id));
-    }
-    await recomputeAllContentSummaries();
-    safeToast("컨텐츠 전체 삭제가 완료되었습니다.","good","컨텐츠");
-    if(typeof loadUsersOnce==='function') await loadUsersOnce({force:true, reason:"admin"});
-    if(typeof loadDashKpis==='function') await loadDashKpis();
-    if(typeof loadUserTable==='function') await loadUserTable();
-    if(typeof loadContentPage==='function') await loadContentPage(0);
-  };
-
-  window.adminDeleteWork = async function(id){
-    if(!(typeof isAdmin==='function' && isAdmin())) return;
-    if(!confirm("이 근무 기록을 삭제하시겠습니까?")) return;
-    const s = await getDoc(doc(db,'workRecords',id));
-    const nick = s.exists() ? String((s.data()||{}).nickname||'') : '';
-    await deleteDoc(doc(db,'workRecords',id));
-    if(nick) await recomputeWorkSummaryForUser(nick);
-    safeToast("근무 기록이 삭제되었습니다.","good","근무");
-    if(typeof loadUsersOnce==='function') await loadUsersOnce({force:true, reason:"admin"});
-    if(typeof loadDashKpis==='function') await loadDashKpis();
-    if(typeof loadUserTable==='function') await loadUserTable();
-    if(typeof loadWorkPage==='function') await loadWorkPage(window.workPage||0);
-  };
-
-  window.adminDeleteAllWork = async function(){
-    if(!(typeof isAdmin==='function' && isAdmin())) return;
-    if(!confirm("근무 기록을 전체 삭제하시겠습니까? (되돌릴 수 없습니다)")) return;
-    if(!confirm("정말 전체 근무 기록을 모두 삭제합니다. 계속하시겠습니까?")) return;
-    const snap = await getDocs(collection(db,'workRecords'));
-    for(const d of snap.docs){
-      await deleteDoc(doc(db,'workRecords', d.id));
-    }
-    await recomputeAllWorkSummaries();
-    safeToast("근무 전체 삭제가 완료되었습니다.","good","근무");
-    if(typeof loadUsersOnce==='function') await loadUsersOnce({force:true, reason:"admin"});
-    if(typeof loadDashKpis==='function') await loadDashKpis();
-    if(typeof loadUserTable==='function') await loadUserTable();
-    if(typeof loadWorkPage==='function') await loadWorkPage(0);
-  };
-
-  // wrap saveEditWork to recompute target user
-  if(typeof window.saveEditWork === 'function'){
-    const oldSaveEditWork = window.saveEditWork;
-    window.saveEditWork = async function(){
-      const nick = (document.getElementById('wNick')?.value || '').trim();
-      await oldSaveEditWork.apply(this, arguments);
-      if(nick){
-        await recomputeWorkSummaryForUser(nick);
-        if(typeof loadUsersOnce==='function') await loadUsersOnce({force:true, reason:"admin"});
-        if(typeof loadDashKpis==='function') await loadDashKpis();
-        if(typeof loadUserTable==='function') await loadUserTable();
-      }
-    };
-  }
-
-  // patch admin cards after each render
-  if(typeof window.renderAdminUserCards === 'function'){
-    const oldRenderAdminUserCards = window.renderAdminUserCards;
-    window.renderAdminUserCards = function(){
-      const r = oldRenderAdminUserCards.apply(this, arguments);
-      setTimeout(hideDepartmentUI, 0);
-      return r;
-    };
-  }
-  if(typeof window.loadUserTable === 'function'){
-    const oldLoadUserTable = window.loadUserTable;
-    window.loadUserTable = async function(){
-      const r = await oldLoadUserTable.apply(this, arguments);
-      setTimeout(hideDepartmentUI, 0);
-      return r;
-    };
-  }
-  if(typeof window.openProfile === 'function'){
-    const oldOpenProfile = window.openProfile;
-    window.openProfile = async function(userId){
-      const r = await oldOpenProfile.apply(this, arguments);
-      try{
-        const body = document.getElementById('profileBody');
-        if(body){
-          body.innerHTML = body.innerHTML.replace(/<div class="k">부서<\/div><div class="v">.*?<\/div>/, '');
-        }
-      }catch(_){}
-      return r;
-    };
-  }
-
-  document.addEventListener('DOMContentLoaded', ()=>{
-    hideDepartmentUI();
-    const mo = new MutationObserver(()=>hideDepartmentUI());
-    mo.observe(document.body, { childList:true, subtree:true });
-    const btn = document.getElementById('btnResetTotals');
-    if(btn) btn.remove();
-  });
-
-})();
-</script>
 
 </body>
 </html>
