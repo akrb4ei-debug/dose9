@@ -536,6 +536,153 @@ body.admin-open{overflow:hidden;}
     .adminUserActions>*{ width:100%; }
   }
 
+
+/* === OAI FINAL VISUAL UPGRADE === */
+:root{
+  --bg:#eef4ff;
+  --bg2:#f8fbff;
+  --card:#ffffff;
+  --line:#dbe4f2;
+  --line2:#c9d7ea;
+  --text:#203044;
+  --muted:#66778f;
+  --blue:#3f6fff;
+  --blue2:#5f8bff;
+  --green:#17a55a;
+  --red:#df4d57;
+  --amber:#d7901d;
+  --shadow:0 10px 28px rgba(38,62,101,.10);
+}
+body{
+  background:linear-gradient(180deg,#eef4ff 0%, #f8fbff 100%) !important;
+  color:var(--text) !important;
+}
+.topbar,.card,.modalCard,.modalBox,.box,.admItem,.adminUserCard{
+  box-shadow:var(--shadow) !important;
+}
+.card,.box,.modalCard,.modalBox{
+  background:var(--card) !important;
+  border-color:var(--line) !important;
+}
+.k{color:var(--muted) !important}
+.v{color:var(--text) !important}
+.tiny,.tinyStatus,.muted{color:var(--muted) !important}
+.pill{
+  border-radius:12px !important;
+  border:1px solid var(--line2) !important;
+  background:#fff !important;
+  color:var(--text) !important;
+  min-height:40px !important;
+  transition:.18s ease;
+}
+.pill:hover{transform:translateY(-1px); filter:brightness(1.01)}
+.pill.primary{
+  background:linear-gradient(180deg,var(--blue2),var(--blue)) !important;
+  color:#fff !important;
+  border-color:var(--blue) !important;
+}
+.pill.danger{
+  background:linear-gradient(180deg,#f26b74,var(--red)) !important;
+  color:#fff !important;
+  border-color:var(--red) !important;
+}
+.badge,.tag,.chip{
+  border-radius:999px !important;
+}
+.tableWrap table{
+  background:#fff !important;
+}
+.tableWrap thead th{
+  background:#f3f7ff !important;
+  color:#304255 !important;
+  border-bottom:1px solid var(--line) !important;
+}
+.tableWrap tbody tr:hover{
+  background:#f8fbff !important;
+}
+.tabs{
+  background:#eef3fb;
+  padding:6px;
+  border-radius:14px;
+  border:1px solid var(--line);
+}
+.tab{
+  border-radius:10px !important;
+}
+.tab.active{
+  background:linear-gradient(180deg,var(--blue2),var(--blue)) !important;
+  color:#fff !important;
+}
+#status{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:999px;
+  padding:8px 12px;
+  max-width:460px;
+}
+.quickActionMenu,.ctxMenu{
+  background:#fff !important;
+  border:1px solid var(--line) !important;
+  box-shadow:var(--shadow) !important;
+}
+.adminUserGrid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(320px,1fr));
+  gap:14px;
+}
+.adminUserCard{
+  background:linear-gradient(180deg,#fff,#f8fbff);
+  border:1px solid var(--line);
+  border-radius:18px;
+  padding:16px;
+}
+.adminUserTitle{font-size:18px;font-weight:800;color:var(--text)}
+.adminUserSub{font-size:12px;color:var(--muted)}
+.adminUserBadges{display:flex;gap:6px;flex-wrap:wrap}
+.adminStatus{
+  display:inline-flex;
+  align-items:center;
+  padding:6px 10px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:700;
+}
+.adminStatus.online{background:#e9fff2;color:#188b4e;border:1px solid #bfeacf}
+.adminStatus.offline{background:#eff4fa;color:#637286;border:1px solid #dbe4f2}
+.adminStatus.role{background:#f2ecff;color:#704bbd;border:1px solid #dfd2ff}
+.adminUserMeta{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.adminMetaItem{background:#f8fbff;border:1px solid #e5edf8;border-radius:12px;padding:10px 12px}
+.adminUserControls,.adminUserRow,.adminUserActions{display:flex;gap:8px;flex-wrap:wrap}
+.recordSwitch{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}
+.recordSwitch .pill.active{
+  background:linear-gradient(180deg,var(--blue2),var(--blue)) !important;
+  color:#fff !important;
+}
+.recordPanel .item{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:12px;
+}
+.moreBtn{
+  width:36px;height:36px;border-radius:10px;border:1px solid var(--line2);
+  background:#fff;color:var(--text);cursor:pointer;
+}
+.kpis{
+  grid-template-columns:repeat(4,minmax(0,1fr)) !important;
+}
+.kpi{
+  background:linear-gradient(180deg,#fff,#f8fbff) !important;
+  border:1px solid var(--line) !important;
+}
+@media (max-width:900px){
+  .kpis,.adminUserMeta{grid-template-columns:1fr !important}
+  .adminUserRow>*,
+  .adminUserActions>*,
+  .recordSwitch>*,
+  .moreBtn{width:100%}
+}
+
 </style>
 
   <script type="module">
@@ -922,53 +1069,88 @@ let usersPage = 0; // 유저 목록 페이지(10명 단위)
       `;
       showModal("profileModal", true);
     }
-async function openUserModal(uid){
 
+async function openUserModal(uid){
       try{
         if(!uid) return;
-        document.getElementById("userModalTitle").textContent = `유저 상세 · ${uid}`;
+        document.getElementById("userModalTitle").textContent = `최근 7일 기록 · ${uid}`;
         document.getElementById("userModalBody").innerHTML = `<div class="tiny muted">불러오는 중...</div>`;
         openModal();
 
         const [w, c] = await Promise.all([loadWork7dOnce(), loadContent7dOnce()]);
-        const ws = w.filter(x=>String(x.nickname||"")===uid);
+        const ws = w.filter(x=>String(x.nickname||x.userId||"")===uid);
         const cs = c.filter(x=>{
           const ps = x.participants||[];
           return Array.isArray(ps) && ps.includes(uid);
         });
 
-        const workItems = ws.slice(0,30).map(r=>{
+        const workItems = ws.map(r=>{
           const cin = fmt(r.checkIn);
           const cout = r.checkOut ? fmt(r.checkOut) : "—";
-          const dur = (r.checkIn && r.checkOut && r.checkIn.seconds && r.checkOut.seconds)
-            ? secsToHMS(r.checkOut.seconds-r.checkIn.seconds)
-            : (r.checkOut? "":"(출근중)");
-          return `<div class="item"><div class="itemTop"><div class="itemTitle"><b>출근</b> <span class="tiny muted">${esc(cin)}</span></div><span class="tag ${r.checkOut?'on':'off'}">${r.checkOut?'퇴근':'출근중'}</span></div><div class="itemMeta">퇴근: ${esc(cout)} · ${esc(dur)}</div></div>`;
+          let dur = "(출근중)";
+          try{
+            const ci = r.checkIn && r.checkIn.toDate ? r.checkIn.toDate() : (r.checkIn ? new Date(r.checkIn) : null);
+            const co = r.checkOut && r.checkOut.toDate ? r.checkOut.toDate() : (r.checkOut ? new Date(r.checkOut) : null);
+            if(ci && co) dur = secsToHMS(Math.max(0, Math.floor((co.getTime()-ci.getTime())/1000)));
+          }catch(_){}
+          return `<div class="item">
+            <div class="itemTop">
+              <div class="itemTitle"><b>근무 기록</b> <span class="tiny muted">${esc(cin)}</span></div>
+              <span class="tag ${r.checkOut?'on':'off'}">${r.checkOut?'퇴근':'출근중'}</span>
+            </div>
+            <div class="itemMeta">출근: ${esc(cin)} · 퇴근: ${esc(cout)} · ${esc(dur)}</div>
+          </div>`;
         }).join("") || `<div class="item"><div class="itemMeta">최근 7일 출퇴근 기록이 없습니다.</div></div>`;
 
-        const contentItems = cs.slice(0,30).map(r=>{
-          const t = fmt(r.time);
-          const type = r.type || "-";
-          const wri = r.writer || "-";
-          return `<div class="item"><div class="itemTop"><div class="itemTitle"><b>${esc(type)}</b> <span class="tiny muted">${esc(t)}</span></div><span class="tag">${esc(wri)}</span></div><div class="itemMeta">참여자: ${(r.participants||[]).map(esc).join(", ")}</div></div>`;
-        }).join("") || `<div class="item"><div class="itemMeta">최근 7일 컨텐츠 참여 기록이 없습니다.</div></div>`;
+        const contentItems = cs.map(r=>{
+          const time = fmt(r.time);
+          const parts = Array.isArray(r.participants)?r.participants:[];
+          const out = needsOutcome(r.type) ? (r.outcome===true ? "성공" : (r.outcome===false ? "실패" : "-")) : "기록";
+          return `<div class="item">
+            <div class="itemTop">
+              <div class="itemTitle"><b>${esc(r.type||"-")}</b> <span class="tiny muted">${esc(time)}</span></div>
+              <span class="tag">${esc(out)}</span>
+            </div>
+            <div class="itemMeta">작성자: ${esc(r.writer||"-")} · 참여자 ${parts.length}명</div>
+          </div>`;
+        }).join("") || `<div class="item"><div class="itemMeta">최근 7일 컨텐츠 기록이 없습니다.</div></div>`;
 
         document.getElementById("userModalBody").innerHTML = `
-          <div class="cardSoft">
-            <div class="rowBetween"><b>최근 7일 출퇴근</b><span class="tiny muted">최신 30건 표시</span></div>
-            <div class="sep"></div>
-            <div class="list">${workItems}</div>
-          </div>
-          <div style="height:12px"></div>
-          <div class="cardSoft">
-            <div class="rowBetween"><b>최근 7일 컨텐츠 참여</b><span class="tiny muted">최신 30건 표시</span></div>
-            <div class="sep"></div>
-            <div class="list">${contentItems}</div>
+          <div class="box" style="margin-bottom:12px;">
+            <div class="row">
+              <div><b>${esc(uid)}</b> 님의 최근 7일 기록</div>
+              <span class="spacer"></span>
+              <span class="badge">근무 ${ws.length}건</span>
+              <span class="badge">컨텐츠 ${cs.length}건</span>
+            </div>
+            <div class="recordSwitch">
+              <button class="pill primary active" id="btnUserRecordWork">근무 기록</button>
+              <button class="pill" id="btnUserRecordContent">컨텐츠 기록</button>
+            </div>
+            <div id="userRecordWork" class="recordPanel">${workItems}</div>
+            <div id="userRecordContent" class="recordPanel hidden">${contentItems}</div>
           </div>
         `;
+
+        const bw = document.getElementById("btnUserRecordWork");
+        const bc = document.getElementById("btnUserRecordContent");
+        const pw = document.getElementById("userRecordWork");
+        const pc = document.getElementById("userRecordContent");
+        bw.onclick = ()=>{
+          bw.classList.add("active","primary");
+          bc.classList.remove("active","primary");
+          pw.classList.remove("hidden");
+          pc.classList.add("hidden");
+        };
+        bc.onclick = ()=>{
+          bc.classList.add("active","primary");
+          bw.classList.remove("active","primary");
+          pc.classList.remove("hidden");
+          pw.classList.add("hidden");
+        };
       }catch(e){
         console.error(e);
-        document.getElementById("userModalBody").innerHTML = `<div class="item"><div class="itemMeta">불러오지 못했습니다. 콘솔을 확인해 주세요.</div></div>`;
+        document.getElementById("userModalBody").innerHTML = `<div class="item"><div class="itemMeta">최근 7일 기록을 불러오는 중 오류가 발생했습니다.</div></div>`;
       }
     }
 
@@ -1365,30 +1547,35 @@ currentUser=id;
     }
 
     // KPI: 온라인 수 / 오늘 출근(카운트) / 오늘 누적 / 주간 누적
-    async function loadDashKpis(){
-      const online = Array.from(usersCache.values()).filter(u=>u.isOnline && (!u.isHidden || isAdmin())).length;
+    
+async function loadDashKpis(){
+      const visibleUsers = Array.from(usersCache.entries()).filter(([id,u])=>isAdmin() || !u.isHidden);
+      const totalUsers = visibleUsers.length;
+      const onlineUsers = visibleUsers.filter(([id,u])=>u.isOnline).length;
+
       const tKey = dayKey(todayStart());
-      let todayIns=0, todaySec=0, weekSec=0;
+      const me = usersCache.get(currentUser) || currentUserData || {};
+      const myTodaySec = (me.todayKey===tKey) ? Number(me.todaySeconds||0) : 0;
+      const myWeekSec = Number(me.weekSeconds||0);
 
-      const wsKey=dayKey(weekStartMonday0());
+      const rows = await loadContent7dOnce().catch(()=>[]);
+      const myRows = rows.filter(r => Array.isArray(r.participants) && r.participants.includes(currentUser));
+      const myTodayContent = myRows.filter(r=>{
+        const dt = r.time && r.time.toDate ? r.time.toDate() : (r.time ? new Date(r.time) : null);
+        return dt && dayKey(dt)===tKey;
+      }).length;
+      const myWeekContent = myRows.length;
 
-      for(const [id,u] of usersCache.entries()){
-        if(!isAdmin() && u.isHidden) continue;
-        // 오늘
-        if(u.todayKey===tKey){
-          todayIns += Number(u.todayCheckIns||0);
-          todaySec += Number(u.todaySeconds||0);
-        }
-        // 주간(요약필드가 주차가 다르면 0으로 취급)
-        if(u.weekStart===wsKey){
-          weekSec += Number(u.weekSeconds||0);
-        }
+      qs("kpiOnline").innerHTML = `<div class="k">총 인원 / 현재 출근</div><div class="v ${onlineUsers? "good":""}">${totalUsers}명 / ${onlineUsers}명</div>`;
+      qs("kpiTodayIn").innerHTML = `<div class="k">오늘 내 컨텐츠 횟수</div><div class="v">${myTodayContent}회</div>`;
+      qs("kpiTodaySec").innerHTML = `<div class="k">오늘 내 출근시간</div><div class="v">${secsToHMS(myTodaySec)}</div>`;
+      qs("kpiWeekSec").innerHTML = `<div class="k">최근 7일 내 출근/컨텐츠</div><div class="v">${secsToHMS(myWeekSec)} / ${myWeekContent}회</div>`;
+
+      const who = qs("who");
+      if(who){
+        const rank = me.rank ? `<span class="badge">${esc(me.rank)}</span>` : "";
+        who.innerHTML = `${rank}<span class="badge">${esc(currentUser||"-")}</span>`;
       }
-
-      qs("kpiOnline").innerHTML = `<div class="k">현재 접속</div><div class="v ${online? "good":""}">${online}명</div>`;
-      qs("kpiTodayIn").innerHTML = `<div class="k">오늘 출근 횟수</div><div class="v">${todayIns}</div>`;
-      qs("kpiTodaySec").innerHTML = `<div class="k">오늘 누적 접속</div><div class="v">${secsToHMS(todaySec)}</div>`;
-      qs("kpiWeekSec").innerHTML = `<div class="k">이번주 누적 접속</div><div class="v">${secsToHMS(weekSec)}</div>`;
     }
 
     // 유저 테이블: users만 읽어서 표시(리드 최소)
@@ -1531,7 +1718,7 @@ currentUser=id;
         if(!wrSnap.exists()) return alert("출근 기록을 찾지 못했습니다.");
         const wr = wrSnap.data();
         const ci = wr.checkIn?.toDate ? wr.checkIn.toDate() : null;
-        if(!ci) return alert("출근 시간이 아직 확정되지 않았습니다. 잠시 후 다시 시도해 주세요.");
+        if(!ci) return alert("출근 시간이 아직 확정되지 않았습니다. 잠시 후 다시 시도해주세요.");
 
         const co = kstNow();
         const durSec = Math.max(0, Math.floor((co.getTime()-ci.getTime())/1000));
@@ -1752,44 +1939,42 @@ function renderContentTimeline(){
     }
 
 
-    async function openCreate(type){
+    
+async function openCreate(type){
       if(!currentUser){ toast("로그인 후 이용 가능합니다.","warn","안내"); return; }
 
-      // ✅ 컨텐츠 작성 버튼을 누른 순간: 온라인 유저만 즉시 갱신해서 표시
-      try{
-        await loadOnlineUsersForCreate();
-      }catch(e){
-        console.warn("[openCreate] online users load failed:", e);
-        // 실패 시 기존 usersCache로 fallback
-        createUsersCache = null;
-        createUsersMode = "all";
-      }
+      createType = type;
+      createSelected = new Set([currentUser]);
+      createSearch = "";
+      createUsersCache = null;
+      createUsersMode = "all";
 
-      createType=type;
-      createSelected=new Set([currentUser]); // 작성자 자동 포함
-      createSearch="";
       qs("cTitle").textContent = `컨텐츠 작성 · ${type}`;
-      qs("cSearch").value="";
+      qs("cSearch").value = "";
       qs("cOutcomeBox").hidden = !needsOutcome(type);
-      qs("cOutcome").value="-";
+      qs("cOutcome").value = "-";
       renderCreateUsers();
       renderCreateSelected();
       showModal("createModal", true);
     }
 
-    function renderCreateUsers(){
+    
+function renderCreateUsers(){
       const q=(createSearch||"").toLowerCase();
-      const source = (createUsersMode==="online" && createUsersCache)?createUsersCache:usersCache;
-      const names=Array.from(source.keys()).sort((a,b)=>a.localeCompare(b,"ko"));
+      const names=Array.from(usersCache.keys()).sort((a,b)=>a.localeCompare(b,"ko"));
       let filtered=q?names.filter(n=>n.toLowerCase().includes(q)):names;
-      if(!isAdmin()) filtered = filtered.filter(n=>!(source.get(n)?.isHidden));
+      if(!isAdmin()) filtered = filtered.filter(n=>!(usersCache.get(n)?.isHidden));
+
       qs("cUserList").innerHTML = filtered.map(n=>{
         const checked=createSelected.has(n)?"checked":"";
+        const u = usersCache.get(n) || {};
+        const rank = u.rank ? `<span class="tiny muted">${esc(u.rank)}</span> ` : "";
         return `<label class="itemRow" style="cursor:pointer;">
-          <span><b>${esc(n)}</b></span>
+          <span>${rank}<b>${esc(n)}</b></span>
           <input type="checkbox" data-cpick="${esc(n)}" ${checked}/>
         </label>`;
       }).join("");
+
       qs("cUserList").querySelectorAll("input[data-cpick]").forEach(cb=>{
         cb.onchange=()=>{
           const n=cb.getAttribute("data-cpick");
@@ -1967,15 +2152,20 @@ function renderContentTimeline(){
       createSelected=new Set([currentUser]);
       renderCreateSelected(); renderCreateUsers();
     }
-    async function saveCreate(){
+    
+async function saveCreate(){
       if(!createType) return;
       const parts=Array.from(createSelected).map(s=>s.trim()).filter(Boolean);
       if(parts.length===0) return alert("0명은 저장하지 않습니다.");
+
       let outcome=null;
       if(needsOutcome(createType)){
         const v=qs("cOutcome").value;
-        if(v==="O") outcome=true; else if(v==="X") outcome=false; else outcome=null;
+        if(v==="O") outcome=true;
+        else if(v==="X") outcome=false;
+        else outcome=null;
       }
+
       await addDoc(colContent,{
         type:createType,
         writer: currentUser,
@@ -1985,14 +2175,9 @@ function renderContentTimeline(){
         edited: null
       });
 
-      // ✅ users 요약: 컨텐츠 카운트/마지막 참여 업데이트 (요약필드)
       const countField = createType==="보급" ? "contentCounts.supply" : (createType==="송전소" ? "contentCounts.plant" : "contentCounts.escort");
       const lastField  = createType==="보급" ? "contentLast.supply" : (createType==="송전소" ? "contentLast.plant" : "contentLast.escort");
 
-      // 작성자 포함 참여자들의 카운트도 올릴지? (리드 최소 위해 write만)
-      // 요구사항: "참여 횟수"는 유저 통계에 보여야 함 → 참여자 전원 업데이트.
-      // 20~30명이라도 참여자 수가 많으면 writes가 늘지만 reads는 늘지 않음.
-      // (무료 한도에서 reads가 먼저 터지는 상황이므로 여기서는 writes 증가를 감수)
       const uniq = Array.from(new Set(parts));
       for(const nick of uniq){
         await updateDoc(doc(db,"users",nick), {
@@ -2003,11 +2188,11 @@ function renderContentTimeline(){
       }
 
       showModal("createModal", false);
-      setStatus("작성되었습니다.");
-      await loadUsersOnce({force:true, reason:"admin"});
-      await loadDashKpis();
-      await loadUserTable();
+      toast("컨텐츠 기록이 등록되었습니다.","good","컨텐츠");
+      setStatus("컨텐츠 기록이 등록되었습니다.");
+      await loadUsersOnce({force:true, reason:"create-content"});
       await loadContentPage(0);
+      try{ await loadDashKpis(); }catch(_){}
     }
 
     // edit content modal (participants 수정 + outcome 수정, 권한: 작성자 또는 관리자)
@@ -2550,24 +2735,8 @@ async function sendChat(){ toast("부서소통 기능은 제거되었습니다."
 async function postNotice(){ toast("부서 공지 기능은 제거되었습니다.","warn","관리"); setStatus("부서 공지 기능 제거됨"); return; }
 
 async function maybeShowNoticeOnce(){
-  if(!dept) return;
-  const n = lsGet(noticeKey(dept), null);
-  if(!n?.id) return;
-
-  const k = seenKey(currentUser, dept);
-  if(localStorage.getItem(k) === n.id) return;
-
-  qs("nDept").textContent = dept;
-  qs("nBy").textContent = n.by||"-";
-  qs("nAt").textContent = fmt(n.at);
-  qs("nText").textContent = n.text||"";
-  showModal("noticeModal", true);
-
-  qs("btnNoticeOk").onclick = function(){
-    try{ localStorage.setItem(k, n.id); }catch{}
-    showModal("noticeModal", false);
-  };
-}
+      return;
+    }
 
     // ---------- MODAL CONTROL ----------
     function showModal(id, on){
@@ -2783,7 +2952,45 @@ async function maybeShowNoticeOnce(){
       list.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>deleteContent(b.getAttribute("data-del")));
     }
 
-    function setTab(name){
+    
+async function renderWorkView(){
+      const list = qs("workViewList");
+      if(!list) return;
+      list.innerHTML = `<div class="tiny muted">불러오는 중...</div>`;
+      try{
+        const rows = await loadWork7dOnce();
+        const visible = rows.filter(r=>{
+          const nick = String(r.nickname||r.userId||"");
+          if(isAdmin()) return true;
+          return !(usersCache.get(nick)?.isHidden);
+        });
+        qs("workViewInfo").textContent = `최근 7일 근무 기록 ${visible.length}건`;
+        list.innerHTML = visible.map(r=>{
+          const nick = String(r.nickname||r.userId||"-");
+          const ci = fmt(r.checkIn);
+          const co = r.checkOut ? fmt(r.checkOut) : "—";
+          let dur = "(출근중)";
+          try{
+            const d1 = r.checkIn && r.checkIn.toDate ? r.checkIn.toDate() : (r.checkIn ? new Date(r.checkIn) : null);
+            const d2 = r.checkOut && r.checkOut.toDate ? r.checkOut.toDate() : (r.checkOut ? new Date(r.checkOut) : null);
+            if(d1 && d2) dur = secsToHMS(Math.max(0, Math.floor((d2.getTime()-d1.getTime())/1000)));
+          }catch(_){}
+          return `<div class="item">
+            <div class="itemTop">
+              <div class="itemTitle"><b>${esc(nick)}</b></div>
+              <span class="tag ${r.checkOut?'on':'off'}">${r.checkOut?'퇴근':'출근중'}</span>
+            </div>
+            <div class="itemMeta">출근: ${esc(ci)} · 퇴근: ${esc(co)} · ${esc(dur)}</div>
+          </div>`;
+        }).join("") || `<div class="item"><div class="itemMeta">표시할 근무 기록이 없습니다.</div></div>`;
+      }catch(e){
+        console.error(e);
+        list.innerHTML = `<div class="item"><div class="itemMeta">근무 기록을 불러오지 못했습니다.</div></div>`;
+      }
+    }
+
+
+function setTab(name){
       if(name==="chat") name="dashboard";
       if(name==="admin"){
         toggleAdminPanel();
@@ -2794,7 +3001,10 @@ async function maybeShowNoticeOnce(){
       closeAdminPanel();
       document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("active", t.dataset.tab===name));
       document.querySelectorAll("[data-view]").forEach(v=>v.hidden = v.dataset.view!==name);
+
       if(name==="graph") renderGraph();
+      if(name==="content") loadContentPage(0);
+      if(name==="work") renderWorkView();
     }
 
     window.addEventListener("DOMContentLoaded", async ()=>{
@@ -2836,6 +3046,7 @@ async function maybeShowNoticeOnce(){
       qs("btnCreatePlant").addEventListener("click", ()=>openCreate("송전소"));
       qs("btnCreateEscort").addEventListener("click", ()=>openCreate("차량수호"));
 
+      qs("btnReloadWorkView")?.addEventListener("click", ()=>renderWorkView());
       qs("contentFilter").addEventListener("change", async function(){
         contentFilter=qs("contentFilter").value;
         contentPage=0;
@@ -3318,6 +3529,7 @@ document.addEventListener("DOMContentLoaded", ()=>{
         <div class="tabs">
           <button class="tab active" data-tab="dashboard">대시보드</button>
           <button class="tab" data-tab="content">컨텐츠 기록</button>
+          <button class="tab" data-tab="work">근무 기록</button>
                     <button class="tab" data-tab="graph">그래프</button>
           <button class="tab" data-tab="admin">관리자</button>
         </div>
@@ -3603,7 +3815,22 @@ document.addEventListener("DOMContentLoaded", ()=>{
           <div id="contentList" class="timeline" style="margin-top:12px;"></div>
         </div>
 
-        <!-- GRAPH VIEW -->
+
+<!-- WORK VIEW -->
+<div class="card" data-view="work" hidden style="grid-column:1/-1;">
+  <div class="row">
+    <h3 style="margin:0;">근무 기록 (최근 7일)</h3>
+    <span class="spacer"></span>
+    <button id="btnReloadWorkView" class="pill">갱신</button>
+  </div>
+  <div class="row" style="margin-top:10px;">
+    <div class="tinyStatus" id="workViewInfo">최근 7일 근무 기록</div>
+  </div>
+  <div id="workViewList" class="timeline" style="margin-top:12px;"></div>
+</div>
+
+<!-- GRAPH VIEW -->
+
         <div class="card" data-view="graph" hidden style="grid-column:1/-1;">
           <div class="row">
             <h3 style="margin:0;">그래프</h3>
