@@ -714,6 +714,48 @@ body{
 .box[data-adminsection] > .row:first-child{margin-bottom:10px}
 #adminContentList, #adminWorkList{display:flex; flex-direction:column; gap:12px}
 
+
+/* OAI premium UX patch */
+#adminCol{background:linear-gradient(180deg,#ffffff,#f7faff)!important;border-color:#dbe4f2!important}
+#adminCol > .row:first-child{padding-bottom:8px;border-bottom:1px solid #e5edf8}
+#adminUserCards .adminUserAccordion{overflow:hidden}
+#adminUserCards .adminUserSummary{cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;gap:12px}
+#adminUserCards .adminUserSummary::-webkit-details-marker{display:none}
+#adminUserCards .adminUserCard{padding:0!important}
+#adminUserCards .adminUserIdentity{padding:16px}
+#adminUserCards .adminUserBadges{padding:16px}
+#adminUserCards .adminUserMeta,
+#adminUserCards .adminUserControls,
+#adminUserCards .adminUserRow,
+#adminUserCards .adminUserActions{padding:0 16px 16px 16px}
+#adminUserCards .adminUserMeta{margin:0}
+#adminUserCards .adminUserActions{padding-top:0}
+#adminUserCards .adminUserRow .pill,
+#adminUserCards .adminUserActions .pill{min-height:42px}
+.recordCard{
+  background:#fff;border:1px solid #dbe4f2;border-radius:16px;padding:14px;
+  box-shadow:0 8px 20px rgba(33,56,99,.06)
+}
+.recordHead,.userRecordTop{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.recordMain{font-size:14px;font-weight:800;color:#1f2f46;margin-top:8px}
+.recordSub{font-size:12px;color:#6b7b91;margin-top:8px;line-height:1.6}
+.recordActions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.recordStack{display:flex;flex-direction:column;gap:10px}
+.dateBlock{margin-bottom:14px}
+.dateTitle{font-size:13px;font-weight:900;color:#49617d;margin-bottom:10px;padding:0 4px}
+.userRecordTop{margin-bottom:12px}
+.bigCount{font-size:13px;font-weight:800;color:#5b6f88}
+#contentList,#workViewList{display:flex;flex-direction:column;gap:12px}
+.tableWrap table{min-width:0!important}
+.tableWrap thead th:last-child,.tableWrap tbody td:last-child{text-align:right}
+.moreBtn{
+  width:36px;height:36px;border-radius:10px;border:1px solid #cfd9e7;background:#fff;color:#213247;cursor:pointer
+}
+@media (max-width:900px){
+  #adminCol{width:calc(100% - 24px)!important;left:12px!important;right:12px!important;top:12px!important;bottom:12px!important}
+  .recordActions .pill,.userRecordTop .pill,.recordSwitch .pill{width:100%}
+}
+
 </style>
 
   <script type="module">
@@ -1154,6 +1196,7 @@ function ensureWorkTabAndView(){
 
 
 
+
 async function openUserModal(uid){
       try{
         if(!uid) return;
@@ -1169,7 +1212,7 @@ async function openUserModal(uid){
         const ws = w.filter(x=>String(x.nickname||x.userId||"")===uid);
         const cs = c.filter(x=>Array.isArray(x.participants) && x.participants.includes(uid));
 
-        const state = { mode:"work", page:0, size:8 };
+        const state = { mode:"work", page:0, size:10 };
 
         function renderMode(){
           const source = state.mode==="work" ? ws : cs;
@@ -1197,55 +1240,55 @@ async function openUserModal(uid){
                   const d2 = r.checkOut?.toDate ? r.checkOut.toDate() : (r.checkOut ? new Date(r.checkOut) : null);
                   if(d1 && d2) dur = secsToHMS(Math.max(0, Math.floor((d2.getTime()-d1.getTime())/1000)));
                 }catch(_){}
-                return `<div class="event compact">
-                  <div class="head">
+                return `<div class="recordCard">
+                  <div class="recordHead">
                     <span class="badge">근무</span>
                     <span class="spacer"></span>
                     <span class="badge ${r.checkOut ? 'off':'on'}">${r.checkOut ? '퇴근':'출근중'}</span>
                   </div>
-                  <div class="p">${esc(cin)} ~ ${esc(co)} (${r.checkOut ? dur : cin+' 출근'})</div>
+                  <div class="recordMain">${esc(cin)} ~ ${esc(co)} (${r.checkOut ? dur : cin+' 출근'})</div>
                 </div>`;
               }else{
                 const t = fmtTimeOnly(r.time);
                 const out = needsOutcome(r.type) ? (r.outcome===true?"성공":(r.outcome===false?"실패":"-")) : "기록";
-                return `<div class="event compact">
-                  <div class="head">
+                return `<div class="recordCard">
+                  <div class="recordHead">
                     <span class="badge">${esc(r.type||"-")}</span>
                     <span class="badge role">${esc(out)}</span>
                     <span class="spacer"></span>
                     <span class="tiny">${esc(t)}</span>
                   </div>
-                  <div class="p">${esc(t)} · 작성자 ${esc(r.writer||"-")} · 참여 ${Array.isArray(r.participants)?r.participants.length:0}명</div>
+                  <div class="recordMain">${esc(t)} · ${esc(r.writer||"-")} 등록 · 참여 ${Array.isArray(r.participants)?r.participants.length:0}명</div>
                 </div>`;
               }
             }).join("");
-            return `<div class="event dateGroup">
-              <div class="head"><span class="t">${esc(date)}</span></div>
-              <div class="timeline" style="margin-top:10px;">${items}</div>
+            return `<div class="dateBlock">
+              <div class="dateTitle">${esc(date)}</div>
+              <div class="recordStack">${items}</div>
             </div>`;
           }).join("") || `<div class="event"><div class="meta">최근 7일 기록이 없습니다.</div></div>`;
 
           body.innerHTML = `
-            <div class="row" style="margin-bottom:12px; align-items:center;">
+            <div class="userRecordTop">
               <div class="bigCount">총 근무 ${ws.length}건 · 총 컨텐츠 ${cs.length}건</div>
-              <span class="spacer"></span>
-              <div class="recordSwitch">
-                <button id="segWork" class="pill ${state.mode==='work'?'primary active':''}">근무 기록</button>
-                <button id="segContent" class="pill ${state.mode==='content'?'primary active':''}">컨텐츠 기록</button>
-              </div>
+              <button id="userModalClose2" class="pill">닫기</button>
             </div>
-            <div class="row" style="margin-bottom:10px;">
+            <div class="recordSwitch">
+              <button id="segWork" class="pill ${state.mode==='work'?'primary active':''}">근무 기록</button>
+              <button id="segContent" class="pill ${state.mode==='content'?'primary active':''}">컨텐츠 기록</button>
+              <span class="spacer"></span>
               <button id="userRecPrev" class="pill">이전</button>
               <button id="userRecNext" class="pill">다음</button>
-              <span class="tinyStatus">${state.page + 1} / ${maxPage}</span>
+              <span class="chip">${state.page + 1} / ${maxPage}</span>
             </div>
-            <div class="timeline">${blocks}</div>
+            <div class="recordPanel">${blocks}</div>
           `;
 
           document.getElementById("segWork").onclick = ()=>{ state.mode='work'; state.page=0; renderMode(); };
           document.getElementById("segContent").onclick = ()=>{ state.mode='content'; state.page=0; renderMode(); };
           document.getElementById("userRecPrev").onclick = ()=>{ state.page=Math.max(0, state.page-1); renderMode(); };
           document.getElementById("userRecNext").onclick = ()=>{ state.page=Math.min(maxPage-1, state.page+1); renderMode(); };
+          document.getElementById("userModalClose2").onclick = ()=>closeModal();
         }
 
         renderMode();
@@ -1254,6 +1297,7 @@ async function openUserModal(uid){
         toast("7일간 기록을 불러오는 중 오류가 발생했습니다.","bad","유저");
       }
     }
+
 
 
     // =============================
@@ -1382,6 +1426,24 @@ async function openUserModal(uid){
     }
 
     const lockBody=(on)=>document.body.classList.toggle("noscroll", !!on);
+
+const __actionLocks = new Map();
+function isLockedAction(key){
+  const until = __actionLocks.get(key) || 0;
+  return Date.now() < until;
+}
+function lockAction(key, ms=1800){
+  __actionLocks.set(key, Date.now() + ms);
+}
+async function runLockedAction(key, fn, ms=1800){
+  if(isLockedAction(key)){
+    toast("잠시 후 다시 시도해주세요.","warn","쿨타임");
+    return;
+  }
+  lockAction(key, ms);
+  return await fn();
+}
+
 
     function normalizeUser(d){
 
@@ -1717,57 +1779,67 @@ async function loadDashKpis(){
     // 유저 테이블: users만 읽어서 표시(리드 최소)
     
 
+
 async function loadUserTable(){
-  const tbody = qs("userTbody");
-  if(!tbody) return;
+      const tbody = qs("userTbody");
+      if(!tbody) return;
 
-  let arr = Array.from(usersCache.entries()).filter(([id,u])=>isAdmin() || !u.isHidden);
+      let arr = Array.from(usersCache.entries()).filter(([id,u])=>isAdmin() || !u.isHidden);
 
-  const sort = qs("sortUsers")?.value || "onlineFirst";
-  const rankScore = (rank)=>{
-    const m = {"군의관":100,"하사":10,"중사":20,"상사":30,"원사":40,"소위":50,"중위":60,"대위":70,"소령":80,"중령":90,"대령":110};
-    return m[String(rank||"")] || 0;
-  };
+      const sort = qs("sortUsers")?.value || "onlineFirst";
+      const rankScore = (rank)=>{
+        const m = {"군의관":100,"하사":10,"중사":20,"상사":30,"원사":40,"소위":50,"중위":60,"대위":70,"소령":80,"중령":90,"대령":110};
+        return m[String(rank||"")] || 0;
+      };
+      const contentCount = (u)=>Number(u.contentCounts?.supply||0)+Number(u.contentCounts?.plant||0)+Number(u.contentCounts?.escort||0);
 
-  if(sort==="onlineOnly"){
-    arr = arr.filter(([id,u])=>!!u.isOnline);
-  }else if(sort==="rankHigh"){
-    arr.sort((a,b)=>rankScore(b[1].rank)-rankScore(a[1].rank) || String(a[0]).localeCompare(String(b[0]),"ko"));
-  }else if(sort==="rankLow"){
-    arr.sort((a,b)=>rankScore(a[1].rank)-rankScore(b[1].rank) || String(a[0]).localeCompare(String(b[0]),"ko"));
-  }else{
-    arr.sort((a,b)=>Number(!!b[1].isOnline)-Number(!!a[1].isOnline) || rankScore(b[1].rank)-rankScore(a[1].rank) || String(a[0]).localeCompare(String(b[0]),"ko"));
-  }
+      if(sort==="onlineOnly"){
+        arr = arr.filter(([id,u])=>!!u.isOnline);
+      }else if(sort==="rankHigh"){
+        arr.sort((a,b)=>rankScore(b[1].rank)-rankScore(a[1].rank) || String(a[0]).localeCompare(String(b[0]),"ko"));
+      }else if(sort==="rankLow"){
+        arr.sort((a,b)=>rankScore(a[1].rank)-rankScore(b[1].rank) || String(a[0]).localeCompare(String(b[0]),"ko"));
+      }else if(sort==="onlineTimeHigh"){
+        arr.sort((a,b)=>Number(b[1].weekSeconds||0)-Number(a[1].weekSeconds||0) || rankScore(b[1].rank)-rankScore(a[1].rank));
+      }else if(sort==="contentCountHigh"){
+        arr.sort((a,b)=>contentCount(b[1])-contentCount(a[1]) || rankScore(b[1].rank)-rankScore(a[1].rank));
+      }else{
+        arr.sort((a,b)=>Number(!!b[1].isOnline)-Number(!!a[1].isOnline) || rankScore(b[1].rank)-rankScore(a[1].rank) || String(a[0]).localeCompare(String(b[0]),"ko"));
+      }
 
-  const total = arr.length;
-  const maxPage = Math.max(1, Math.ceil(total / USER_PAGE_SIZE));
-  usersPage = Math.max(0, Math.min(usersPage, maxPage - 1));
-  const slice = arr.slice(usersPage * USER_PAGE_SIZE, (usersPage + 1) * USER_PAGE_SIZE);
+      const total = arr.length;
+      const maxPage = Math.max(1, Math.ceil(total / USER_PAGE_SIZE));
+      usersPage = Math.max(0, Math.min(usersPage, maxPage - 1));
+      const slice = arr.slice(usersPage * USER_PAGE_SIZE, (usersPage + 1) * USER_PAGE_SIZE);
 
-  if(qs("userPageInfo")) qs("userPageInfo").textContent = `${usersPage + 1} / ${maxPage}`;
-  if(qs("userPrev")) qs("userPrev").disabled = usersPage <= 0;
-  if(qs("userNext")) qs("userNext").disabled = usersPage >= maxPage - 1;
+      if(qs("userPageInfo")) qs("userPageInfo").textContent = `${usersPage + 1} / ${maxPage}`;
+      if(qs("userPrev")) qs("userPrev").disabled = usersPage <= 0;
+      if(qs("userNext")) qs("userNext").disabled = usersPage >= maxPage - 1;
 
-  tbody.innerHTML = slice.map(([id,u])=>{
-    const last = u.lastCheckIn ? fmt(u.lastCheckIn) : (u.lastContentAt ? fmt(u.lastContentAt) : "-");
-    const online = u.isOnline ? '<span class="badge on">출근중</span>' : '<span class="badge off">오프라인</span>';
-    return `<tr>
-      <td><b class="link" data-profile="${esc(id)}">${esc(id)}</b></td>
-      <td>${esc(u.rank||"-")}</td>
-      <td>${online}</td>
-      <td>${esc(last)}</td>
-      <td>${secsToHMS(Number(u.weekSeconds||0))}</td>
-      <td>${Number(u.todayContentCount||0)}회</td>
-      <td>${Number(u.contentCounts?.supply||0)}</td>
-      <td>${Number(u.contentCounts?.plant||0)}</td>
-      <td>${Number(u.contentCounts?.escort||0)}</td>
-    </tr>`;
-  }).join("") || `<tr><td colspan="9" style="text-align:center;">표시할 유저가 없습니다.</td></tr>`;
+      tbody.innerHTML = slice.map(([id,u])=>{
+        const last = u.lastCheckIn ? fmt(u.lastCheckIn) : (u.lastContentAt ? fmt(u.lastContentAt) : "-");
+        const online = u.isOnline ? '<span class="badge on">출근중</span>' : '<span class="badge off">오프라인</span>';
+        const totalContent = contentCount(u);
+        return `<tr>
+          <td><b class="link" data-profile="${esc(id)}">${esc(id)}</b></td>
+          <td>${esc(u.rank||"-")}</td>
+          <td>${online}</td>
+          <td>${esc(last)}</td>
+          <td>${secsToHMS(Number(u.weekSeconds||0))}</td>
+          <td>${Number(u.todayContentCount||0)}회</td>
+          <td>${totalContent}회</td>
+          <td style="text-align:right;">
+            <button class="moreBtn" data-ctx="${esc(id)}">⋯</button>
+          </td>
+        </tr>`;
+      }).join("") || `<tr><td colspan="8" style="text-align:center;">표시할 유저가 없습니다.</td></tr>`;
 
-  tbody.querySelectorAll("[data-profile]").forEach(el=>{
-    el.onclick = ()=>openProfile(el.getAttribute("data-profile"));
-  });
-}
+      tbody.querySelectorAll("[data-profile]").forEach(el=>{ el.onclick = ()=>openProfile(el.getAttribute("data-profile")); });
+      tbody.querySelectorAll("[data-ctx]").forEach(el=>{
+        el.onclick = (ev)=>showCtxMenu(ev.clientX, ev.clientY, el.getAttribute("data-ctx"));
+      });
+    }
+
 
 
 
@@ -1994,39 +2066,40 @@ async function loadUserTable(){
       }).join(" ");
     }
 
+
 function renderContentTimeline(){
       const list = qs("contentList");
       if(!list) return;
       const items = contentPageDocs.map(d=>{
         const r=d.data();
         const type = r.type || "-";
-        const out = needsOutcome(type) ? (r.outcome===true?"O":(r.outcome===false?"X":"-")) : "-";
+        const out = needsOutcome(type) ? (r.outcome===true?"성공":(r.outcome===false?"실패":"-")) : "기록";
         const writer = r.writer || "-";
         const writerHidden = (!isAdmin() && usersCache.get(writer)?.isHidden);
         if(writerHidden) return null;
         const time = fmt(r.time);
+        const shortTime = fmtTimeOnly(r.time);
         let parts = Array.isArray(r.participants)?r.participants:[];
         if(!isAdmin()){
           parts = parts.filter(n=>!(usersCache.get(n)?.isHidden));
           if(parts.length===0) return null;
         }
-        const boldWriter = `<b style="font-weight:900;">${esc(writer)}</b>`;
-        const edited = r.edited?.mode==="admin" ? `<span class="tiny">수정:${esc(r.edited.by||"-")}</span>` :
+        const edited = r.edited?.mode==="admin" ? `<span class="tiny">관리자 수정:${esc(r.edited.by||"-")}</span>` :
                       r.edited?.mode==="self" ? `<span class="tiny">(수정됨)</span>` : "";
         const canEdit = isAdmin() || writer===currentUser;
         const canDelete = isAdmin() || writer===currentUser;
         return `
-          <div class="event">
-            <div class="head">
+          <div class="recordCard contentCard">
+            <div class="recordHead">
               <span class="badge">${esc(type)}</span>
-              ${needsOutcome(type)?`<span class="badge">${out}</span>`:""}
+              <span class="badge role">${esc(out)}</span>
               <span class="spacer"></span>
-              <span class="tiny">${esc(time)}</span>
+              <span class="tiny">${esc(shortTime)}</span>
             </div>
-            <div class="meta">${boldWriter} ${edited}</div>
-            <div class="p">참여자: ${renderParticipants(parts, r.edited?.added, r.edited?.removed)}</div>
-            <div class="row" style="margin-top:10px;">
-              ${canEdit?`<button class="pill" data-edit="${d.id}">수정</button>`:""}
+            <div class="recordMain">${esc(time)} · 작성자 <b>${esc(writer)}</b> ${edited}</div>
+            <div class="recordSub">참여자: ${renderParticipants(parts, r.edited?.added, r.edited?.removed)}</div>
+            <div class="recordActions">
+              ${canEdit?`<button class="pill primary" data-edit="${d.id}">수정</button>`:""}
               ${canDelete?`<button class="pill danger" data-del="${d.id}">삭제</button>`:""}
             </div>
           </div>
@@ -2035,19 +2108,14 @@ function renderContentTimeline(){
 
       list.innerHTML = items || `<div class="tiny">최근 7일 기록이 없습니다.</div>`;
 
-      // paging buttons
       qs("contentPageInfo").textContent = `${contentPage+1} 페이지`;
       qs("btnPrevContent").disabled = contentPage===0;
       qs("btnNextContent").disabled = contentPageDocs.length < PAGE_SIZE;
 
-      // bind edit/delete
-      list.querySelectorAll("[data-edit]").forEach(b=>{
-        b.onclick=()=>openEditContent(b.getAttribute("data-edit"));
-      });
-      list.querySelectorAll("[data-del]").forEach(b=>{
-        b.onclick=()=>deleteContent(b.getAttribute("data-del"));
-      });
+      list.querySelectorAll("[data-edit]").forEach(b=>{ b.onclick=()=>openEditContent(b.getAttribute("data-edit")); });
+      list.querySelectorAll("[data-del]").forEach(b=>{ b.onclick=()=>deleteContent(b.getAttribute("data-del")); });
     }
+
 
     // create content modal
     let createType=null, createSelected=new Set(), createSearch="";
@@ -2289,61 +2357,57 @@ function renderCreateUsers(){
     
 
 
+
 async function saveCreate(){
-      if(window.__saveCreateBusy){
-        toast("잠시 후 다시 시도해주세요.","warn","컨텐츠");
-        return;
-      }
-      if(!createType) return;
-      const parts=Array.from(createSelected).map(s=>s.trim()).filter(Boolean);
-      if(parts.length===0) return alert("0명은 저장하지 않습니다.");
+      return runLockedAction("saveCreate", async ()=>{
+        if(!createType) return;
+        const parts=Array.from(createSelected).map(s=>s.trim()).filter(Boolean);
+        if(parts.length===0) return alert("0명은 저장하지 않습니다.");
 
-      let outcome=null;
-      if(needsOutcome(createType)){
-        const v=qs("cOutcome").value;
-        if(v==="O") outcome=true;
-        else if(v==="X") outcome=false;
-        else outcome=null;
-      }
-
-      window.__saveCreateBusy = true;
-      const btn = qs("btnCreateSave");
-      if(btn) btn.disabled = true;
-      try{
-        await addDoc(colContent,{
-          type:createType,
-          writer: currentUser,
-          participants: parts,
-          outcome,
-          time: serverTimestamp(),
-          edited: null
-        });
-
-        const countField = createType==="보급" ? "contentCounts.supply" : (createType==="송전소" ? "contentCounts.plant" : "contentCounts.escort");
-        const lastField  = createType==="보급" ? "contentLast.supply" : (createType==="송전소" ? "contentLast.plant" : "contentLast.escort");
-        const uniq = Array.from(new Set(parts));
-        for(const nick of uniq){
-          await updateDoc(doc(db,"users",nick), {
-            [countField]: increment(1),
-            [lastField]: serverTimestamp(),
-            lastContentAt: serverTimestamp()
-          }).catch(()=>{});
+        let outcome=null;
+        if(needsOutcome(createType)){
+          const v=qs("cOutcome").value;
+          if(v==="O") outcome=true;
+          else if(v==="X") outcome=false;
+          else outcome=null;
         }
 
-        showModal("createModal", false);
-        toast("컨텐츠 기록이 등록되었습니다.","good","컨텐츠");
-        setStatus("컨텐츠 기록이 등록되었습니다.");
-        await loadUsersOnce({force:true, reason:"create-content"});
-        await loadContentPage(0);
-        try{ await loadDashKpis(); }catch(_){}
-        try{ await loadUserTable(); }catch(_){}
-      } finally {
-        setTimeout(()=>{
-          window.__saveCreateBusy = false;
+        const btn = qs("btnCreateSave");
+        if(btn) btn.disabled = true;
+        try{
+          await addDoc(colContent,{
+            type:createType,
+            writer: currentUser,
+            participants: parts,
+            outcome,
+            time: serverTimestamp(),
+            edited: null
+          });
+
+          const countField = createType==="보급" ? "contentCounts.supply" : (createType==="송전소" ? "contentCounts.plant" : "contentCounts.escort");
+          const lastField  = createType==="보급" ? "contentLast.supply" : (createType==="송전소" ? "contentLast.plant" : "contentLast.escort");
+          const uniq = Array.from(new Set(parts));
+          for(const nick of uniq){
+            await updateDoc(doc(db,"users",nick), {
+              [countField]: increment(1),
+              [lastField]: serverTimestamp(),
+              lastContentAt: serverTimestamp()
+            }).catch(()=>{});
+          }
+
+          showModal("createModal", false);
+          toast("컨텐츠 기록이 등록되었습니다.","good","컨텐츠");
+          setStatus("컨텐츠 기록이 등록되었습니다.");
+          await loadUsersOnce({force:true, reason:"create-content"});
+          await loadContentPage(0);
+          try{ await loadDashKpis(); }catch(_){}
+          try{ await loadUserTable(); }catch(_){}
+        } finally {
           if(btn) btn.disabled = false;
-        }, 1200);
-      }
+        }
+      }, 2200);
     }
+
 
 
     // edit content modal (participants 수정 + outcome 수정, 권한: 작성자 또는 관리자)
@@ -2397,27 +2461,37 @@ async function saveCreate(){
     function editSelectAll(){ Array.from(usersCache.keys()).forEach(n=>editSelected.add(n)); editSelected.add(editData.writer||currentUser); renderEditSelected(); renderEditUsers(); }
     function editClearAll(){ editSelected=new Set([editData.writer||currentUser]); renderEditSelected(); renderEditUsers(); }
 
-    async function saveEdit(){
-      if(!editId||!editData) return;
-      const parts=Array.from(editSelected).map(s=>s.trim()).filter(Boolean);
-      if(parts.length===0) return alert("0명은 저장하지 않습니다.");
-      let outcome=editData.outcome ?? null;
-      if(needsOutcome(editData.type)){
-        const v=qs("eOutcome").value;
-        if(v==="O") outcome=true; else if(v==="X") outcome=false; else outcome=null;
-      }
-      const oldPartsArr = Array.isArray(editData.participants)?editData.participants:[];
-      const edited = (isAdmin() && editData.writer!==currentUser)
-        ? {mode:"admin", by: currentUser, at: serverTimestamp()}
-        : {mode:"self", by: editData.writer||currentUser, at: serverTimestamp()};
-      await updateDoc(doc(db,"contentRecords",editId),{participants: parts,outcome,edited});
-      const affected = new Set([...(oldPartsArr||[]), ...parts, editData.writer].filter(Boolean));
-      for(const nick of affected) await recomputeContentSummaryForUser(nick);
-      showModal("editModal", false);
-      toast("컨텐츠 수정이 저장되었습니다.","good","컨텐츠 수정");
-      setStatus("컨텐츠 수정 저장");
-      await refreshAllViews();
+    
+async function saveEdit(){
+      return runLockedAction("saveEdit", async ()=>{
+        if(!editId||!editData) return;
+        const parts=Array.from(editSelected).map(s=>s.trim()).filter(Boolean);
+        if(parts.length===0) return alert("0명은 저장하지 않습니다.");
+        let outcome=editData.outcome ?? null;
+        if(needsOutcome(editData.type)){
+          const v=qs("eOutcome").value;
+          if(v==="O") outcome=true; else if(v==="X") outcome=false; else outcome=null;
+        }
+        const oldPartsArr = Array.isArray(editData.participants)?editData.participants:[];
+        const edited = (isAdmin() && editData.writer!==currentUser)
+          ? {mode:"admin", by: currentUser, at: serverTimestamp()}
+          : {mode:"self", by: editData.writer||currentUser, at: serverTimestamp()};
+        const btn = qs("btnEditSave");
+        if(btn) btn.disabled = true;
+        try{
+          await updateDoc(doc(db,"contentRecords",editId),{participants: parts,outcome,edited});
+          const affected = new Set([...(oldPartsArr||[]), ...parts, editData.writer].filter(Boolean));
+          for(const nick of affected) await recomputeContentSummaryForUser(nick);
+          showModal("editModal", false);
+          toast("컨텐츠 수정이 저장되었습니다.","good","컨텐츠 수정");
+          setStatus("컨텐츠 수정 저장");
+          await refreshAllViews();
+        } finally {
+          if(btn) btn.disabled = false;
+        }
+      }, 1800);
     }
+
 
     async function deleteContent(id){
       const s=await getDoc(doc(db,"contentRecords",id));
@@ -2622,17 +2696,23 @@ async function saveCreate(){
     }
 
 
-    async function adminDeleteWork(id){
-      if(!isAdmin()) return;
-      if(!confirm("이 근무 기록을 삭제하시겠습니까?")) return;
-      const s = await getDoc(doc(db,"workRecords",id));
-      const nick = s.exists() ? String((s.data()||{}).nickname || (s.data()||{}).userId || "").trim() : "";
-      await deleteDoc(doc(db,"workRecords",id));
-      if(nick) await recomputeWorkSummaryForUser(nick);
-      setStatus("근무 기록이 삭제되었습니다.");
-      toast("근무 기록이 삭제되었습니다.","good","근무");
-      await refreshAllViews();
+    
+async function adminDeleteWork(id){
+      return runLockedAction(`deleteWork:${id}`, async ()=>{
+        const s = await getDoc(doc(db,"workRecords",id));
+        if(!s.exists()) return;
+        const row = s.data()||{};
+        const nick = String(row.nickname || row.userId || "").trim();
+        if(!(isAdmin() || nick===currentUser)) return alert("삭제 권한이 없습니다.");
+        if(!confirm("이 근무 기록을 삭제하시겠습니까?")) return;
+        await deleteDoc(doc(db,"workRecords",id));
+        if(nick) await recomputeWorkSummaryForUser(nick);
+        setStatus("근무 기록이 삭제되었습니다.");
+        toast("근무 기록이 삭제되었습니다.","good","근무");
+        await refreshAllViews();
+      }, 1500);
     }
+
     async function adminDeleteAllWork(){
       if(!isAdmin()) return;
       if(!confirm("근무 기록을 전체 삭제하시겠습니까? (되돌릴 수 없습니다)")) return;
@@ -2650,39 +2730,59 @@ async function saveCreate(){
 
     // edit work record modal: 관리자만
     let wEditId=null;
-    async function openEditWork(id){
-      if(!isAdmin()) return;
+    
+async function openEditWork(id){
       const s=await getDoc(doc(db,"workRecords",id));
       if(!s.exists()) return alert("기록 없음");
+      const r=s.data()||{};
+      const owner = String(r.nickname||r.userId||"");
+      if(!(isAdmin() || owner===currentUser)) return alert("수정 권한이 없습니다.");
       wEditId=id;
-      const r=s.data();
-      qs("wNick").value=r.nickname||"";
+      qs("wNick").value=owner;
+      qs("wNick").disabled = !isAdmin();
       qs("wIn").value = toLocalInput(r.checkIn);
       qs("wOut").value = toLocalInput(r.checkOut);
       showModal("workEditModal", true);
     }
+
     function toLocalInput(ts){
       if(!ts) return "";
       const d=ts.toDate?ts.toDate():null; if(!d) return "";
       const p=n=>String(n).padStart(2,"0");
       return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
     }
-    async function saveEditWork(){
-      if(!isAdmin()||!wEditId) return;
-      const nick=qs("wNick").value.trim();
-      const inV=qs("wIn").value;
-      const outV=qs("wOut").value;
-      if(!nick||!inV) return alert("닉네임/출근은 필수입니다.");
-      const ci=new Date(inV);
-      const co=outV?new Date(outV):null;
-      const dur = co ? Math.max(0, Math.floor((co.getTime()-ci.getTime())/1000)) : null;
-      await updateDoc(doc(db,"workRecords",wEditId),{nickname:nick,checkIn: ci,checkOut: co,durationSec: dur});
-      await recomputeWorkSummaryForUser(nick);
-      showModal("workEditModal", false);
-      setStatus("근무 기록이 저장되었습니다.");
-      toast("근무 기록이 저장되었습니다.","good","근무");
-      await refreshAllViews();
+    
+async function saveEditWork(){
+      return runLockedAction("saveEditWork", async ()=>{
+        if(!wEditId) return;
+        const btn = qs("btnWorkSave");
+        if(btn) btn.disabled = true;
+        try{
+          const s=await getDoc(doc(db,"workRecords",wEditId));
+          if(!s.exists()) return alert("기록 없음");
+          const existing=s.data()||{};
+          const owner = String(existing.nickname||existing.userId||"");
+          if(!(isAdmin() || owner===currentUser)) return alert("수정 권한이 없습니다.");
+
+          const nick=isAdmin() ? qs("wNick").value.trim() : owner;
+          const inV=qs("wIn").value;
+          const outV=qs("wOut").value;
+          if(!nick||!inV) return alert("닉네임/출근은 필수입니다.");
+          const ci=new Date(inV);
+          const co=outV?new Date(outV):null;
+          const dur = co ? Math.max(0, Math.floor((co.getTime()-ci.getTime())/1000)) : null;
+          await updateDoc(doc(db,"workRecords",wEditId),{nickname:nick,checkIn: ci,checkOut: co,durationSec: dur});
+          await recomputeWorkSummaryForUser(nick);
+          showModal("workEditModal", false);
+          setStatus("근무 기록이 저장되었습니다.");
+          toast("근무 기록이 저장되었습니다.","good","근무");
+          await refreshAllViews();
+        } finally {
+          if(btn) btn.disabled = false;
+        }
+      }, 1800);
     }
+
 
     // total reset(3-1 confirm): users 요약 리셋
     async function adminResetTotals(){
@@ -2692,45 +2792,54 @@ async function saveCreate(){
     }
 
     // ---------- ADMIN: USER MANAGEMENT (화이트리스트/계급/부서/숨김/권한/부서장) ----------
-    async function adminAddUser(){
-      if(!isAdmin()) return;
-      const id=qs("addNick").value.trim();
-      const pw=qs("addPw").value.trim();
-      if(!id||!pw) return alert("닉네임/비밀번호를 입력해 주세요.");
-      const s=await getDoc(doc(db,"users",id));
-      if(s.exists()) return alert("이미 존재합니다.");
-      await setDoc(doc(db,"users",id),{
-        password: pw,
-        isAdmin:false,
-        hidden:false,
-        isHidden:false,
-        rank:"",
-        deptLeaderOf: [],
-        // 요약필드 기본값
-        isOnline:false,
-        openWorkId:null,
-        lastCheckIn:null,
-        lastCheckOut:null,
-        weekStart: dayKey(weekStartMonday0()),
-        weekSeconds: 0,
-        todayKey: dayKey(todayStart()),
-        todaySeconds: 0,
-        todayCheckIns: 0,
-        contentCounts: {supply:0, plant:0, escort:0},
-        contentLast: {supply:null, plant:null, escort:null},
-        lastContentAt: null
-      });
-      qs("addNick").value=""; qs("addPw").value="";
-      setStatus("유저 추가 완료");
-      await loadUsersOnce({force:true, reason:"admin"});
-      await loadDashKpis();
-      await loadUserTable();
-      await renderAdminUserCards();
-      try{ await loadDashKpis(); await loadUserTable(); }catch(e){}
-      try{ if(typeof loadWorkPage==="function") await loadWorkPage(0); }catch(e){}
+    
+async function adminAddUser(){
+      return runLockedAction("adminAddUser", async ()=>{
+        if(!isAdmin()) return;
+        const id=qs("addNick").value.trim();
+        const pw=qs("addPw").value.trim();
+        if(!id||!pw) return alert("닉네임/비밀번호를 입력해 주세요.");
+        const s=await getDoc(doc(db,"users",id));
+        if(s.exists()) return alert("이미 존재합니다.");
+        const btn = qs("btnAddUser");
+        if(btn) btn.disabled = true;
+        try{
+          await setDoc(doc(db,"users",id),{
+            password: pw,
+            isAdmin:false,
+            hidden:false,
+            isHidden:false,
+            rank:"",
+            deptLeaderOf: [],
+            isOnline:false,
+            openWorkId:null,
+            lastCheckIn:null,
+            lastCheckOut:null,
+            weekStart: dayKey(weekStartMonday0()),
+            weekSeconds: 0,
+            todayKey: dayKey(todayStart()),
+            todaySeconds: 0,
+            todayCheckIns: 0,
+            contentCounts: {supply:0, plant:0, escort:0},
+            contentLast: {supply:null, plant:null, escort:null},
+            lastContentAt: null
+          });
+          qs("addNick").value=""; qs("addPw").value="";
+          setStatus("유저 추가 완료");
+          toast("유저가 추가되었습니다.","good","관리");
+          await loadUsersOnce({force:true, reason:"admin"});
+          await loadDashKpis();
+          await loadUserTable();
+          await renderAdminUserCards();
+        } finally {
+          if(btn) btn.disabled = false;
+        }
+      }, 1800);
     }
 
-    function renderAdminUserCards(){
+
+    
+function renderAdminUserCards(){
       if(!isAdmin()) return;
       const wrap = qs("adminUserCards");
       if(!wrap) return;
@@ -2741,6 +2850,8 @@ async function saveCreate(){
         sortSel.innerHTML = `
           <option value="rankDesc">계급 높은순</option>
           <option value="rankAsc">계급 낮은순</option>
+          <option value="onlineTimeDesc">접속시간 높은순</option>
+          <option value="contentCountDesc">컨텐츠 횟수 많은순</option>
           <option value="onlineFirst">접속자 우선</option>
           <option value="onlineOnly">접속자만</option>
           <option value="nameAsc">이름 A→Z</option>
@@ -2758,20 +2869,21 @@ async function saveCreate(){
       let arr = Array.from(usersCache.entries()).map(([id,u])=>[id, u || {}]);
 
       if(keyword){
-        arr = arr.filter(([id,u])=>{
-          return `${id} ${u.rank||""} ${u.displayName||""}`.toLowerCase().includes(keyword);
-        });
+        arr = arr.filter(([id,u])=>`${id} ${u.rank||""} ${u.displayName||""}`.toLowerCase().includes(keyword));
       }
 
       const rankOrder = {"군의관":100,"하사":10,"중사":20,"상사":30,"원사":40,"소위":50,"중위":60,"대위":70,"소령":80,"중령":90,"대령":110};
       const getRank = (u)=>rankOrder[String(u.rank||"")] || 0;
+      const getContentCount = (u)=>Number(u.contentCounts?.supply||0)+Number(u.contentCounts?.plant||0)+Number(u.contentCounts?.escort||0);
 
       if(mode==="rankDesc") arr.sort((a,b)=>getRank(b[1]) - getRank(a[1]));
       if(mode==="rankAsc") arr.sort((a,b)=>getRank(a[1]) - getRank(b[1]));
+      if(mode==="onlineTimeDesc") arr.sort((a,b)=>Number(b[1].weekSeconds||0) - Number(a[1].weekSeconds||0));
+      if(mode==="contentCountDesc") arr.sort((a,b)=>getContentCount(b[1]) - getContentCount(a[1]));
       if(mode==="onlineFirst") arr.sort((a,b)=>Number(!!b[1].isOnline) - Number(!!a[1].isOnline) || getRank(b[1]) - getRank(a[1]));
       if(mode==="onlineOnly") arr = arr.filter(([_,u])=>!!u.isOnline);
-      if(mode==="nameAsc") arr.sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
-      if(mode==="nameDesc") arr.sort((a,b)=>String(b[0]).localeCompare(String(a[0])));
+      if(mode==="nameAsc") arr.sort((a,b)=>String(a[0]).localeCompare(String(b[0]),"ko"));
+      if(mode==="nameDesc") arr.sort((a,b)=>String(b[0]).localeCompare(String(a[0]),"ko"));
 
       const total = arr.length;
       const maxPage = Math.max(1, Math.ceil(total / ADMIN_PAGE_SIZE));
@@ -2780,56 +2892,47 @@ async function saveCreate(){
 
       const rankOptsTpl = (val)=>RANKS.map(r=>`<option value="${esc(r)}" ${String(val)===String(r)?"selected":""}>${esc(r)}</option>`).join("");
 
-      wrap.innerHTML = `
-        <div class="adminUserGrid">
-          ${slice.map(([id,u])=>{
-            const admin = u.isAdmin ? "checked" : "";
-            const hidden = u.isHidden ? "checked" : "";
-            const rankOpts = `<option value="">(계급)</option>` + rankOptsTpl(u.rank||"");
-            const status = u.isOnline ? '<span class="adminStatus online">출근중</span>' : '<span class="adminStatus offline">오프라인</span>';
-            const title = `${esc(u.rank||"-")} ${esc(u.displayName || id)}`;
-            const sub = esc(id);
-
-            return `
-              <div class="adminUserCard" data-adm="${esc(id)}">
-                <div class="adminUserTop">
-                  <div class="adminUserIdentity">
-                    <div class="adminUserTitle">${title}</div>
-                    <div class="adminUserSub mono">${sub}</div>
-                  </div>
-                  <div class="adminUserBadges">
-                    ${status}
-                    <span class="adminStatus role">${u.isAdmin ? "관리자" : "일반"}</span>
-                  </div>
-                </div>
-
-                <div class="adminUserMeta">
-                  <div class="adminMetaItem"><span class="k">최근 안내</span><span class="v small">${u.lastCheckIn ? fmt(u.lastCheckIn) : "-"}</span></div>
-                  <div class="adminMetaItem"><span class="k">숨김</span><span class="v small">${u.isHidden ? "예" : "아니오"}</span></div>
-                </div>
-
-                <div class="adminUserControls">
-                  <label class="checkLine"><input type="checkbox" data-admin="${esc(id)}" ${admin}/> 관리자</label>
-                  <label class="checkLine"><input type="checkbox" data-hidden="${esc(id)}" ${hidden}/> 숨김</label>
-                </div>
-
-                <div class="adminUserRow">
-                  <select class="w220" data-rank="${esc(id)}">${rankOpts}</select>
-                  <input class="w220" placeholder="비밀번호 변경" data-pw="${esc(id)}"/>
-                  <button class="pill primary" data-save="${esc(id)}">저장</button>
-                </div>
-
-                <div class="adminUserActions">
-                  <button class="pill" data-forcein="${esc(id)}">강제 출근</button>
-                  <button class="pill" data-forceout="${esc(id)}">강제 퇴근</button>
-                  <button class="pill" data-view7d="${esc(id)}">최근 7일 기록</button>
-                  <button class="pill danger" data-deluser="${esc(id)}">유저 삭제</button>
-                </div>
+      wrap.innerHTML = `<div class="adminUserGrid">
+        ${slice.map(([id,u])=>{
+          const admin = u.isAdmin ? "checked" : "";
+          const hidden = u.isHidden ? "checked" : "";
+          const rankOpts = `<option value="">(계급)</option>` + rankOptsTpl(u.rank||"");
+          const totalContent = getContentCount(u);
+          return `<details class="adminUserCard adminUserAccordion" data-adm="${esc(id)}">
+            <summary class="adminUserSummary">
+              <div class="adminUserIdentity">
+                <div class="adminUserTitle">${esc(u.rank||"-")} ${esc(u.displayName || id)}</div>
+                <div class="adminUserSub mono">${esc(id)}</div>
               </div>
-            `;
-          }).join("")}
-        </div>
-      `;
+              <div class="adminUserBadges">
+                <span class="adminStatus ${u.isOnline ? 'online':'offline'}">${u.isOnline ? '출근중':'오프라인'}</span>
+                <span class="adminStatus role">${u.isAdmin ? "관리자" : "일반"}</span>
+              </div>
+            </summary>
+            <div class="adminUserMeta">
+              <div class="adminMetaItem"><span class="k">최근 출근</span><span class="v small">${u.lastCheckIn ? fmt(u.lastCheckIn) : "-"}</span></div>
+              <div class="adminMetaItem"><span class="k">최근 퇴근</span><span class="v small">${u.lastCheckOut ? fmt(u.lastCheckOut) : "-"}</span></div>
+              <div class="adminMetaItem"><span class="k">최근 7일 출근시간</span><span class="v small">${secsToHMS(Number(u.weekSeconds||0))}</span></div>
+              <div class="adminMetaItem"><span class="k">컨텐츠 누적</span><span class="v small">${totalContent}회</span></div>
+            </div>
+            <div class="adminUserControls">
+              <label class="checkLine"><input type="checkbox" data-admin="${esc(id)}" ${admin}/> 관리자</label>
+              <label class="checkLine"><input type="checkbox" data-hidden="${esc(id)}" ${hidden}/> 숨김</label>
+            </div>
+            <div class="adminUserRow">
+              <select class="w220" data-rank="${esc(id)}">${rankOpts}</select>
+              <input class="w220" placeholder="비밀번호 변경" data-pw="${esc(id)}"/>
+              <button class="pill primary" data-save="${esc(id)}">저장</button>
+            </div>
+            <div class="adminUserActions">
+              <button class="pill" data-forcein="${esc(id)}">강제 출근</button>
+              <button class="pill" data-forceout="${esc(id)}">강제 퇴근</button>
+              <button class="pill" data-view7d="${esc(id)}">최근 7일 기록</button>
+              <button class="pill danger" data-deluser="${esc(id)}">유저 삭제</button>
+            </div>
+          </details>`;
+        }).join("")}
+      </div>`;
 
       if(!slice.length){
         wrap.innerHTML = `<div class="tiny muted">표시할 유저가 없습니다.</div>`;
@@ -2851,26 +2954,31 @@ async function saveCreate(){
       wrap.querySelectorAll("[data-view7d]").forEach(b=>{ b.onclick = ()=>openUserModal(b.getAttribute("data-view7d")); });
     }
 
-    async function adminSaveUser(id){
-      if(!isAdmin()) return;
-      const isA = qs("adminUserCards").querySelector(`input[data-admin="${cssEsc(id)}"]`)?.checked || false;
-      const isH = qs("adminUserCards").querySelector(`input[data-hidden="${cssEsc(id)}"]`)?.checked || false;
-      const rank = qs("adminUserCards").querySelector(`select[data-rank="${cssEsc(id)}"]`)?.value || "";
-      const pwEl = qs("adminUserCards").querySelector(`input[data-pw="${cssEsc(id)}"]`);
-      const pw = (pwEl?.value||"").trim();
-      const updates={ isAdmin:isA, hidden:isH, isHidden:isH, rank };
-      if(pw) updates.password=pw;
-      try{ await updateDoc(doc(db,"users",id), updates); }
-      catch(e){ console.error("[adminSaveUser] update failed", e); toast(`저장 실패: ${e?.code||e?.message||e}`,"bad","관리"); return; }
-      if(pwEl) pwEl.value="";
-      toast("유저 설정이 저장되었습니다.","good","관리"); setStatus("저장 완료");
-      await loadUsersOnce({force:true, reason:"admin"});
-      try{ if(id===currentUser){ currentUserData = normalizeUser(usersCache.get(currentUser)||currentUserData||{}); } }catch(e){}
-      await loadDashKpis();
-      await loadUserTable();
-      await renderAdminUserCards();
-      try{ if(typeof loadWorkPage==="function") await loadWorkPage(0); }catch(e){}
+
+    
+async function adminSaveUser(id){
+      return runLockedAction(`adminSaveUser:${id}`, async ()=>{
+        if(!isAdmin()) return;
+        const root = qs("adminUserCards");
+        const isA = root.querySelector(`input[data-admin="${cssEsc(id)}"]`)?.checked || false;
+        const isH = root.querySelector(`input[data-hidden="${cssEsc(id)}"]`)?.checked || false;
+        const rank = root.querySelector(`select[data-rank="${cssEsc(id)}"]`)?.value || "";
+        const pwEl = root.querySelector(`input[data-pw="${cssEsc(id)}"]`);
+        const pw = (pwEl?.value||"").trim();
+        const updates={ isAdmin:isA, hidden:isH, isHidden:isH, rank };
+        if(pw) updates.password=pw;
+        try{ await updateDoc(doc(db,"users",id), updates); }
+        catch(e){ console.error("[adminSaveUser] update failed", e); toast(`저장 실패: ${e?.code||e?.message||e}`,"bad","관리"); return; }
+        if(pwEl) pwEl.value="";
+        toast("유저 설정이 저장되었습니다.","good","관리"); setStatus("저장 완료");
+        await loadUsersOnce({force:true, reason:"admin"});
+        try{ if(id===currentUser){ currentUserData = normalizeUser(usersCache.get(currentUser)||currentUserData||{}); } }catch(e){}
+        await loadDashKpis();
+        await loadUserTable();
+        await renderAdminUserCards();
+      }, 1500);
     }
+
 
     async function adminSaveLeader(id){ toast("부서장 기능은 제거되었습니다.","warn","관리"); setStatus("부서장 기능 제거됨"); return; }
 
@@ -2983,27 +3091,20 @@ async function maybeShowNoticeOnce(){
     // ---------- ADMIN TABS ----------
     let adminActiveTab = "users";
     
-    function setAdminTab(tab){
-      adminActiveTab = tab;
+    
+function setAdminTab(tab){
+      adminActiveTab = "users";
       document.querySelectorAll("[data-adminsection]").forEach(sec=>{
-        const on = sec.getAttribute("data-adminsection")===tab;
+        const on = sec.getAttribute("data-adminsection")==="users";
         sec.hidden = !on;
       });
       document.querySelectorAll("[data-admintab]").forEach(b=>{
-        b.classList.toggle("active", b.getAttribute("data-admintab")===tab);
+        const isUsers = b.getAttribute("data-admintab")==="users";
+        b.classList.toggle("active", isUsers);
       });
-      if(tab==="users"){ renderAdminUserCards(); }
-      if(tab==="work"){
-        workPage = 0;
-        workCursors = [];
-        loadWorkPage(0);
-      }
-      if(tab==="content"){
-        adminContentPage = 0;
-        adminContentCursors = [];
-        loadAdminContentPage(0);
-      }
+      renderAdminUserCards();
     }
+
 
 
     // work table filter (client-side)
@@ -3160,9 +3261,10 @@ async function maybeShowNoticeOnce(){
 
     
 
+
 async function renderWorkView(){
-      const list = qs("workViewList") || qs("patchedWorkList");
-      const info = qs("workViewInfo") || qs("patchedWorkCount");
+      const list = qs("workViewList");
+      const info = qs("workViewInfo");
       if(!list || !info) return;
       list.innerHTML = `<div class="tiny muted">불러오는 중...</div>`;
       try{
@@ -3189,26 +3291,37 @@ async function renderWorkView(){
               const d2 = r.checkOut && r.checkOut.toDate ? r.checkOut.toDate() : (r.checkOut ? new Date(r.checkOut) : null);
               if(d1 && d2) dur = secsToHMS(Math.max(0, Math.floor((d2.getTime()-d1.getTime())/1000)));
             }catch(_){}
-            return `<div class="event compact">
-              <div class="head">
+            const canManage = isAdmin() || nick===currentUser;
+            return `<div class="recordCard workCard">
+              <div class="recordHead">
                 <span class="badge">${esc(nick)}</span>
                 <span class="spacer"></span>
                 <span class="badge ${r.checkOut ? 'off':'on'}">${r.checkOut ? '퇴근':'출근중'}</span>
               </div>
-              <div class="p">${esc(cin)} ~ ${esc(co)} (${r.checkOut ? dur : cin+' 출근'})</div>
-              <div class="meta">근무시간 ${esc(dur)}</div>
+              <div class="recordMain">${esc(cin)} ~ ${esc(co)} (${r.checkOut ? dur : cin+' 출근'})</div>
+              <div class="recordSub">근무시간 ${esc(dur)}</div>
+              ${canManage?`<div class="recordActions">
+                <button class="pill primary" data-wedit="${r.id}">수정</button>
+                <button class="pill danger" data-wdel="${r.id}">삭제</button>
+                ${isAdmin() && !r.checkOut ? `<button class="pill" data-wforce="${esc(nick)}">강제퇴근</button>` : ``}
+              </div>`:``}
             </div>`;
           }).join("");
-          return `<div class="event dateGroup">
-            <div class="head"><span class="t">${esc(date)}</span></div>
-            <div class="timeline" style="margin-top:10px;">${items}</div>
+          return `<div class="dateBlock">
+            <div class="dateTitle">${esc(date)}</div>
+            <div class="recordStack">${items}</div>
           </div>`;
         }).join("") || `<div class="event"><div class="meta">표시할 근무 기록이 없습니다.</div></div>`;
+
+        list.querySelectorAll("[data-wdel]").forEach(b=>{ b.onclick=()=>adminDeleteWork(b.getAttribute("data-wdel")); });
+        list.querySelectorAll("[data-wforce]").forEach(b=>{ b.onclick=()=>adminForceOut(b.getAttribute("data-wforce")); });
+        list.querySelectorAll("[data-wedit]").forEach(b=>{ b.onclick=()=>openEditWork(b.getAttribute("data-wedit")); });
       }catch(e){
         console.error(e);
         list.innerHTML = `<div class="event"><div class="meta">근무 기록을 불러오지 못했습니다.</div></div>`;
       }
     }
+
 
 
 
@@ -3243,6 +3356,9 @@ function setTab(name){
       document.querySelectorAll("[data-admintab]").forEach(btn=>{
         btn.addEventListener("click", ()=>setAdminTab(btn.getAttribute("data-admintab")));
       });
+      // 관리자 패널에서는 유저 관리만 사용
+      document.querySelectorAll('[data-admintab="work"], [data-admintab="content"]').forEach(el=>el.remove());
+      document.querySelectorAll('[data-adminsection="work"], [data-adminsection="content"]').forEach(el=>el.remove());
       qs("workStatusFilter")?.addEventListener("change", renderWorkTable);
       qs("adminContentType")?.addEventListener("change", ()=>{ adminContentCursors=[]; loadAdminContentPage(0); });
       qs("adminContentPrev")?.addEventListener("click", ()=>loadAdminContentPage(Math.max(0, adminContentPage-1)));
@@ -3295,6 +3411,12 @@ function setTab(name){
       qs("btnCreateSave").addEventListener("click", saveCreate);
       qs("userModalClose")?.addEventListener("click", closeModal);
       qs("backdrop")?.addEventListener("click", closeModal);
+      document.addEventListener("click",(e)=>{
+        const menu=qs("ctxMenu");
+        if(menu && !menu.classList.contains("hidden") && !menu.contains(e.target) && !e.target.closest("[data-ctx]")){
+          hideCtxMenu();
+        }
+      });
 
       qs("editModal").addEventListener("click",(e)=>{ if(e.target.id==="editModal") showModal("editModal", false); });
       qs("btnEditClose").addEventListener("click", ()=>showModal("editModal", false));
@@ -3543,6 +3665,8 @@ function setTab(name){
                   <option value="rankHigh">정렬: 계급 높은순</option>
                   <option value="rankLow">정렬: 계급 낮은순</option>
                   <option value="onlineOnly">정렬: 온라인만</option>
+                  <option value="onlineTimeHigh">정렬: 접속시간 높은순</option>
+                  <option value="contentCountHigh">정렬: 컨텐츠 횟수 많은순</option>
                 </select>
               </div>
               <div class="tableWrap" style="margin-top:10px;">
@@ -3555,9 +3679,8 @@ function setTab(name){
                       <th>마지막</th>
                       <th>주간</th>
                       <th>오늘</th>
-                      <th>보급</th>
-                      <th>송전소</th>
-                      <th>차량</th>
+                      <th>컨텐츠 총합</th>
+                      <th>관리</th>
                     </tr>
                   </thead>
                   <tbody id="userTbody"></tbody>
@@ -3592,9 +3715,7 @@ function setTab(name){
 
           <div class="row" style="margin-top:10px;">
             <button class="pill tab active" data-admintab="users">유저 관리</button>
-            <button class="pill tab" data-admintab="work">근무기록</button>
-            <button class="pill tab" data-admintab="content">컨텐츠 기록</button>
-          </div>
+                      </div>
 
 
           <div class="two" style="margin-top:12px;">
@@ -3618,45 +3739,9 @@ function setTab(name){
               <div id="adminUserCards"></div>
             </div>
 
-            <div class="box" data-adminsection="work" hidden>
-              <div class="row">
-                <b>근무 기록 관리</b>
-                <span class="spacer"></span>
-                <select id="workStatusFilter" class="w220">
-                  <option value="ALL">전체</option>
-                  <option value="ACTIVE">출근중만</option>
-                  <option value="DONE">퇴근완료만</option>
-                </select>
-                <span class="spacer"></span>
-                <button id="btnDelAllWork" class="pill danger">근무 기록 전체삭제</button>
-              </div>
-              <div class="row" style="margin-top:10px;">
-                <button id="btnPrevWork" class="pill">이전</button>
-                <button id="btnNextWork" class="pill">다음</button>
-                <span id="workPageInfo" class="tinyStatus"></span>
-              </div>
-              <div id="adminWorkList" class="timeline" style="margin-top:10px;"></div>
+            <div class="box" data-adminsection="work" hidden></div>
 
-              <div class="row" style="margin-top:10px;">
-                              </div>
-
-              <div class="muted" style="margin-top:10px;">
-                                • 강제출근/강제퇴근은 users 요약필드와 workRecords를 함께 갱신합니다.
-              </div>
-            </div>
-
-            <div class="box" data-adminsection="content" hidden>
-              <div class="row">
-                <b>컨텐츠 기록 관리</b>
-                <span class="spacer"></span>
-                <select id="adminContentType" class="w220">
-                  <option value="ALL">전체</option>
-                  <option value="보급">보급만</option>
-                  <option value="송전소">송전소만</option>
-                  <option value="차량수호">차량수호만</option>
-                </select>
-                <button id="btnDelAllContent" class="pill danger">전체삭제</button>
-              </div>
+            <div class="box" data-adminsection="content" hidden></div>
               <div class="row" style="margin-top:10px;">
                 <button id="adminContentPrev" class="pill">이전</button>
                 <button id="adminContentNext" class="pill">다음</button>
