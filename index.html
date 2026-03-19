@@ -697,6 +697,23 @@ body{
 .timeline .event,.timeline .item{background:#fff;border:1px solid #dce5f3;border-radius:14px;padding:12px;box-shadow:0 4px 12px rgba(33,56,99,.05)}
 @media (max-width:900px){.kpis{grid-template-columns:1fr}}
 
+
+/* OAI UX polish */
+.event.compact{padding:10px 12px}
+.event.dateGroup{background:linear-gradient(180deg,#ffffff,#f9fbff); border:1px solid #d9e4f2}
+.event.dateGroup .head .t{font-size:14px; font-weight:800}
+#adminWorkList .event.compact .p,
+#adminContentList .event.compact .p,
+#workViewList .event.compact .p{font-size:14px; font-weight:700; color:#203044}
+#adminWorkList .event.compact .meta,
+#adminContentList .event.compact .meta,
+#workViewList .event.compact .meta{font-size:12px; color:#66768d}
+.recordSwitch .pill{min-width:120px}
+.bigCount{font-size:13px; color:#55657a; font-weight:700}
+.box[data-adminsection]{padding:16px; border-radius:18px}
+.box[data-adminsection] > .row:first-child{margin-bottom:10px}
+#adminContentList, #adminWorkList{display:flex; flex-direction:column; gap:12px}
+
 </style>
 
   <script type="module">
@@ -1136,52 +1153,108 @@ function ensureWorkTabAndView(){
     }
 
 
+
 async function openUserModal(uid){
       try{
         if(!uid) return;
-        document.getElementById("userModalTitle").textContent = `유저 상세 · ${uid}`;
-        document.getElementById("userModalBody").innerHTML = `<div class="tiny muted">불러오는 중...</div>`;
+        const titleEl = document.getElementById("userModalTitle");
+        const body = document.getElementById("userModalBody");
+        if(!titleEl || !body) return;
+
+        titleEl.textContent = `최근 7일 기록 · ${uid}`;
+        body.innerHTML = `<div class="tiny muted">불러오는 중...</div>`;
         await openModal();
+
         const [w, c] = await Promise.all([loadWork7dOnce(), loadContent7dOnce()]);
         const ws = w.filter(x=>String(x.nickname||x.userId||"")===uid);
         const cs = c.filter(x=>Array.isArray(x.participants) && x.participants.includes(uid));
-        const body = document.getElementById("userModalBody");
-        body.innerHTML = `
-          <div class="bigCount">총 근무 ${ws.length}건 · 총 컨텐츠 ${cs.length}건</div>
-          <div class="recordSwitch">
-            <button id="segWork" class="pill primary active">근무 기록</button>
-            <button id="segContent" class="pill">컨텐츠 기록</button>
-          </div>
-          <div id="segWrap"></div>`;
-        const segWrap = document.getElementById("segWrap");
-        const renderSeg = (mode)=>{
-          document.getElementById("segWork").classList.toggle("active", mode==="work");
-          document.getElementById("segWork").classList.toggle("primary", mode==="work");
-          document.getElementById("segContent").classList.toggle("active", mode==="content");
-          document.getElementById("segContent").classList.toggle("primary", mode==="content");
-          if(mode==="work"){
-            segWrap.innerHTML = ws.length ? ws.map(r=>{
-              const cin = fmt(r.checkIn); const cout = r.checkOut ? fmt(r.checkOut) : "출근중";
-              const cits = r.checkIn?.seconds ? r.checkIn.seconds*1000 : (r.checkIn ? new Date(r.checkIn).getTime() : null);
-              const cots = r.checkOut?.seconds ? r.checkOut.seconds*1000 : (r.checkOut ? new Date(r.checkOut).getTime() : null);
-              const dur = (cits && cots) ? secsToHMS(Math.max(0, Math.floor((cots-cits)/1000))) : (r.checkOut ? "-" : "진행중");
-              return `<div class="item"><div class="itemTop"><div class="itemTitle"><b>근무 기록</b> <span class="tiny muted">${esc(cin)}</span></div><span class="tag">${r.checkOut?'퇴근':'출근중'}</span></div><div class="itemMeta">출근 ${esc(cin)} · 퇴근 ${esc(cout)}</div><div class="p">근무시간: ${esc(dur)}</div></div>`;
-            }).join("") : `<div class="item"><div class="itemMeta">최근 7일 출퇴근 기록이 없습니다.</div></div>`;
-          } else {
-            segWrap.innerHTML = cs.length ? cs.map(r=>{
-              const t = fmt(r.time); const type = r.type || "-"; const wri = r.writer || "-";
-              return `<div class="item"><div class="itemTop"><div class="itemTitle"><b>${esc(type)}</b> <span class="tiny muted">${esc(t)}</span></div><span class="tag">기록</span></div><div class="itemMeta">작성자 ${esc(wri)}</div><div class="p">참여자: ${(Array.isArray(r.participants)?r.participants:[]).map(esc).join(', ')}</div></div>`;
-            }).join("") : `<div class="item"><div class="itemMeta">최근 7일 컨텐츠 참여 기록이 없습니다.</div></div>`;
-          }
-        };
-        document.getElementById("segWork").onclick = ()=>renderSeg("work");
-        document.getElementById("segContent").onclick = ()=>renderSeg("content");
-        renderSeg("work");
+
+        const state = { mode:"work", page:0, size:8 };
+
+        function renderMode(){
+          const source = state.mode==="work" ? ws : cs;
+          const total = source.length;
+          const maxPage = Math.max(1, Math.ceil(total / state.size));
+          state.page = Math.max(0, Math.min(state.page, maxPage - 1));
+          const pageRows = source.slice(state.page * state.size, (state.page + 1) * state.size);
+
+          const grouped = pageRows.reduce((acc,r)=>{
+            const key = fmtDateLabel(state.mode==="work" ? r.checkIn : r.time);
+            if(!acc[key]) acc[key]=[];
+            acc[key].push(r);
+            return acc;
+          }, {});
+          const order = Object.keys(grouped).sort((a,b)=>String(b).localeCompare(String(a),"ko"));
+
+          const blocks = order.map(date=>{
+            const items = grouped[date].map(r=>{
+              if(state.mode==="work"){
+                const cin = fmtTimeOnly(r.checkIn);
+                const co = r.checkOut ? fmtTimeOnly(r.checkOut) : "진행중";
+                let dur = "진행중";
+                try{
+                  const d1 = r.checkIn?.toDate ? r.checkIn.toDate() : (r.checkIn ? new Date(r.checkIn) : null);
+                  const d2 = r.checkOut?.toDate ? r.checkOut.toDate() : (r.checkOut ? new Date(r.checkOut) : null);
+                  if(d1 && d2) dur = secsToHMS(Math.max(0, Math.floor((d2.getTime()-d1.getTime())/1000)));
+                }catch(_){}
+                return `<div class="event compact">
+                  <div class="head">
+                    <span class="badge">근무</span>
+                    <span class="spacer"></span>
+                    <span class="badge ${r.checkOut ? 'off':'on'}">${r.checkOut ? '퇴근':'출근중'}</span>
+                  </div>
+                  <div class="p">${esc(cin)} ~ ${esc(co)} (${r.checkOut ? dur : cin+' 출근'})</div>
+                </div>`;
+              }else{
+                const t = fmtTimeOnly(r.time);
+                const out = needsOutcome(r.type) ? (r.outcome===true?"성공":(r.outcome===false?"실패":"-")) : "기록";
+                return `<div class="event compact">
+                  <div class="head">
+                    <span class="badge">${esc(r.type||"-")}</span>
+                    <span class="badge role">${esc(out)}</span>
+                    <span class="spacer"></span>
+                    <span class="tiny">${esc(t)}</span>
+                  </div>
+                  <div class="p">${esc(t)} · 작성자 ${esc(r.writer||"-")} · 참여 ${Array.isArray(r.participants)?r.participants.length:0}명</div>
+                </div>`;
+              }
+            }).join("");
+            return `<div class="event dateGroup">
+              <div class="head"><span class="t">${esc(date)}</span></div>
+              <div class="timeline" style="margin-top:10px;">${items}</div>
+            </div>`;
+          }).join("") || `<div class="event"><div class="meta">최근 7일 기록이 없습니다.</div></div>`;
+
+          body.innerHTML = `
+            <div class="row" style="margin-bottom:12px; align-items:center;">
+              <div class="bigCount">총 근무 ${ws.length}건 · 총 컨텐츠 ${cs.length}건</div>
+              <span class="spacer"></span>
+              <div class="recordSwitch">
+                <button id="segWork" class="pill ${state.mode==='work'?'primary active':''}">근무 기록</button>
+                <button id="segContent" class="pill ${state.mode==='content'?'primary active':''}">컨텐츠 기록</button>
+              </div>
+            </div>
+            <div class="row" style="margin-bottom:10px;">
+              <button id="userRecPrev" class="pill">이전</button>
+              <button id="userRecNext" class="pill">다음</button>
+              <span class="tinyStatus">${state.page + 1} / ${maxPage}</span>
+            </div>
+            <div class="timeline">${blocks}</div>
+          `;
+
+          document.getElementById("segWork").onclick = ()=>{ state.mode='work'; state.page=0; renderMode(); };
+          document.getElementById("segContent").onclick = ()=>{ state.mode='content'; state.page=0; renderMode(); };
+          document.getElementById("userRecPrev").onclick = ()=>{ state.page=Math.max(0, state.page-1); renderMode(); };
+          document.getElementById("userRecNext").onclick = ()=>{ state.page=Math.min(maxPage-1, state.page+1); renderMode(); };
+        }
+
+        renderMode();
       }catch(e){
         console.error(e);
-        toast("7일간 기록을 불러오지 못했습니다.","bad","유저");
+        toast("7일간 기록을 불러오는 중 오류가 발생했습니다.","bad","유저");
       }
     }
+
 
     // =============================
     // 컨텍스트 메뉴 (관리자 전용)
@@ -1447,6 +1520,28 @@ async function ensureUserDocDefaultsOnce(userId, userData){
         return "-";
       }
     }
+
+    function fmtDateLabel(ts){
+      if(ts==null || ts==="") return "-";
+      try{
+        if(ts && typeof ts.toDate==="function") ts = ts.toDate();
+        const d = ts instanceof Date ? ts : new Date(ts);
+        if(!Number.isFinite(d.getTime())) return "-";
+        const p=(n)=>String(n).padStart(2,"0");
+        return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}`;
+      }catch(_){ return "-"; }
+    }
+    function fmtTimeOnly(ts){
+      if(ts==null || ts==="") return "-";
+      try{
+        if(ts && typeof ts.toDate==="function") ts = ts.toDate();
+        const d = ts instanceof Date ? ts : new Date(ts);
+        if(!Number.isFinite(d.getTime())) return "-";
+        const p=(n)=>String(n).padStart(2,"0");
+        return `${p(d.getHours())}:${p(d.getMinutes())}`;
+      }catch(_){ return "-"; }
+    }
+
     function secsToHMS(sec){
       sec=Math.max(0, Math.floor(sec||0));
       const h=Math.floor(sec/3600);
@@ -2193,41 +2288,63 @@ function renderCreateUsers(){
     }
     
 
+
 async function saveCreate(){
+      if(window.__saveCreateBusy){
+        toast("잠시 후 다시 시도해주세요.","warn","컨텐츠");
+        return;
+      }
       if(!createType) return;
       const parts=Array.from(createSelected).map(s=>s.trim()).filter(Boolean);
       if(parts.length===0) return alert("0명은 저장하지 않습니다.");
+
       let outcome=null;
       if(needsOutcome(createType)){
         const v=qs("cOutcome").value;
-        if(v==="O") outcome=true; else if(v==="X") outcome=false; else outcome=null;
+        if(v==="O") outcome=true;
+        else if(v==="X") outcome=false;
+        else outcome=null;
       }
-      await addDoc(colContent,{
-        type:createType,
-        writer: currentUser,
-        participants: parts,
-        outcome,
-        time: serverTimestamp(),
-        edited: null
-      });
-      const countField = createType==="보급" ? "contentCounts.supply" : (createType==="송전소" ? "contentCounts.plant" : "contentCounts.escort");
-      const lastField  = createType==="보급" ? "contentLast.supply" : (createType==="송전소" ? "contentLast.plant" : "contentLast.escort");
-      const uniq = Array.from(new Set(parts));
-      for(const nick of uniq){
-        await updateDoc(doc(db,"users",nick), {
-          [countField]: increment(1),
-          [lastField]: serverTimestamp(),
-          lastContentAt: serverTimestamp()
-        }).catch(()=>{});
+
+      window.__saveCreateBusy = true;
+      const btn = qs("btnCreateSave");
+      if(btn) btn.disabled = true;
+      try{
+        await addDoc(colContent,{
+          type:createType,
+          writer: currentUser,
+          participants: parts,
+          outcome,
+          time: serverTimestamp(),
+          edited: null
+        });
+
+        const countField = createType==="보급" ? "contentCounts.supply" : (createType==="송전소" ? "contentCounts.plant" : "contentCounts.escort");
+        const lastField  = createType==="보급" ? "contentLast.supply" : (createType==="송전소" ? "contentLast.plant" : "contentLast.escort");
+        const uniq = Array.from(new Set(parts));
+        for(const nick of uniq){
+          await updateDoc(doc(db,"users",nick), {
+            [countField]: increment(1),
+            [lastField]: serverTimestamp(),
+            lastContentAt: serverTimestamp()
+          }).catch(()=>{});
+        }
+
+        showModal("createModal", false);
+        toast("컨텐츠 기록이 등록되었습니다.","good","컨텐츠");
+        setStatus("컨텐츠 기록이 등록되었습니다.");
+        await loadUsersOnce({force:true, reason:"create-content"});
+        await loadContentPage(0);
+        try{ await loadDashKpis(); }catch(_){}
+        try{ await loadUserTable(); }catch(_){}
+      } finally {
+        setTimeout(()=>{
+          window.__saveCreateBusy = false;
+          if(btn) btn.disabled = false;
+        }, 1200);
       }
-      showModal("createModal", false);
-      toast("컨텐츠 기록이 등록되었습니다.","good","컨텐츠");
-      setStatus("컨텐츠 기록이 등록되었습니다.");
-      await loadUsersOnce({force:true, reason:"create-content"});
-      await loadContentPage(0);
-      try{ await loadDashKpis(); }catch(_){ }
-      try{ await loadUserTable(); }catch(_){ }
     }
+
 
     // edit content modal (participants 수정 + outcome 수정, 권한: 작성자 또는 관리자)
     let editId=null, editData=null, editSelected=new Set(), editSearch="";
@@ -2865,6 +2982,7 @@ async function maybeShowNoticeOnce(){
 
     // ---------- ADMIN TABS ----------
     let adminActiveTab = "users";
+    
     function setAdminTab(tab){
       adminActiveTab = tab;
       document.querySelectorAll("[data-adminsection]").forEach(sec=>{
@@ -2875,15 +2993,25 @@ async function maybeShowNoticeOnce(){
         b.classList.toggle("active", b.getAttribute("data-admintab")===tab);
       });
       if(tab==="users"){ renderAdminUserCards(); }
-      if(tab==="work"){ renderWorkTable(); }
-      if(tab==="content"){ loadAdminContentPage(adminContentPage); }
+      if(tab==="work"){
+        workPage = 0;
+        workCursors = [];
+        loadWorkPage(0);
+      }
+      if(tab==="content"){
+        adminContentPage = 0;
+        adminContentCursors = [];
+        loadAdminContentPage(0);
+      }
     }
+
 
     // work table filter (client-side)
     const __renderWorkTable = (typeof window.renderWorkTable==="function") ? window.renderWorkTable : null;
+    
     function renderWorkTable(){
-      const tbody = qs("workTbody");
-      if(!tbody){ if(__renderWorkTable) return __renderWorkTable(); return; }
+      const list = qs("adminWorkList");
+      if(!list){ return; }
       const status = qs("workStatusFilter")?.value || "ALL";
       const rows = workDocs.filter(d=>{
         const r=d.data();
@@ -2892,40 +3020,63 @@ async function maybeShowNoticeOnce(){
         if(status==="DONE") return !active;
         return true;
       });
-      tbody.innerHTML = rows.map(d=>{
+
+      qs("workPageInfo").textContent = `${workPage+1} 페이지`;
+      qs("btnPrevWork").disabled = workPage===0;
+      qs("btnNextWork").disabled = workDocs.length < PAGE_SIZE;
+
+      const grouped = rows.reduce((acc,d)=>{
         const r=d.data();
-        const id=d.id;
-        const name=r.nickname||"-";
-        const ci=fmt(r.checkIn);
-        const co=fmt(r.checkOut);
-        let sec=0;
-        try{
-          if(r.checkIn?.toDate && r.checkOut?.toDate){
-            sec=Math.max(0, Math.floor((r.checkOut.toDate()-r.checkIn.toDate())/1000));
-          }else if(r.checkIn?.toDate && !r.checkOut){
-            sec=Math.max(0, Math.floor((Date.now()-r.checkIn.toDate().getTime())/1000));
-          }
-        }catch(_){}
-        const hms=secsToHMS(sec);
-        const active = !r.checkOut;
-        const st = active?'<span class="badge good">출근중</span>':'<span class="badge">퇴근</span>';
-        const act = isAdmin()?(
-          active ? `<button class="pill danger" data-forceout="${id}">강제퇴근</button>`
-                 : `<button class="pill" disabled>완료</button>`
-        ):"";
-        return `<tr>
-          <td>${esc(name)}</td>
-          <td>${esc(ci)}</td>
-          <td>${esc(co)}</td>
-          <td>${esc(hms)}</td>
-          <td>${st}</td>
-          <td>${act}</td>
-        </tr>`;
-      }).join("");
-      tbody.querySelectorAll("[data-forceout]").forEach(btn=>{
-        btn.onclick = ()=>adminForceCheckOut(btn.getAttribute("data-forceout"));
-      });
+        const key = fmtDateLabel(r.checkIn);
+        if(!acc[key]) acc[key] = [];
+        acc[key].push(d);
+        return acc;
+      }, {});
+
+      const order = Object.keys(grouped).sort((a,b)=>String(b).localeCompare(String(a),"ko"));
+
+      list.innerHTML = order.map(date=>{
+        const items = grouped[date].map(d=>{
+          const r=d.data();
+          const id=d.id;
+          const name=r.nickname||r.userId||"-";
+          const cin=fmtTimeOnly(r.checkIn);
+          const co=r.checkOut ? fmtTimeOnly(r.checkOut) : "진행중";
+          let sec=0;
+          try{
+            const d1 = r.checkIn?.toDate ? r.checkIn.toDate() : (r.checkIn ? new Date(r.checkIn) : null);
+            const d2 = r.checkOut?.toDate ? r.checkOut.toDate() : (r.checkOut ? new Date(r.checkOut) : null);
+            if(d1 && d2) sec=Math.max(0, Math.floor((d2.getTime()-d1.getTime())/1000));
+            else if(d1 && !d2) sec=Math.max(0, Math.floor((Date.now()-d1.getTime())/1000));
+          }catch(_){}
+          const hms=secsToHMS(sec);
+          const active = !r.checkOut;
+          return `<div class="event compact">
+            <div class="head">
+              <span class="badge">${esc(name)}</span>
+              <span class="spacer"></span>
+              <span class="badge ${active?'on':'off'}">${active?'출근중':'퇴근'}</span>
+            </div>
+            <div class="p">${esc(cin)} ~ ${esc(co)} (${active ? esc(cin)+' 출근' : hms})</div>
+            <div class="meta">근무시간 ${esc(hms)}</div>
+            <div class="row" style="margin-top:10px;">
+              <button class="pill" data-wedit="${id}">수정</button>
+              <button class="pill danger" data-wdel="${id}">삭제</button>
+              ${active?`<button class="pill danger" data-wforce="${esc(name)}">강제퇴근</button>`:""}
+            </div>
+          </div>`;
+        }).join("");
+        return `<div class="event dateGroup">
+          <div class="head"><span class="t">${esc(date)}</span></div>
+          <div class="timeline" style="margin-top:10px;">${items}</div>
+        </div>`;
+      }).join("") || `<div class="event"><div class="meta">최근 7일 근무 기록이 없습니다.</div></div>`;
+
+      list.querySelectorAll("[data-wdel]").forEach(b=>{ b.onclick=()=>adminDeleteWork(b.getAttribute("data-wdel")); });
+      list.querySelectorAll("[data-wforce]").forEach(b=>{ b.onclick=()=>adminForceOut(b.getAttribute("data-wforce")); });
+      list.querySelectorAll("[data-wedit]").forEach(b=>{ b.onclick=()=>openEditWork(b.getAttribute("data-wedit")); });
     }
+
 
     // ---------- ADMIN CONTENT (최근 7일) ----------
     async function loadAdminContentPage(page){
@@ -2957,37 +3108,58 @@ async function maybeShowNoticeOnce(){
       }
     }
 
+    
     function renderAdminContentTimeline(){
       const list = qs("adminContentList");
       if(!list) return;
-      list.innerHTML = adminContentDocs.map(d=>{
+
+      const grouped = adminContentDocs.reduce((acc,d)=>{
         const r=d.data();
-        const type = r.type||"-";
-        const out = needsOutcome(type) ? (r.outcome===true?"O":(r.outcome===false?"X":"-")) : "-";
-        const time = fmt(r.time);
-        const writer = r.writer||"-";
-        const parts = Array.isArray(r.participants)?r.participants:[];
-        return `
-          <div class="event">
+        const key = fmtDateLabel(r.time);
+        if(!acc[key]) acc[key] = [];
+        acc[key].push(d);
+        return acc;
+      }, {});
+      const order = Object.keys(grouped).sort((a,b)=>String(b).localeCompare(String(a),"ko"));
+
+      qs("adminContentPageInfo").textContent = `${adminContentPage+1} 페이지`;
+
+      list.innerHTML = order.map(date=>{
+        const items = grouped[date].map(d=>{
+          const r=d.data();
+          const type = r.type||"-";
+          const out = needsOutcome(type) ? (r.outcome===true?"성공":(r.outcome===false?"실패":"-")) : "기록";
+          const time = fmtTimeOnly(r.time);
+          const writer = r.writer||"-";
+          const parts = Array.isArray(r.participants)?r.participants:[];
+          return `<div class="event compact">
             <div class="head">
               <span class="badge">${esc(type)}</span>
-              ${needsOutcome(type)?`<span class="badge">${out}</span>`:""}
+              <span class="badge role">${esc(out)}</span>
               <span class="spacer"></span>
               <span class="tiny">${esc(time)}</span>
             </div>
-            <div class="meta"><b style="font-weight:900;">${esc(writer)}</b></div>
-            <div class="p">참여자: ${renderParticipants(parts, r.edited?.added, r.edited?.removed)}</div>
+            <div class="p">${esc(time)} · ${esc(writer)} 등록 · 참여 ${parts.length}명</div>
+            <div class="meta">${parts.map(esc).join(", ")}</div>
             <div class="row" style="margin-top:10px;">
               <button class="pill" data-edit="${d.id}">수정</button>
               <button class="pill danger" data-del="${d.id}">삭제</button>
             </div>
           </div>`;
-      }).join("");
+        }).join("");
+        return `<div class="event dateGroup">
+          <div class="head"><span class="t">${esc(date)}</span></div>
+          <div class="timeline" style="margin-top:10px;">${items}</div>
+        </div>`;
+      }).join("") || `<div class="event"><div class="meta">최근 7일 컨텐츠 기록이 없습니다.</div></div>`;
+
       list.querySelectorAll("[data-edit]").forEach(b=>b.onclick=()=>openEdit(b.getAttribute("data-edit")));
       list.querySelectorAll("[data-del]").forEach(b=>b.onclick=()=>deleteContent(b.getAttribute("data-del")));
     }
 
+
     
+
 async function renderWorkView(){
       const list = qs("workViewList") || qs("patchedWorkList");
       const info = qs("workViewInfo") || qs("patchedWorkCount");
@@ -2997,32 +3169,47 @@ async function renderWorkView(){
         const rows = await loadWork7dOnce();
         const visible = rows.filter(r => isAdmin() || !(usersCache.get(String(r.nickname||r.userId||""))?.isHidden));
         info.textContent = `최근 7일 근무 기록 ${visible.length}건`;
-        list.innerHTML = visible.map(r=>{
-          const nick = String(r.nickname||r.userId||"-");
-          const ci = fmt(r.checkIn);
-          const co = r.checkOut ? fmt(r.checkOut) : "출근중";
-          let dur = "진행중";
-          try{
-            const cits = r.checkIn?.seconds ? r.checkIn.seconds*1000 : (r.checkIn ? new Date(r.checkIn).getTime() : null);
-            const cots = r.checkOut?.seconds ? r.checkOut.seconds*1000 : (r.checkOut ? new Date(r.checkOut).getTime() : null);
-            if(cits && cots) dur = secsToHMS(Math.max(0, Math.floor((cots-cits)/1000)));
-          }catch(_){ }
-          return `<div class="event">
-            <div class="head">
-              <span class="badge role">${esc(usersCache.get(nick)?.rank || "-")}</span>
-              <span class="badge">${esc(nick)}</span>
-              <span class="spacer"></span>
-              <span class="tiny">${esc(ci)}</span>
-            </div>
-            <div class="meta">출근 ${esc(ci)} · 퇴근 ${esc(co)}</div>
-            <div class="p">근무시간: ${esc(dur)}</div>
+
+        const grouped = visible.reduce((acc,r)=>{
+          const key = fmtDateLabel(r.checkIn);
+          if(!acc[key]) acc[key]=[];
+          acc[key].push(r);
+          return acc;
+        }, {});
+        const order = Object.keys(grouped).sort((a,b)=>String(b).localeCompare(String(a),"ko"));
+
+        list.innerHTML = order.map(date=>{
+          const items = grouped[date].map(r=>{
+            const nick = String(r.nickname||r.userId||"-");
+            const cin = fmtTimeOnly(r.checkIn);
+            const co = r.checkOut ? fmtTimeOnly(r.checkOut) : "진행중";
+            let dur = "진행중";
+            try{
+              const d1 = r.checkIn && r.checkIn.toDate ? r.checkIn.toDate() : (r.checkIn ? new Date(r.checkIn) : null);
+              const d2 = r.checkOut && r.checkOut.toDate ? r.checkOut.toDate() : (r.checkOut ? new Date(r.checkOut) : null);
+              if(d1 && d2) dur = secsToHMS(Math.max(0, Math.floor((d2.getTime()-d1.getTime())/1000)));
+            }catch(_){}
+            return `<div class="event compact">
+              <div class="head">
+                <span class="badge">${esc(nick)}</span>
+                <span class="spacer"></span>
+                <span class="badge ${r.checkOut ? 'off':'on'}">${r.checkOut ? '퇴근':'출근중'}</span>
+              </div>
+              <div class="p">${esc(cin)} ~ ${esc(co)} (${r.checkOut ? dur : cin+' 출근'})</div>
+              <div class="meta">근무시간 ${esc(dur)}</div>
+            </div>`;
+          }).join("");
+          return `<div class="event dateGroup">
+            <div class="head"><span class="t">${esc(date)}</span></div>
+            <div class="timeline" style="margin-top:10px;">${items}</div>
           </div>`;
-        }).join("") || `<div class="event"><div class="itemMeta">최근 7일 근무 기록이 없습니다.</div></div>`;
+        }).join("") || `<div class="event"><div class="meta">표시할 근무 기록이 없습니다.</div></div>`;
       }catch(e){
         console.error(e);
-        list.innerHTML = `<div class="event"><div class="itemMeta">근무 기록을 불러오지 못했습니다.</div></div>`;
+        list.innerHTML = `<div class="event"><div class="meta">근무 기록을 불러오지 못했습니다.</div></div>`;
       }
     }
+
 
 
 
@@ -3106,6 +3293,8 @@ function setTab(name){
       qs("btnOcr").addEventListener("click", runOcrForCreate);
       qs("cOcrFile").addEventListener("change", ()=>{ qs("cOcrResult").textContent=""; });
       qs("btnCreateSave").addEventListener("click", saveCreate);
+      qs("userModalClose")?.addEventListener("click", closeModal);
+      qs("backdrop")?.addEventListener("click", closeModal);
 
       qs("editModal").addEventListener("click",(e)=>{ if(e.target.id==="editModal") showModal("editModal", false); });
       qs("btnEditClose").addEventListener("click", ()=>showModal("editModal", false));
@@ -3145,6 +3334,7 @@ function setTab(name){
       document.addEventListener("keydown",(e)=>{
         if(e.key==="Escape"){
           ["createModal","editModal","workEditModal","noticeModal"].forEach(id=>{ const el=qs(id); if(el) el.hidden=true; });
+          try{ closeModal(); }catch(_){ }
           lockBody(false);
         }
       });
@@ -3445,21 +3635,7 @@ function setTab(name){
                 <button id="btnNextWork" class="pill">다음</button>
                 <span id="workPageInfo" class="tinyStatus"></span>
               </div>
-              <div class="tableWrap" style="margin-top:10px;">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>닉네임</th>
-                      <th>출근</th>
-                      <th>퇴근</th>
-                      <th>시간</th>
-                      <th>상태</th>
-                      <th>조치</th>
-                    </tr>
-                  </thead>
-                  <tbody id="workTbody"></tbody>
-                </table>
-              </div>
+              <div id="adminWorkList" class="timeline" style="margin-top:10px;"></div>
 
               <div class="row" style="margin-top:10px;">
                               </div>
