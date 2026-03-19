@@ -1007,6 +1007,57 @@ let usersPage = 0; // 유저 목록 페이지(10명 단위)
     let work7dLoadedAt=0;
     const CACHE_7D_MS = 60*1000; // 1분 캐시
 
+
+function sevenDaysAgo(){
+  const d = new Date(kstNow().getTime());
+  d.setDate(d.getDate() - 7);
+  d.setHours(0,0,0,0);
+  return d;
+}
+
+function ensureWorkTabAndView(){
+  const tabs = document.querySelector(".tabs");
+  if(tabs && !document.querySelector('.tab[data-tab="work"]')){
+    const btn = document.createElement("button");
+    btn.className = "tab";
+    btn.dataset.tab = "work";
+    btn.textContent = "근무 기록";
+    btn.addEventListener("click", ()=>setTab("work"));
+    tabs.appendChild(btn);
+  }
+
+  if(!document.querySelector('[data-view="work"]')){
+    const grid = document.querySelector(".grid");
+    if(grid){
+      const card = document.createElement("div");
+      card.className = "card";
+      card.dataset.view = "work";
+      card.hidden = true;
+      card.innerHTML = `
+        <div class="row" style="align-items:center; margin-bottom:10px;">
+          <h3 style="margin:2px 0 0 0;">근무 기록 (최근 7일)</h3>
+          <span class="spacer"></span>
+          <button id="btnReloadWorkView" class="pill">갱신</button>
+        </div>
+        <div class="tinyStatus" id="workViewInfo">최근 7일 근무 기록</div>
+        <div id="workViewList" class="timeline" style="margin-top:12px;"></div>
+      `;
+      const adminBackdrop = document.getElementById("adminBackdrop");
+      if(adminBackdrop && adminBackdrop.parentElement === grid){
+        grid.insertBefore(card, adminBackdrop);
+      }else{
+        grid.appendChild(card);
+      }
+    }
+  }
+
+  const reload = qs("btnReloadWorkView");
+  if(reload && !reload.dataset.boundWorkReload){
+    reload.dataset.boundWorkReload = "1";
+    reload.addEventListener("click", ()=>renderWorkView());
+  }
+}
+
     async function loadWork7dOnce(){
       const now=Date.now();
       if(work7dCache && (now-work7dLoadedAt)<CACHE_7D_MS) return work7dCache;
@@ -1435,7 +1486,7 @@ async function login(){
 
         await refreshAll({silent:true});
         await maybeShowNoticeOnce();
-        try{ ensureWorkTabAndView(); }catch(e){ console.warn(e); }
+        try{ ensureWorkTabAndView(); }catch(e){ console.warn("[login] work tab failed", e); }
         toast("로그인되었습니다.","good","로그인");
       }catch(e){
         console.error(e);
@@ -3102,38 +3153,100 @@ function setTab(name){
 
 
 
-// ===== OAI FINAL CLEAN PATCH =====
-const __cooldowns = new Map();
-function withCooldown(key, ms=3000){
-  const now = Date.now();
-  const until = __cooldowns.get(key) || 0;
-  if(now < until){
-    toast("잠시 후 다시 시도해주세요.", "warn", "쿨타임");
-    return false;
-  }
-  __cooldowns.set(key, now + ms);
-  return true;
-}
-document.addEventListener("click", (e)=>{
-  const t = e.target;
-  if(!(t instanceof HTMLElement)) return;
-  const id = t.id || "";
-  const text = (t.textContent||"").trim();
-  const key = id || text;
-  if(!key) return;
-  if(["btnLogin","btnLogout","btnRefresh","btnSummary","btnIn","btnOut","btnAddUser","btnDelAllWork","btnDelAllContent","btnWorkSave","btnEditSave","btnCreateSave"].includes(id)){
-    if(!withCooldown(key, 3000)){
-      e.preventDefault();
-      e.stopImmediatePropagation();
-    }
-  }
-}, true);
-// ===== /OAI FINAL CLEAN PATCH =====
 
 
 
 </script>
   <!-- BUILD_STAMP 2026-02-20 04:12:27 -->
+
+
+<style id="oai-clean-visibility-fix">
+  body{
+    color:#213247 !important;
+    background:linear-gradient(180deg,#eef4ff 0%, #f8fbff 100%) !important;
+  }
+  .topbar{
+    background:rgba(255,255,255,.88) !important;
+    border-color:#dbe4f2 !important;
+  }
+  .card,.box,.modalBox,.modalCard,.adminCol,.admItem,.adminUserCard,
+  .event,.item,.ctxMenu,.miniMenu,.tableWrap,.tableWrap table{
+    background:#ffffff !important;
+    border-color:#dbe4f2 !important;
+    color:#213247 !important;
+  }
+  .title,.mTitle,.itemTitle,.v,.adminUserTitle,.chip b,.badge b{
+    color:#1f2f46 !important;
+  }
+  .subtitle,.muted,.tiny,.tinyStatus,.k,.itemMeta,.event .meta,.adminUserSub{
+    color:#66768d !important;
+  }
+  .tableWrap thead th{
+    background:#f4f8ff !important;
+    color:#304255 !important;
+  }
+  .tableWrap tbody td{
+    color:#243447 !important;
+    background:#ffffff !important;
+  }
+  .tableWrap tbody tr:hover td{
+    background:#f8fbff !important;
+  }
+  .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px !important}
+  .kpi{
+    background:linear-gradient(180deg,#ffffff,#f6f9ff) !important;
+    border:1px solid #dce5f3 !important;
+    border-radius:18px !important;
+    padding:16px !important;
+    box-shadow:0 8px 20px rgba(33,56,99,.08) !important;
+  }
+  .kpi .k{font-size:12px;color:#6a7991 !important;margin-bottom:8px}
+  .kpi .v{font-size:22px;font-weight:800;color:#1f2f46 !important}
+  .tabs{
+    background:#eef3fb !important;
+    border:1px solid #dbe4f2 !important;
+  }
+  .tab{color:#2b3b50 !important}
+  .tab.active,.pill.primary{
+    background:linear-gradient(180deg,#5f8bff,#3f6fff) !important;
+    color:#fff !important;
+    border-color:#3f6fff !important;
+  }
+  .pill{
+    background:#fff !important;
+    color:#213247 !important;
+    border-color:#cfd9e7 !important;
+    min-height:40px !important;
+  }
+  .pill.danger{
+    background:linear-gradient(180deg,#f26b74,#df4d57) !important;
+    color:#fff !important;
+    border-color:#df4d57 !important;
+  }
+  .chip,.badge,.tag{
+    color:#213247 !important;
+    border-color:#d4ddea !important;
+    background:#f7faff !important;
+  }
+  .badge.on,.adminStatus.online{color:#137946 !important;background:#eafff1 !important;border-color:#bfeacd !important}
+  .badge.off,.adminStatus.offline{color:#5e6e83 !important;background:#eef3f8 !important;border-color:#d8e1ec !important}
+  .badge.role,.adminStatus.role{color:#6b4db2 !important;background:#f4eeff !important;border-color:#ddd1ff !important}
+  input,select,textarea{
+    color:#213247 !important;
+    background:#ffffff !important;
+    border-color:#cfd9e7 !important;
+  }
+  input::placeholder,textarea::placeholder{color:#8a98ac !important}
+  #status{
+    color:#213247 !important;
+    background:#fff !important;
+    border:1px solid #dbe4f2 !important;
+    border-radius:999px !important;
+    padding:8px 12px !important;
+  }
+  @media (max-width:900px){ .kpis{grid-template-columns:1fr !important} }
+</style>
+
 </head>
 
 <body>
@@ -3603,19 +3716,116 @@ document.addEventListener("click", (e)=>{
 
 
 
-<script id="oai-startup-clean-fix">
+
+<script id="oai-clean-runtime-fix">
 document.addEventListener("DOMContentLoaded", ()=>{
-  try{ ensureWorkTabAndView(); }catch(e){ console.error(e); }
-  document.addEventListener("click", (e)=>{
-    if(!(e.target instanceof HTMLElement)) return;
-    if(!e.target.closest(".miniMenu") && !e.target.closest("[data-menu-open]")){
-      document.querySelectorAll(".miniMenu.show").forEach(m=>m.classList.remove("show"));
+  const qs = (id)=>document.getElementById(id);
+
+  // keep notice feature inert so login never fails on removed dept logic
+  try{
+    if(typeof maybeShowNoticeOnce === "function"){
+      window.maybeShowNoticeOnce = async function(){ return; };
     }
-  });
-  const btnRefresh=document.getElementById("btnRefresh");
-  if(btnRefresh && !btnRefresh.dataset.workFix){
-    btnRefresh.dataset.workFix="1";
-    btnRefresh.addEventListener("click", ()=>{ try{ renderWorkView(); }catch(_){} });
+  }catch(_){}
+
+  // make work tab/view exist exactly once
+  try{
+    if(typeof ensureWorkTabAndView === "function"){
+      ensureWorkTabAndView();
+    }
+  }catch(e){
+    console.warn("[oai-clean-runtime-fix] ensureWorkTabAndView failed", e);
+  }
+
+  // safer tab clicks
+  try{
+    document.querySelectorAll(".tab[data-tab='content']").forEach(btn=>{
+      if(btn.dataset.oaiBound) return;
+      btn.dataset.oaiBound = "1";
+      btn.addEventListener("click", ()=>{
+        try{
+          if(typeof loadContentPage === "function") loadContentPage(0);
+        }catch(e){
+          console.warn("[content tab reload failed]", e);
+        }
+      });
+    });
+    document.querySelectorAll(".tab[data-tab='work']").forEach(btn=>{
+      if(btn.dataset.oaiBoundWork) return;
+      btn.dataset.oaiBoundWork = "1";
+      btn.addEventListener("click", ()=>{
+        try{
+          if(typeof renderWorkView === "function") renderWorkView();
+        }catch(e){
+          console.warn("[work tab reload failed]", e);
+        }
+      });
+    });
+  }catch(_){}
+
+  // safer page buttons
+  try{
+    const prev = qs("userPrev");
+    const next = qs("userNext");
+    if(prev && !prev.dataset.oaiBound){
+      prev.dataset.oaiBound = "1";
+      prev.addEventListener("click", ()=>{ try{ if(typeof loadUserTable==="function") loadUserTable(); }catch(_){} });
+    }
+    if(next && !next.dataset.oaiBound){
+      next.dataset.oaiBound = "1";
+      next.addEventListener("click", ()=>{ try{ if(typeof loadUserTable==="function") loadUserTable(); }catch(_){} });
+    }
+  }catch(_){}
+
+  // stronger refresh wrappers, once
+  try{
+    if(typeof refreshAll === "function" && !refreshAll.__oaiWrapped){
+      const oldRefreshAll = refreshAll;
+      window.refreshAll = async function(opts={}){
+        try{ await oldRefreshAll.call(this, opts); }catch(e){ console.error(e); }
+        try{ if(typeof loadDashKpis === "function") await loadDashKpis(); }catch(e){ console.warn("[refreshAll] kpi failed", e); }
+        try{ if(typeof loadUserTable === "function") await loadUserTable(); }catch(e){ console.warn("[refreshAll] userTable failed", e); }
+        try{ if(typeof ensureWorkTabAndView === "function") ensureWorkTabAndView(); }catch(e){ console.warn("[refreshAll] worktab failed", e); }
+      };
+      window.refreshAll.__oaiWrapped = true;
+    }
+
+    if(typeof refreshSummary === "function" && !refreshSummary.__oaiWrapped){
+      const oldRefreshSummary = refreshSummary;
+      window.refreshSummary = async function(opts={}){
+        try{ await oldRefreshSummary.call(this, opts); }catch(e){ console.error(e); }
+        try{ if(typeof loadDashKpis === "function") await loadDashKpis(); }catch(e){ console.warn("[refreshSummary] kpi failed", e); }
+        try{ if(typeof loadUserTable === "function") await loadUserTable(); }catch(e){ console.warn("[refreshSummary] userTable failed", e); }
+      };
+      window.refreshSummary.__oaiWrapped = true;
+    }
+  }catch(e){
+    console.warn("[oai-clean-runtime-fix] refresh wrapper failed", e);
+  }
+
+  // content create feedback normalization
+  try{
+    if(typeof saveCreate === "function" && !saveCreate.__oaiWrapped){
+      const oldSaveCreate = saveCreate;
+      window.saveCreate = async function(...args){
+        const result = await oldSaveCreate.apply(this, args);
+        try{
+          if(typeof toast === "function") toast("컨텐츠 기록이 등록되었습니다.","good","컨텐츠");
+        }catch(_){}
+        try{
+          if(typeof setStatus === "function") setStatus("컨텐츠 기록이 등록되었습니다.");
+        }catch(_){}
+        try{
+          if(typeof loadDashKpis === "function") await loadDashKpis();
+          if(typeof loadUserTable === "function") await loadUserTable();
+          if(typeof loadContentPage === "function") await loadContentPage(0);
+        }catch(_){}
+        return result;
+      };
+      window.saveCreate.__oaiWrapped = true;
+    }
+  }catch(e){
+    console.warn("[oai-clean-runtime-fix] saveCreate wrapper failed", e);
   }
 });
 </script>
