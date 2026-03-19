@@ -3343,124 +3343,123 @@ function setTab(name){
     }
 
     window.addEventListener("DOMContentLoaded", async ()=>{
-      await seedDefaultAdmin();
-      // 초기 로드시 관리자 패널이 자동으로 열리지 않도록 항상 닫힘 상태로 시작합니다.
-      try{ closeAdminPanel(); }catch(e){}
+  await seedDefaultAdmin();
+  try{ closeAdminPanel(); }catch(e){}
 
-      qs("btnLogin").addEventListener("click", login);
-      qs("btnLogout").addEventListener("click", logout);
+  const on = (id, ev, fn)=>{
+    const el = qs(id);
+    if(el) el.addEventListener(ev, fn);
+  };
 
-      qs("btnAdminClose")?.addEventListener("click", closeAdminPanel);
+  on("btnLogin","click", login);
+  on("btnLogout","click", logout);
+  on("btnAdminClose","click", closeAdminPanel);
 
-      // admin tabs
-      document.querySelectorAll("[data-admintab]").forEach(btn=>{
-        btn.addEventListener("click", ()=>setAdminTab(btn.getAttribute("data-admintab")));
-      });
-      // 관리자 패널에서는 유저 관리만 사용
-      document.querySelectorAll('[data-admintab="work"], [data-admintab="content"]').forEach(el=>el.remove());
-      document.querySelectorAll('[data-adminsection="work"], [data-adminsection="content"]').forEach(el=>el.remove());
-      qs("workStatusFilter")?.addEventListener("change", renderWorkTable);
-      qs("adminContentType")?.addEventListener("change", ()=>{ adminContentCursors=[]; loadAdminContentPage(0); });
-      qs("adminContentPrev")?.addEventListener("click", ()=>loadAdminContentPage(Math.max(0, adminContentPage-1)));
-      qs("adminContentNext")?.addEventListener("click", ()=>loadAdminContentPage(adminContentPage+1));
-      qs("adminBackdrop")?.addEventListener("click", closeAdminPanel);
-      qs("btnProfileClose")?.addEventListener("click", ()=>showModal("profileModal", false));
-      document.addEventListener("keydown", (e)=>{
-        if(e.key==="Escape"){
-          try{ closeAdminPanel(); }catch(_){ }
-          try{ showModal("createModal", false); }catch(_){ }
-        }
-      });
+  // admin tabs
+  document.querySelectorAll("[data-admintab]").forEach(btn=>{
+    btn.addEventListener("click", ()=>setAdminTab(btn.getAttribute("data-admintab")));
+  });
+  // 관리자 패널에서는 유저 관리만 사용
+  document.querySelectorAll('[data-admintab="work"], [data-admintab="content"]').forEach(el=>el.remove());
+  document.querySelectorAll('[data-adminsection="work"], [data-adminsection="content"]').forEach(el=>el.remove());
 
-      qs("btnSummary").addEventListener("click", ()=>refreshSummary({silent:false}));
+  on("workStatusFilter","change", renderWorkTable);
+  on("adminContentType","change", ()=>{ adminContentCursors=[]; loadAdminContentPage(0); });
+  on("adminContentPrev","click", ()=>loadAdminContentPage(Math.max(0, adminContentPage-1)));
+  on("adminContentNext","click", ()=>loadAdminContentPage(adminContentPage+1));
+  on("adminBackdrop","click", closeAdminPanel);
+  on("btnProfileClose","click", ()=>showModal("profileModal", false));
 
-      qs("btnRefresh").addEventListener("click", ()=>refreshAll({silent:false}));
+  document.addEventListener("keydown", (e)=>{
+    if(e.key==="Escape"){
+      try{ closeAdminPanel(); }catch(_){}
+      try{ showModal("createModal", false); }catch(_){}
+      try{ closeModal(); }catch(_){}
+      lockBody(false);
+    }
+  });
 
-      qs("btnIn").addEventListener("click", checkIn);
-      qs("btnOut").addEventListener("click", checkOut);
+  on("btnSummary","click", ()=>refreshSummary({silent:false}));
+  on("btnRefresh","click", ()=>refreshAll({silent:false}));
+  on("btnIn","click", checkIn);
+  on("btnOut","click", checkOut);
 
-      // create
-      qs("btnCreateSupply").addEventListener("click", ()=>openCreate("보급"));
-      qs("btnCreatePlant").addEventListener("click", ()=>openCreate("송전소"));
-      qs("btnCreateEscort").addEventListener("click", ()=>openCreate("차량수호"));
+  // create
+  on("btnCreateSupply","click", ()=>openCreate("보급"));
+  on("btnCreatePlant","click", ()=>openCreate("송전소"));
+  on("btnCreateEscort","click", ()=>openCreate("차량수호"));
 
-      qs("btnReloadWorkView")?.addEventListener("click", ()=>renderWorkView());
-      qs("contentFilter").addEventListener("change", async function(){
-        contentFilter=qs("contentFilter").value;
-        contentPage=0;
-        contentPageCursors=[];
-        await loadContentPage(0);
-      });
-      qs("btnPrevContent").addEventListener("click", ()=>loadContentPage(Math.max(0, contentPage-1)));
-      qs("btnNextContent").addEventListener("click", ()=>loadContentPage(contentPage+1));
+  on("btnReloadWorkView","click", ()=>renderWorkView());
+  on("contentFilter","change", async ()=>{
+    contentFilter = qs("contentFilter")?.value || "ALL";
+    contentPage = 0;
+    contentPageCursors = [];
+    await loadContentPage(0);
+  });
+  on("btnPrevContent","click", ()=>loadContentPage(Math.max(0, contentPage-1)));
+  on("btnNextContent","click", ()=>loadContentPage(contentPage+1));
 
-      qs("sortUsers").addEventListener("change", ()=>{ usersPage=0; loadUserTable(); });
+  on("sortUsers","change", ()=>{ usersPage=0; loadUserTable(); });
+  on("userPrev","click", ()=>{ usersPage=Math.max(0, usersPage-1); loadUserTable(); });
+  on("userNext","click", ()=>{ usersPage=usersPage+1; loadUserTable(); });
 
-      qs("userPrev").addEventListener("click", ()=>{ usersPage=Math.max(0, usersPage-1); loadUserTable(); });
-      qs("userNext").addEventListener("click", ()=>{ usersPage=usersPage+1; loadUserTable(); });
+  // modals
+  on("createModal","click",(e)=>{ if(e.target.id==="createModal") showModal("createModal", false); });
+  on("btnCreateClose","click", ()=>showModal("createModal", false));
+  on("btnCreateCancel","click", ()=>showModal("createModal", false));
+  on("btnCreateAll","click", createSelectAll);
+  on("btnCreateClear","click", createClearAll);
+  on("cSearch","input", ()=>{ createSearch=qs("cSearch")?.value.trim() || ""; renderCreateUsers(); });
+  on("btnOcr","click", runOcrForCreate);
+  on("cOcrFile","change", ()=>{ const r=qs("cOcrResult"); if(r) r.textContent=""; });
+  on("btnCreateSave","click", saveCreate);
+  on("userModalClose","click", closeModal);
+  on("backdrop","click", closeModal);
 
-      // modals
-      qs("createModal").addEventListener("click",(e)=>{ if(e.target.id==="createModal") showModal("createModal", false); });
-      qs("btnCreateClose").addEventListener("click", ()=>showModal("createModal", false));
-      qs("btnCreateCancel").addEventListener("click", ()=>showModal("createModal", false));
-      qs("btnCreateAll").addEventListener("click", createSelectAll);
-      qs("btnCreateClear").addEventListener("click", createClearAll);
-      qs("cSearch").addEventListener("input", ()=>{ createSearch=qs("cSearch").value.trim(); renderCreateUsers(); });
-      qs("btnOcr").addEventListener("click", runOcrForCreate);
-      qs("cOcrFile").addEventListener("change", ()=>{ qs("cOcrResult").textContent=""; });
-      qs("btnCreateSave").addEventListener("click", saveCreate);
-      qs("userModalClose")?.addEventListener("click", closeModal);
-      qs("backdrop")?.addEventListener("click", closeModal);
-      document.addEventListener("click",(e)=>{
-        const menu=qs("ctxMenu");
-        if(menu && !menu.classList.contains("hidden") && !menu.contains(e.target) && !e.target.closest("[data-ctx]")){
-          hideCtxMenu();
-        }
-      });
+  document.addEventListener("click",(e)=>{
+    const menu=qs("ctxMenu");
+    if(menu && !menu.classList.contains("hidden") && !menu.contains(e.target) && !e.target.closest("[data-ctx]")){
+      hideCtxMenu();
+    }
+  });
 
-      qs("editModal").addEventListener("click",(e)=>{ if(e.target.id==="editModal") showModal("editModal", false); });
-      qs("btnEditClose").addEventListener("click", ()=>showModal("editModal", false));
-      qs("btnEditCancel").addEventListener("click", ()=>showModal("editModal", false));
-      qs("btnEditAll").addEventListener("click", editSelectAll);
-      qs("btnEditClear").addEventListener("click", editClearAll);
-      qs("eSearch").addEventListener("input", ()=>{ editSearch=qs("eSearch").value.trim(); renderEditUsers(); });
-      qs("btnEditSave").addEventListener("click", saveEdit);
+  on("editModal","click",(e)=>{ if(e.target.id==="editModal") showModal("editModal", false); });
+  on("btnEditClose","click", ()=>showModal("editModal", false));
+  on("btnEditCancel","click", ()=>showModal("editModal", false));
+  on("btnEditAll","click", editSelectAll);
+  on("btnEditClear","click", editClearAll);
+  on("eSearch","input", ()=>{ editSearch=qs("eSearch")?.value.trim() || ""; renderEditUsers(); });
+  on("btnEditSave","click", saveEdit);
 
-      qs("workEditModal").addEventListener("click",(e)=>{ if(e.target.id==="workEditModal") showModal("workEditModal", false); });
-      qs("btnWorkClose").addEventListener("click", ()=>showModal("workEditModal", false));
-      qs("btnWorkCancel").addEventListener("click", ()=>showModal("workEditModal", false));
-      qs("btnWorkSave").addEventListener("click", saveEditWork);
+  on("workEditModal","click",(e)=>{ if(e.target.id==="workEditModal") showModal("workEditModal", false); });
+  on("btnWorkClose","click", ()=>showModal("workEditModal", false));
+  on("btnWorkCancel","click", ()=>showModal("workEditModal", false));
+  on("btnWorkSave","click", saveEditWork);
 
-      // admin
-      qs("btnAdmin").addEventListener("click", toggleAdminPanel);
-      qs("adminSearch").addEventListener("input", renderAdminUserCards);
-      qs("btnAddUser").addEventListener("click", adminAddUser);
+  // admin
+  on("btnAdmin","click", toggleAdminPanel);
+  on("adminSearch","input", renderAdminUserCards);
+  on("btnAddUser","click", adminAddUser);
 
-      qs("btnPrevWork").addEventListener("click", ()=>loadWorkPage(Math.max(0, workPage-1)));
-      qs("btnNextWork").addEventListener("click", ()=>loadWorkPage(workPage+1));
-      qs("btnDelAllWork").addEventListener("click", adminDeleteAllWork);
-      qs("btnDelAllContent").addEventListener("click", adminDeleteAllContent);
-      
-      // tabs
-      document.querySelectorAll(".tab").forEach(t=>{
-        t.addEventListener("click", ()=>setTab(t.dataset.tab));
-      });
+  // removed admin work/content section buttons are optional
+  on("btnPrevWork","click", ()=>loadWorkPage(Math.max(0, workPage-1)));
+  on("btnNextWork","click", ()=>loadWorkPage(workPage+1));
+  on("btnDelAllWork","click", adminDeleteAllWork);
+  on("btnDelAllContent","click", adminDeleteAllContent);
 
-      // default tab
-      setTab("dashboard");
-      document.querySelectorAll('.tab[data-tab="chat"], [data-tab="chat"], [data-view="chat"]').forEach(el=>{ try{ el.remove(); }catch(_){} });
-      ["btnSendChat","btnPostNotice","btnResetTotals"].forEach(id=>{ const el=qs(id); if(el) try{el.remove();}catch(_){} });
-      document.querySelectorAll("th,td,.tiny,.muted,.badge").forEach(el=>{ const t=(el.textContent||"").trim(); if(t==="부서"||t.includes("부서장")||t.includes("부서 소통")) try{ (el.closest("tr")||el).remove(); }catch(_){} });
+  // tabs
+  document.querySelectorAll(".tab").forEach(t=>{
+    t.addEventListener("click", ()=>setTab(t.dataset.tab));
+  });
 
-      // esc close modals
-      document.addEventListener("keydown",(e)=>{
-        if(e.key==="Escape"){
-          ["createModal","editModal","workEditModal","noticeModal"].forEach(id=>{ const el=qs(id); if(el) el.hidden=true; });
-          try{ closeModal(); }catch(_){ }
-          lockBody(false);
-        }
-      });
-    });
+  setTab("dashboard");
+  document.querySelectorAll('.tab[data-tab="chat"], [data-tab="chat"], [data-view="chat"]').forEach(el=>{ try{ el.remove(); }catch(_){} });
+  ["btnSendChat","btnPostNotice","btnResetTotals"].forEach(id=>{ const el=qs(id); if(el) try{el.remove();}catch(_){} });
+  document.querySelectorAll("th,td,.tiny,.muted,.badge").forEach(el=>{
+    const t=(el.textContent||"").trim();
+    if(t==="부서"||t.includes("부서장")||t.includes("부서 소통")) try{ (el.closest("tr")||el).remove(); }catch(_){}
+  });
+});
   
 
 
@@ -3557,6 +3556,33 @@ function setTab(name){
     padding:8px 12px !important;
   }
   @media (max-width:900px){ .kpis{grid-template-columns:1fr !important} }
+</style>
+
+
+<style id="oai-menu-fix">
+  .ctxMenu{
+    background:#ffffff !important;
+    border:1px solid #dbe4f2 !important;
+    box-shadow:0 16px 34px rgba(33,56,99,.14) !important;
+  }
+  .ctxMenu button{
+    color:#213247 !important;
+    background:#ffffff !important;
+    border-bottom:1px solid #e5edf8 !important;
+    font-weight:800 !important;
+  }
+  .ctxMenu button:hover{
+    background:#f5f9ff !important;
+  }
+  .ctxMenu button.danger{
+    color:#cf3342 !important;
+  }
+  .moreBtn{
+    color:#213247 !important;
+    background:#ffffff !important;
+    border:1px solid #cfd9e7 !important;
+    font-weight:900 !important;
+  }
 </style>
 
 </head>
@@ -3977,119 +4003,6 @@ function setTab(name){
 
 
 
-
-<script id="oai-clean-runtime-fix">
-document.addEventListener("DOMContentLoaded", ()=>{
-  const qs = (id)=>document.getElementById(id);
-
-  // keep notice feature inert so login never fails on removed dept logic
-  try{
-    if(typeof maybeShowNoticeOnce === "function"){
-      window.maybeShowNoticeOnce = async function(){ return; };
-    }
-  }catch(_){}
-
-  // make work tab/view exist exactly once
-  try{
-    if(typeof ensureWorkTabAndView === "function"){
-      ensureWorkTabAndView();
-    }
-  }catch(e){
-    console.warn("[oai-clean-runtime-fix] ensureWorkTabAndView failed", e);
-  }
-
-  // safer tab clicks
-  try{
-    document.querySelectorAll(".tab[data-tab='content']").forEach(btn=>{
-      if(btn.dataset.oaiBound) return;
-      btn.dataset.oaiBound = "1";
-      btn.addEventListener("click", ()=>{
-        try{
-          if(typeof loadContentPage === "function") loadContentPage(0);
-        }catch(e){
-          console.warn("[content tab reload failed]", e);
-        }
-      });
-    });
-    document.querySelectorAll(".tab[data-tab='work']").forEach(btn=>{
-      if(btn.dataset.oaiBoundWork) return;
-      btn.dataset.oaiBoundWork = "1";
-      btn.addEventListener("click", ()=>{
-        try{
-          if(typeof renderWorkView === "function") renderWorkView();
-        }catch(e){
-          console.warn("[work tab reload failed]", e);
-        }
-      });
-    });
-  }catch(_){}
-
-  // safer page buttons
-  try{
-    const prev = qs("userPrev");
-    const next = qs("userNext");
-    if(prev && !prev.dataset.oaiBound){
-      prev.dataset.oaiBound = "1";
-      prev.addEventListener("click", ()=>{ try{ if(typeof loadUserTable==="function") loadUserTable(); }catch(_){} });
-    }
-    if(next && !next.dataset.oaiBound){
-      next.dataset.oaiBound = "1";
-      next.addEventListener("click", ()=>{ try{ if(typeof loadUserTable==="function") loadUserTable(); }catch(_){} });
-    }
-  }catch(_){}
-
-  // stronger refresh wrappers, once
-  try{
-    if(typeof refreshAll === "function" && !refreshAll.__oaiWrapped){
-      const oldRefreshAll = refreshAll;
-      window.refreshAll = async function(opts={}){
-        try{ await oldRefreshAll.call(this, opts); }catch(e){ console.error(e); }
-        try{ if(typeof loadDashKpis === "function") await loadDashKpis(); }catch(e){ console.warn("[refreshAll] kpi failed", e); }
-        try{ if(typeof loadUserTable === "function") await loadUserTable(); }catch(e){ console.warn("[refreshAll] userTable failed", e); }
-        try{ if(typeof ensureWorkTabAndView === "function") ensureWorkTabAndView(); }catch(e){ console.warn("[refreshAll] worktab failed", e); }
-      };
-      window.refreshAll.__oaiWrapped = true;
-    }
-
-    if(typeof refreshSummary === "function" && !refreshSummary.__oaiWrapped){
-      const oldRefreshSummary = refreshSummary;
-      window.refreshSummary = async function(opts={}){
-        try{ await oldRefreshSummary.call(this, opts); }catch(e){ console.error(e); }
-        try{ if(typeof loadDashKpis === "function") await loadDashKpis(); }catch(e){ console.warn("[refreshSummary] kpi failed", e); }
-        try{ if(typeof loadUserTable === "function") await loadUserTable(); }catch(e){ console.warn("[refreshSummary] userTable failed", e); }
-      };
-      window.refreshSummary.__oaiWrapped = true;
-    }
-  }catch(e){
-    console.warn("[oai-clean-runtime-fix] refresh wrapper failed", e);
-  }
-
-  // content create feedback normalization
-  try{
-    if(typeof saveCreate === "function" && !saveCreate.__oaiWrapped){
-      const oldSaveCreate = saveCreate;
-      window.saveCreate = async function(...args){
-        const result = await oldSaveCreate.apply(this, args);
-        try{
-          if(typeof toast === "function") toast("컨텐츠 기록이 등록되었습니다.","good","컨텐츠");
-        }catch(_){}
-        try{
-          if(typeof setStatus === "function") setStatus("컨텐츠 기록이 등록되었습니다.");
-        }catch(_){}
-        try{
-          if(typeof loadDashKpis === "function") await loadDashKpis();
-          if(typeof loadUserTable === "function") await loadUserTable();
-          if(typeof loadContentPage === "function") await loadContentPage(0);
-        }catch(_){}
-        return result;
-      };
-      window.saveCreate.__oaiWrapped = true;
-    }
-  }catch(e){
-    console.warn("[oai-clean-runtime-fix] saveCreate wrapper failed", e);
-  }
-});
-</script>
 
 </body>
 </html>
